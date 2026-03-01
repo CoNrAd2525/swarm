@@ -1,0 +1,121 @@
+[33ma8bba59d0d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{0}: commit: feat: real data settlement processing via CSV (NO SIMULATIONS)
+[33m14bcfccf42[m HEAD@{1}: commit: feat: Add multi-rail settlement and improve gitignore
+[33m5e98496ce3[m HEAD@{2}: cherry-pick: Update website content for deployment
+[33m4e3d6b349d[m[33m ([m[1;32mtemp-deploy[m[33m)[m HEAD@{3}: checkout: moving from deploy-1770839620213 to main
+[33m1f445f0bd1[m[33m ([m[1;32mdeploy-1770839620213[m[33m)[m HEAD@{4}: commit: Update website content for deployment
+[33m4e3d6b349d[m[33m ([m[1;32mtemp-deploy[m[33m)[m HEAD@{5}: checkout: moving from temp-deploy to deploy-1770839620213
+[33m4e3d6b349d[m[33m ([m[1;32mtemp-deploy[m[33m)[m HEAD@{6}: checkout: moving from main to temp-deploy
+[33m4e3d6b349d[m[33m ([m[1;32mtemp-deploy[m[33m)[m HEAD@{7}: commit: UP
+[33mbb3b44f290[m HEAD@{8}: commit: up
+[33m989276b315[m HEAD@{9}: commit: iiii
+[33ma93ac80c88[m HEAD@{10}: commit: Owner routing: enable bank_transfer, add payoneer_standard fallback; update env example; add security/retention policies
+[33m6b4ad29272[m HEAD@{11}: commit: Deploy catalogue static artifact; prefer full illustrated PDF; update sync script; add dependencies; trigger Pages workflow
+[33m2c00800c77[m HEAD@{12}: commit: chore(scheduler): sync catalogue into static; ensure deploy pages carries PDF
+[33md7cb89a63d[m HEAD@{13}: commit: chore(changelog): add 2026-02-01 entries; workflows: org broadcast & autonomous truth marker; env loaders
+[33m95d10c17b0[m HEAD@{14}: commit: upp
+[33m325126c56e[m HEAD@{15}: commit: feat(paypal): autonomous per-payer link generator + CLI; fix submodule gitlinks
+[33m4c74874515[m HEAD@{16}: commit: Settlement delivery: generate per-payer PayPal links and CSV; fallback to invoices; add bunker kill-switch to PayPal order creation
+[33m13863e65c1[m HEAD@{17}: commit: chore: trigger deploy [no-op]
+[33me5396d3b07[m HEAD@{18}: commit: upyago
+[33m6e5ea7cd74[m HEAD@{19}: commit: Update package.json
+[33mc1b20b547c[m HEAD@{20}: commit: upyourz
+[33m527c4887b2[m HEAD@{21}: checkout: moving from fix-vercel-build-output to main
+[33m9a36ecd984[m[33m ([m[1;32mfix-vercel-build-output[m[33m)[m HEAD@{22}: commit: up-sy daisy
+[33m1443d6ff92[m HEAD@{23}: commit: up
+[33ma4dded2fa7[m HEAD@{24}: commit: push people around
+[33m2fba935418[m HEAD@{25}: cherry-pick: chore(vercel): add Build Output generator and hook; fix(deploy): cross-workspace script runner & CREDS fallback
+[33m3118b7585c[m HEAD@{26}: checkout: moving from main to fix-vercel-build-output
+[33m527c4887b2[m HEAD@{27}: rebase (abort): returning to refs/heads/main
+[33m3118b7585c[m HEAD@{28}: pull --rebase origin main (start): checkout 3118b7585c2ceee0cb754eba67402a612938bd58
+[33m527c4887b2[m HEAD@{29}: reset: moving to HEAD
+[33m527c4887b2[m HEAD@{30}: commit: chore(vercel): add Build Output generator and hook; fix(deploy): cross-workspace script runner & CREDS fallback
+[33m6bfb0fc52b[m HEAD@{31}: commit: up
+[33m5a3d00294d[m HEAD@{32}: checkout: moving from fix-ssl-deploy to main
+[33m8e72840ddc[m[33m ([m[1;32mfix-ssl-deploy[m[33m)[m HEAD@{33}: commit: oup
+[33m9e284ed513[m HEAD@{34}: commit: up
+[33m72a41fce76[m HEAD@{35}: commit: chore(security): remove sensitive pillow-talk txt; untrack CREDS; add cloud watchdog, updater, and daemon schedules
+[33m2794f0f319[m HEAD@{36}: commit: ooop
+[33m41aedf7ab5[m HEAD@{37}: commit: up..............
+[33m752f64f72c[m HEAD@{38}: commit: chore(security): add secure dependency updater (root)
+[33m3181ef063b[m HEAD@{39}: commit: Bank readiness workflow + SMTP production wiring; agent competency enforcement; readiness check script
+[33m7fef57ea8c[m HEAD@{40}: commit: Swarm trust reset preflight + revenue recovery directive; executor trust reset; Base44 changeset CLI; supervisor loop workflow; monitor settlements script
+[33m9c359b9345[m HEAD@{41}: commit: upyago
+[33mb182c5b506[m HEAD@{42}: commit: Supervisor: health loop; Vercel: mild HSTS + social redirects
+[33m8a117759d2[m HEAD@{43}: commit: Pre-shutdown: SMTP alerts, relax XFO, CHANGELOG, scripts, safe .env removal
+[33mcbcf732e0d[m HEAD@{44}: commit: Add OwnerDistributor (ERC20) + CHANGELOG; enforce OWNER routing via env
+[33m6bd29b23b8[m HEAD@{45}: commit: Enforce env-driven OWNER routing and wallet binding across routes
+[33m121f9bbc46[m HEAD@{46}: commit: upp
+[33mc81e7c5328[m HEAD@{47}: commit: ci: finalize CNAME + payments page; fix binance signing encoding/time
+[33m820826823a[m HEAD@{48}: reset: moving to HEAD~1
+[33m8a09f581f3[m HEAD@{49}: commit: ci: finalize CNAME and payments page; crypto signing improvements
+[33m820826823a[m HEAD@{50}: commit: chore(repo): remove heavy artifacts from VCS; add .gitignore for backups/doomsday/factures
+[33m3177691506[m HEAD@{51}: commit: feat(intel): unknown payer verification + intel agent; gate follow-ups; CHANGELOG
+[33m869242ae3e[m[33m ([m[1;34mgrafted[m[33m)[m HEAD@{52}: commit: up
+[33m0918913a51[m HEAD@{53}: commit: up
+[33mbf9262091b[m HEAD@{54}: commit: up
+[33me5c78c1c60[m HEAD@{55}: commit: up
+[33m02f978fa81[m HEAD@{56}: commit: Fix SSL: Consolidate rank repo, enable CNAME gen, fix deploy workflow
+[33m258d8ec07a[m HEAD@{57}: checkout: moving from base44 to fix-ssl-deploy
+[33m4137b18951[m[33m ([m[1;32mbase44[m[33m)[m HEAD@{58}: reset: moving to HEAD
+[33m4137b18951[m[33m ([m[1;32mbase44[m[33m)[m HEAD@{59}: reset: moving to HEAD
+[33m4137b18951[m[33m ([m[1;32mbase44[m[33m)[m HEAD@{60}: reset: moving to HEAD~1
+[33m2fd1bced9a[m HEAD@{61}: commit: Fix SSL: Consolidate rank repo, enable CNAME gen, fix deploy workflow
+[33m4137b18951[m[33m ([m[1;32mbase44[m[33m)[m HEAD@{62}: commit: feat(routes): add chimoney_ilp and google_pay_remittance; honor crypto preference; OTP support; instruction artifacts; extend action runner
+[33m04a5705931[m HEAD@{63}: commit: feat: headless bank upload with human-in-loop KYC queue; route splitting orchestration; improved payer identification
+[33m1314f9eda0[m HEAD@{64}: commit: Resilience: add replenishment trigger in autonomous-daemon; update CHANGELOG; record project memory for underfunded behavior
+[33m4adafc14af[m HEAD@{65}: commit: feat: Autonomous Finance, Enforcement & Self-Healing modules + Changelog update
+[33m3012816aab[m HEAD@{66}: reset: moving to HEAD~1
+[33m961ced2b66[m HEAD@{67}: commit: feat: Autonomous Finance, Enforcement & Self-Healing modules + Changelog update
+[33m3012816aab[m HEAD@{68}: reset: moving to HEAD~1
+[33m5a3d00294d[m HEAD@{69}: checkout: moving from main to base44
+[33m5a3d00294d[m HEAD@{70}: commit: feat: Autonomous Finance, Enforcement & Self-Healing modules + Changelog update
+[33m3012816aab[m HEAD@{71}: commit: feat(finance): implement PaymentAssuranceProtocol and Stop Work Orders
+[33mff57e15f6a[m HEAD@{72}: commit: feat(autonomy): add SelfHealer and fix missing scripts
+[33m9aea2bf8fd[m HEAD@{73}: commit: Create Putin_s_Bikers_Open_a_Balkan_Front.m4a
+[33m0df5897d2d[m HEAD@{74}: commit: feat: persist owner ethics, payoneer supervisor fix, and procurement request
+[33m448a7eb34e[m HEAD@{75}: commit: up
+[33m258d8ec07a[m HEAD@{76}: commit: chore(marketing): enforce pure PayPal.me checkout; docs: changelog for 2026-01-14
+[33m2f32669c58[m HEAD@{77}: commit: feat: tighten payoneer followups and swarm supervision
+[33m303596cab5[m HEAD@{78}: commit: lint automation: restrict Biome scope; add ignore configs; add peer-review script and supervisor integration; runnable background supervision
+[33mae2d8a2a17[m HEAD@{79}: commit: payoneer followups: multi-row parsing; dedupe by batch; scheduling via followup_at and --delay_hours; flags --payer and --out; changelogs updated
+[33m2813c83c60[m HEAD@{80}: commit: payoneer followups: add XLS/XLSX extraction and folder processing; generated follow-up payloads for submitted.manually; embed PoSP evidence in messages
+[33md7234cb927[m HEAD@{81}: commit: Watcher: notify new Payoneer batches; supervisor reports routes status; continue regular updates
+[33m25231e103d[m HEAD@{82}: commit: Swarm: aims ingestion + supervisor delegation with PoSP; news watcher for agentic/security/API/paypal topics; Payoneer batches generated; safe .gitignore
+[33m5439d2ab8c[m HEAD@{83}: commit: CONSOLIDATE: Add Proof of Service Power (PoSP); enforce in settlement; supervisor emits proofs; update changelog
+[33mca6c9d0157[m HEAD@{84}: commit: CONSOLIDATE: import Nouveau-dossier-3- into external/
+[33m3fa3306acd[m HEAD@{85}: reset: moving to HEAD
+[33m3fa3306acd[m HEAD@{86}: commit: CONSOLIDATE
+[33m4b7b021a69[m HEAD@{87}: commit: Undo ownersign/swarmverify; revert package.json scripts
+[33me6df6343cc[m HEAD@{88}: commit: Add ownersign and swarmverify scripts; wire npm tasks; lint passes
+[33m26e16d2a08[m HEAD@{89}: commit: crypto: add Binance Crypto Box CLI and fallback; harden Binance API client; add swarm memory doc; unify lint config and scripts; update changelog
+[33m045f9165d8[m HEAD@{90}: commit: chore: shared CLI args util; refactor core scripts; enhance Bitget settlement CLI & manual fallback; add 2026-01-13 changelog
+[33mac378bd7ea[m HEAD@{91}: pull --rebase (finish): returning to refs/heads/main
+[33mac378bd7ea[m HEAD@{92}: pull --rebase (pick): chore: fix paypal generator to force PayPal.me, add marketing funnel script, correct binance debug typo, update autonomous config; fix push-to-base44 imports
+[33ma984251f4d[m HEAD@{93}: pull --rebase (pick): feat: enable autonomous owner settlement routes; add PayPal auto-payout, PayPal.me generator, bank wire CSV, micro-withdraw; update env and changelog; create backup
+[33m1ce28b82c1[m HEAD@{94}: pull --rebase (pick): up
+[33m4554dda501[m HEAD@{95}: pull --rebase (pick): Report webhook control endpoints
+[33m18b3b685a7[m HEAD@{96}: pull --rebase (pick): Make all-good timeout configurable
+[33m64df9a64ca[m HEAD@{97}: pull --rebase (pick): Fix health live flag default
+[33mab85a808e8[m HEAD@{98}: pull --rebase (pick): Add reality-check dashboard and payout truth upgrades
+[33m9aa38e62f9[m HEAD@{99}: pull --rebase (pick): Update report: deploy-live bank env + live offline disable
+[33m6dfd2d452f[m HEAD@{100}: pull --rebase (pick): Deploy script: ensure Attijari bank env is set
+[33m7d2aa64921[m HEAD@{101}: pull --rebase (pick): Deploy script: disable Base44 offline mode in live
+[33mfbb79ed3bd[m HEAD@{102}: pull --rebase (pick): Update Agentic Commerce Protocol.txt
+[33mdf33dbbaff[m HEAD@{103}: pull --rebase (pick): Update Agentic Commerce Protocol.txt
+[33mbedadc8fce[m HEAD@{104}: pull --rebase (pick): up3
+[33m775556575b[m HEAD@{105}: pull --rebase (pick): up2
+[33mb86b5f1ce5[m HEAD@{106}: pull --rebase (pick): up
+[33m7d8797b369[m HEAD@{107}: pull --rebase (pick): Truth-only payout tracking + SBDS policy enforcement
+[33m5333945afb[m HEAD@{108}: pull --rebase (pick): Enforce owner-only payout recipients and safer live execution
+[33m6be27dcede[m HEAD@{109}: pull --rebase (pick): invariants: require real PayPal transaction id to mark revenue paid_out; align with Steps.Ahead hard invariants
+[33md939efca26[m HEAD@{110}: pull --rebase (pick): hard: enforce LIVE gates (no sandbox, no placeholders), stricter webhook config, readiness PPP2 flags
+[33me7e82d8abf[m HEAD@{111}: pull --rebase (pick): Harden ignores for secrets and local artifacts
+[33m0653a20702[m HEAD@{112}: pull --rebase (pick): Swarm LIVE gating and payout automation hardening
+[33m3d23f934bf[m HEAD@{113}: pull --rebase (pick): webhook/report: remove misleading public URL; document tunnel setup
+[33mdd4399ca65[m HEAD@{114}: pull --rebase (pick): webhook: emit public localhost.run URL on startup
+[33m9f83e18227[m HEAD@{115}: pull --rebase (pick): webhook: allow server startup without config; prompt PayPal creds
+[33m2d8543ef68[m HEAD@{116}: pull --rebase (pick): report: document live deploy, Base44 entity requirements, PayPal webhook setup
+[33m7c6c824a26[m HEAD@{117}: pull --rebase (pick): deploy-live: ignore placeholder credential values
+[33mf9693e0c8c[m HEAD@{118}: pull --rebase (pick): deploy-live: add all action
+[33m5b330103ef[m HEAD@{119}: pull --rebase (pick): Live deploy: readiness + Base44 URL parsing
+[33m9a73db49d7[m HEAD@{120}: pull --rebase (pick): Bank wire export: infer destination from Earning metadata

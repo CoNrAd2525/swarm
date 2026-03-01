@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS | Digital Solutions</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Syncopate:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #050505;
+            --text-color: #f0f0f0;
+            --accent: #00ff88;
+            --accent-2: #00ccff;
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --font-display: 'Syncopate', sans-serif;
+            --font-body: 'Space Grotesk', sans-serif;
+            --easing: cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            cursor: none; /* Custom cursor used */
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-body);
+            overflow-x: hidden;
+            width: 100vw;
+            height: 100%;
+        }
+
+        /* --- Custom Cursor --- */
+        .cursor-dot,
+        .cursor-outline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .cursor-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent);
+        }
+
+        .cursor-outline {
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--accent);
+            transition: width 0.2s, height 0.2s, background-color 0.2s;
+        }
+
+        body:hover .cursor-outline.hovered {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(0, 255, 136, 0.1);
+            border-color: transparent;
+            backdrop-filter: blur(2px);
+        }
+
+        /* --- WebGL Background --- */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.6;
+        }
+
+        /* --- Layout & Typography --- */
+        .container {
+            width: 90%;
+            max-width: 1600px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* --- Magnetic Navigation --- */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 2rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            mix-blend-mode: difference;
+        }
+
+        .logo {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            user-select: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 3rem;
+            list-style: none;
+        }
+
+        .nav-item {
+            position: relative;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: var(--text-color);
+            font-family: var(--font-body);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: inline-block;
+            transition: color 0.3s;
+        }
+        
+        /* The magnetic element wrapper */
+        .magnetic-wrap {
+            display: inline-block;
+            transition: transform 0.3s var(--easing);
+        }
+
+        /* --- Hero Section (Rejection Layout) --- */
+        header {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: clamp(4rem, 12vw, 12rem);
+            line-height: 0.85;
+            text-transform: uppercase;
+            mix-blend-mode: overlay;
+            opacity: 0.9;
+            position: relative;
+        }
+
+        .hero-sub {
+            font-size: 1.2rem;
+            max-width: 400px;
+            margin-top: 2rem;
+            border-left: 2px solid var(--accent);
+            padding-left: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 2rem;
+            right: 2rem;
+            font-family: var(--font-display);
+            font-size: 0.8rem;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(10px); }
+        }
+
+        /* --- Marquee Section --- */
+        .marquee-section {
+            padding: 4rem 0;
+            background: var(--text-color);
+            color: var(--bg-color);
+            transform: rotate(-2deg) scale(1.05);
+            margin: 4rem 0;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .marquee-content {
+            display: inline-block;
+            animation: marquee 20s linear infinite;
+        }
+
+        .marquee-text {
+            font-family: var(--font-display);
+            font-size: 4rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-right: 4rem;
+        }
+
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* --- 3D Tilt Projects Section --- */
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 3rem;
+            margin-bottom: 4rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+            display: inline-block;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 4rem;
+            padding: 4rem 0;
+            perspective: 1000px;
+        }
+
+        .project-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            height: 500px;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: perspective(1000px);
+            transition: transform 0.1s linear; /* Smooth JS follow */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 2rem;
+        }
+
+        .card-bg-img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.5;
+            transition: opacity 0.3s, transform 0.5s;
+            z-index: 1;
+        }
+
+        .project-card:hover .card-bg-img {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+
+        /* Glare Effect */
+        .card-glare {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.3), transparent 60%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 2;
+            mix-blend-mode: overlay;
+        }
+
+        .card-content {
+            position: relative;
+            z-index: 3;
+            transform: translateZ(50px); /* 3D pop */
+        }
+
+        .card-title {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .card-tags {
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* --- Bottom Scrolling Light Effect --- */
+        .bottom-light-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .bottom-light-beam {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            box-shadow: 0 -10px 40px 10px var(--accent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .bottom-glow-overlay {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: radial-gradient(circle at 50% 100%, rgba(0, 255, 136, 0.05), transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* --- Footer --- */
+        footer {
+            margin-top: 10rem;
+            padding: 5rem 0;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .footer-col h3 {
+            font-family: var(--font-display);
+            margin-bottom: 1.5rem;
+        }
+
+        .footer-col ul {
+            list-style: none;
+        }
+
+        .footer-col li {
+            margin-bottom: 0.8rem;
+        }
+
+        .footer-col a {
+            color: #888;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer-col a:hover {
+            color: var(--accent);
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 768px) {
+            h1 { font-size: 15vw; }
+            .nav-links { display: none; } /* Simplified for demo */
+            .projects-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Custom Cursor -->
+    <div class="cursor-dot" id="cursor-dot"></div>
+    <div class="cursor-outline" id="cursor-outline"></div>
+
+    <!-- WebGL Background -->
+    <div id="canvas-container"></div>
+
+    <!-- Bottom Light Effects -->
+    <div class="bottom-glow-overlay" id="glow-overlay"></div>
+    <div class="bottom-light-container">
+        <div class="bottom-light-beam" id="bottom-beam"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="logo magnetic-area">
+            <div class="magnetic-wrap">NEXUS</div>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item magnetic-area">
+                <a href="#work" class="nav-link magnetic-wrap">Work</a>
+            </li>
+            <li class="nav-item magnetic-area">
+                <a href="#services" class="nav-link magnetic-wrap">Services</a>
+            </li>
+            <li class="nav-item magnetic-area">
+                <a href="#about" class="nav-link magnetic-wrap">About</a>
+            </li>
+            <li class="nav-item magnetic-area">
+                <a href="#contact" class="nav-link magnetic-wrap">Contact</a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Hero -->
+        <header>
+            <h1>Digital<br>Alchemy</h1>
+            <div class="hero-sub">
+                We reject templates. We engineer bespoke digital ecosystems for forward-thinking enterprises.
+            </div>
+            <div class="scroll-indicator">SCROLL TO EXPLORE</div>
+        </header>
+
+        <!-- Marquee -->
+        <section class="marquee-section">
+            <div class="marquee-content">
+                <span class="marquee-text">Web Development // Immersive 3D // UI/UX Design // Shader Art // Creative Strategy // Web Development // Immersive 3D // UI/UX Design // Shader Art // Creative Strategy //</span>
+                <span class="marquee-text">Web Development // Immersive 3D // UI/UX Design // Shader Art // Creative Strategy // Web Development // Immersive 3D // UI/UX Design // Shader Art // Creative Strategy //</span>
+            </div>
+        </section>
+
+        <!-- Projects (3D Tilt Cards) -->
+        <section id="work">
+            <div class="section-title">Selected Works</div>
+            <div class="projects-grid">
+                <!-- Card 1 -->
+                <article class="project-card tilt-card">
+                    <img src="https://picsum.photos/seed/tech1/600/800" alt="Project 1" class="card-bg-img">
+                    <div class="card-glare"></div>
+                    <div class="card-content">
+                        <h3 class="card-title">Cyber Finance</h3>
+                        <p class="card-tags">WebGL / Fintech</p>
+                    </div>
+                </article>
+
+                <!-- Card 2 -->
+                <article class="project-card tilt-card">
+                    <img src="https://picsum.photos/seed/arch2/600/800" alt="Project 2" class="card-bg-img">
+                    <div class="card-glare"></div>
+                    <div class="card-content">
+                        <h3 class="card-title">Neon Architects</h3>
+                        <p class="card-tags">3D Showcase</p>
+                    </div>
+                </article>
+
+                <!-- Card 3 -->
+                <article class="project-card tilt-card">
+                    <img src="https://picsum.photos/seed/art3/600/800" alt="Project 3" class="card-bg-img">
+                    <div class="card-glare"></div>
+                    <div class="card-content">
+                        <h3 class="card-title">Void Data</h3>
+                        <p class="card-tags">Dashboard / AI</p>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer id="contact">
+            <div class="footer-col">
+                <h3>NEXUS</h3>
+                <p>Rejecting the ordinary.<br>Building the future.</p>
+            </div>
+            <div class="footer-col">
+                <h3>Socials</h3>
+                <ul>
+                    <li><a href="#" class="magnetic-link">Instagram</a></li>
+                    <li><a href="#" class="magnetic-link">Twitter / X</a></li>
+                    <li><a href="#" class="magnetic-link">LinkedIn</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h3>Locate</h3>
+                <p>Digital Node 7<br>Cyberspace, 00000</p>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+        /**
+         * 1. CURSOR LOGIC
+         */
+        const cursorDot = document.getElementById('cursor-dot');
+        const cursorOutline = document.getElementById('cursor-outline');
+        
+        window.addEventListener('mousemove', (e) => {
+            const posX = e.clientX;
+            const posY = e.clientY;
+
+            // Dot follows immediately
+            cursorDot.style.left = `${posX}px`;
+            cursorDot.style.top = `${posY}px`;
+
+            // Outline follows with slight delay (using CSS transition)
+            cursorOutline.style.left = `${posX}px`;
+            cursorOutline.style.top = `${posY}px`;
+        });
+
+        // Hover effect for interactive elements
+        const interactiveElements = document.querySelectorAll('a, .project-card, button');
+        interactiveElements.forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                cursorOutline.classList.add('hovered');
+            });
+            el.addEventListener('mouseleave', () => {
+                cursorOutline.classList.remove('hovered');
+            });
+        });
+
+        /**
+         * 2. THREE.JS SHADER BACKGROUND
+         */
+        const initThreeJS = () => {
+            const container = document.getElementById('canvas-container');
+            const scene = new THREE.Scene();
+            const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+            const renderer = new THREE.WebGLRenderer({ alpha: true });
+            
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            // Custom Shader Material
+            const geometry = new THREE.PlaneGeometry(2, 2);
+            
+            const uniforms = {
+                u_time: { value: 0.0 },
+                u_resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+                u_mouse: { value: new THREE.Vector2(0, 0) }
+            };
+
+            const fragmentShader = `
+                uniform float u_time;
+                uniform vec2 u_resolution;
+                uniform vec2 u_mouse;
+
+                // Simple noise function
+                vec3 palette( float t ) {
+                    vec3 a = vec3(0.5, 0.5, 0.5);
+                    vec3 b = vec3(0.5, 0.5, 0.5);
+                    vec3 c = vec3(1.0, 1.0, 1.0);
+                    vec3 d = vec3(0.263,0.416,0.557);
+                    return a + b*cos( 6.28318*(c*t+d) );
+                }
+
+                void main() {
+                    vec2 uv = (gl_FragCoord.xy * 2.0 - u_resolution.xy) / u_resolution.y;
+                    vec2 uv0 = uv;
+                    vec3 finalColor = vec3(0.0);
+                    
+                    // Distort based on mouse
+                    uv += (u_mouse * 0.05);
+
+                    for (float i = 0.0; i < 3.0; i++) {
+                        uv = fract(uv * 1.5) - 0.5;
+
+                        float d = length(uv) * exp(-length(uv0));
+
+                        vec3 col = palette(length(uv0) + i*.4 + u_time*.4);
+
+                        d = sin(d*8. + u_time)/8.;
+                        d = abs(d);
+
+                        d = pow(0.01 / d, 1.2);
+
+                        finalColor += col * d;
+                    }
+                        
+                    // Darken it for background usage
+                    gl_FragColor = vec4(finalColor * 0.2, 1.0);
+                }
+            `;
+
+            const vertexShader = `
+                void main() {
+                    gl_Position = vec4( position, 1.0 );
+                }
+            `;
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: uniforms,
+                fragmentShader: fragmentShader,
+                vertexShader: vertexShader
+            });
+
+            const plane = new THREE.Mesh(geometry, material);
+            scene.add(plane);
+
+            // Mouse interaction for shader
+            document.addEventListener('mousemove', (e) => {
+                uniforms.u_mouse.value.x = e.clientX / window.innerWidth;
+                uniforms.u_mouse.value.y = 1.0 - (e.clientY / window.innerHeight);
+            });
+
+            // Animation Loop
+            const animate = () => {
+                requestAnimationFrame(animate);
+                uniforms.u_time.value += 0.01;
+                renderer.render(scene, camera);
+            };
+
+            animate();
+
+            // Resize handling
+            window.addEventListener('resize', () => {
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                uniforms.u_resolution.value.x = window.innerWidth;
+                uniforms.u_resolution.value.y = window.innerHeight;
+            });
+        };
+
+        initThreeJS();
+
+        /**
+         * 3. MAGNETIC BUTTONS
+         * Elements move towards the cursor slightly
+         */
+        const magnets = document.querySelectorAll('.magnetic-area');
+        
+        magnets.forEach((magnet) => {
+            const content = magnet.querySelector('.magnetic-wrap');
+            
+            magnet.addEventListener('mousemove', (e) => {
+                const rect = magnet.getBoundingClientRect();
+                // Calculate distance from center of element
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                
+                // Move the content towards mouse (divide for strength)
+                content.style.transform = `translate(${x * 0.4}px, ${y * 0.4}px)`;
+            });
+
+            magnet.addEventListener('mouseleave', () => {
+                content.style.transform = 'translate(0px, 0px)';
+            });
+        });
+
+        /**
+         * 4. 3D TILT CARDS
+         * Perspective rotation logic
+         */
+        const cards = document.querySelectorAll('.tilt-card');
+
+        cards.forEach(card => {
+            const glare = card.querySelector('.card-glare');
+            
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left; // x position within the element.
+                const y = e.clientY - rect.top;  // y position within the element.
+                
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                const rotateX = ((y - centerY) / centerY) * -10; // Max rotation deg
+                const rotateY = ((x - centerX) / centerX) * 10;
+
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+                
+                // Move glare
+                glare.style.opacity = '1';
+                glare.style.background = `radial-gradient(circle at ${x}px ${y}px, rgba(255,255,255,0.3), transparent 60%)`;
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)';
+                glare.style.opacity = '0';
+            });
+        });
+
+        /**
+         * 5. BOTTOM SCROLLING LIGHT EFFECT
+         * Changes intensity based on scroll depth
+         */
+        const bottomBeam = document.getElementById('bottom-beam');
+        const glowOverlay = document.getElementById('glow-overlay');
+
+        window.addEventListener('scroll', () => {
+            const scrollTotal = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollCurrent = window.scrollY;
+            const scrollPercentage = scrollCurrent / scrollTotal;
+
+            // Beam opacity based on scroll
+            bottomBeam.style.opacity = 0.2 + (scrollPercentage * 0.8);
+            
+            // Color shift from Green (top) to Blue (bottom)
+            if (scrollPercentage > 0.5) {
+                bottomBeam.style.background = 'linear-gradient(90deg, transparent, #00ccff, transparent)';
+                bottomBeam.style.boxShadow = '0 -10px 40px 10px #00ccff';
+                glowOverlay.style.background = 'radial-gradient(circle at 50% 100%, rgba(0, 204, 255, 0.08), transparent 60%)';
+            } else {
+                bottomBeam.style.background = 'linear-gradient(90deg, transparent, #00ff88, transparent)';
+                bottomBeam.style.boxShadow = '0 -10px 40px 10px #00ff88';
+                glowOverlay.style.background = 'radial-gradient(circle at 50% 100%, rgba(0, 255, 136, 0.05), transparent 60%)';
+            }
+        });
+
+    </script>
+</body>
+</html>

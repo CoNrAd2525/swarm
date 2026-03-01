@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  site:
+    image: ghcr.io/${OWNER}/realworldcerts-site:latest
+    container_name: realworldcerts-site
+    restart: unless-stopped
+    environment:
+      - SITE_PORT=8080
+      - SITE_RATE_MAX=30
+      - SITE_RATE_WINDOW_MS=60000
+      - SITE_ALLOWLIST=
+      - PAYPAL_OWNER_EMAIL=${PAYPAL_OWNER_EMAIL}
+    ports:
+      - "80:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

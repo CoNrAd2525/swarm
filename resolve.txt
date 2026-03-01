@@ -1,0 +1,671 @@
+This is a comprehensive technical guide for developing autonomous agentic swarm agents. It details the current security standards, signature algorithms, and API implementation specifics for Binance (including the new Ed25519 standard), Bitget, Bybit, and the specific requirements for integrating with Trust Wallet (Web3 signing).
+
+---
+
+# Executive Summary for Agentic Swarm Developers
+
+For autonomous swarm agents, **security and latency are critical**. Unlike traditional bots, swarm agents often operate concurrently, increasing the risk of timestamp synchronization errors and nonce conflicts.
+
+*   **Binance:** Is migrating from HMAC SHA256 to **Ed25519**. Agents must support both for backward compatibility but should prioritize Ed25519 for new deployments due to its efficiency and security.
+*   **Bitget & Bybit:** Currently utilize **HMAC SHA256**. They require strict parameter ordering and specific HTTP headers.
+*   **Trust Wallet:** Does not have a centralized trading API. Agents interact with it via **Web3 standards (EIP-191/EIP-712)** signing on the blockchain, interacting directly with smart contracts rather than a CEX API.
+
+---
+
+## 1. Binance API: Ed25519 Implementation
+
+Binance has officially introduced **Ed25519** support for API keys. This is a major shift from the industry-standard HMAC SHA256. Ed25519 offers higher security, better performance (faster verification), and smaller signature sizes, which is ideal for high-frequency swarm agents.
+
+### Key Concepts for Agents
+*   **Key Pair Generation:** You generate the Ed25519 key pair locally. You upload the **Public Key** to Binance. The **Private Key** never leaves your agent.
+*   **Key Binding:** When creating the API Key in the dashboard, you must select the key type (HMAC SHA256 or Ed25519).
+*   **Algorithm:** The signature is a raw byte signature of the payload, encoded in **Base64**.
+
+### The Signature Algorithm (Ed25519)
+
+1.  **Payload Construction:**
+    The string to sign is exactly the same as the HMAC method:
+    `timestamp + method + requestPath + queryString` (for GET)
+    `timestamp + method + requestPath + body` (for POST)
+    
+    *Note: Do not include the API Key or Signature in the payload string.*
+
+2.  **Signing:**
+    Sign the payload string using your Ed25519 **Private Seed**.
+
+3.  **Encoding:**
+    Encode the resulting 64-byte signature into a **Base64** string.
+
+### Python Implementation (Binance Ed25519)
+
+*Dependency: `nacl` (PyNaCl)*
+```bash
+pip install pynacl requests
+```
+
+```python
+import time
+import base64
+import requests
+from nacl.signing import SigningKey
+from nacl.encoding import RawEncoder
+import urllib.parse
+
+# AGENT CONFIGURATION
+API_KEY = "YOUR_BINANCE_API_KEY"
+# This is the 32-byte or 64-byte hex seed you generated locally
+PRIVATE_KEY_SEED = bytes.fromhex("YOUR_ED25519_PRIVATE_SEED_HEX") 
+BASE_URL = "https://api.binance.com"
+
+def sign_request_ed25519(method, endpoint, params=None, body=None):
+    """
+    Signs a request using Binance's Ed25519 standard.
+    """
+    # 1. Timestamp
+    timestamp = int(time.time() * 1000)
+
+    # 2. Construct Payload String
+    # For GET: queryString is URL encoded parameters
+    # For POST: body is JSON string
+    if method == "GET":
+        if params:
+            queryString = urllib.parse.urlencode(params)
+        else:
+            queryString = ""
+        payload = f"{timestamp}{method}{endpoint}?{queryString}"
+    else:
+        # POST
+        if body:
+            # Ensure body is a JSON string without spaces if strictly required, 
+            # though standard json.dumps is usually fine.
+            payload_str = str(body) 
+        else:
+            payload_str = ""
+        payload = f"{timestamp}{method}{endpoint}{payload_str}"
+
+    # 3. Sign
+    signing_key = SigningKey(PRIVATE_KEY_SEED)
+    
+    # Sign the payload bytes (UTF-8 encoded)
+    signed_bytes = signing_key.sign(payload.encode('utf-8'))
+    
+    # The signature is the first 64 bytes of the result (before the message append)
+    signature_bytes = signed_bytes.signature
+    
+    # 4. Encode to Base64
+    signature_base64 = base64.b64encode(signature_bytes).decode('utf-8')
+
+    return timestamp, signature_base64
+
+# Example Usage: Get Account Info
+def get_account_info():
+    endpoint = "/api/v3/account"
+    method = "GET"
+    params = {"recvWindow": 5000} # Optional but recommended for swarms
+
+    ts, sig = sign_request_ed25519(method, endpoint, params=params)
+    
+    headers = {
+        "X-MBX-APIKEY": API_KEY,
+        "Content-Type": "application/json"
+    }
+    
+    # Append signature and timestamp to params
+    params["timestamp"] = ts
+    params["signature"] = sig
+    
+    response = requests.get(f"{BASE_URL}{endpoint}", headers=headers, params=params)
+    return response.json()
+
+# print(get_account_info())
+```
+
+---
+
+## 2. Bitget API: HMAC SHA256
+
+Bitget uses the standard HMAC SHA256 but with a unique twist: they require an **API Passphrase**. This adds a layer of security: even if an API key leaks, transactions cannot be signed without the passphrase.
+
+### Key Concepts for Agents
+*   **Passphrase:** Defined by the user when creating the API key.
+*   **Payload Order:** `timestamp + method + requestPath + body`.
+*   **Headers:** Requires `ACCESS-SIGN`, `ACCESS-TIMESTAMP`, `ACCESS-KEY`, and `ACCESS-PASSPHRASE`.
+
+### Python Implementation (Bitget HMAC)
+
+```python
+import hmac
+import hashlib
+import base64
+import time
+import requests
+import json
+
+API_KEY = "YOUR_BITGET_KEY"
+API_SECRET = "YOUR_BITGET_SECRET"
+PASSPHRASE = "YOUR_BITGET_PASSPHRASE"
+BASE_URL = "https://api.bitget.com"
+
+def generate_signature(timestamp, method, request_path, body=''):
+    if body:
+        body = json.dumps(body)
+    
+    message = timestamp + method.upper() + request_path + body
+    mac = hmac.new(bytes(API_SECRET, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+    d = mac.digest()
+    return base64.b64encode(d).decode('utf-8')
+
+def bitget_request(endpoint, method="GET", payload=None):
+    timestamp = str(int(time.time() * 1000))
+    
+    # Prepare signature
+    signature = generate_signature(timestamp, method, endpoint, payload)
+    
+    headers = {
+        "ACCESS-KEY": API_KEY,
+        "ACCESS-SIGN": signature,
+        "ACCESS-TIMESTAMP": timestamp,
+        "ACCESS-PASSPHRASE": PASSPHRASE,
+        "Content-Type": "application/json"
+    }
+    
+    url = f"{BASE_URL}{endpoint}"
+    
+    if method == "GET":
+        return requests.get(url, headers=headers, params=payload)
+    else:
+        return requests.post(url, headers=headers, data=json.dumps(payload))
+
+# Example: Get Spot Account Balance
+# print(bitget_request("/api/spot/v1/account/assets", "GET").json())
+```
+
+---
+
+## 3. Bybit API: HMAC SHA256
+
+Bybit is widely used by institutional agents. They recently updated their API to V5, which standardizes the signature process across linear, inverse, and spot markets.
+
+### Key Concepts for Agents
+*   **RecvWindow:** Critical for swarms. Bybit agents should send a `recv_window` (default 5000ms) to handle network latency between the agent and the exchange.
+*   **Payload Order:** `apiKey + timestamp + recvWindow + queryString`.
+*   **Parameter Sorting:** For GET requests, parameters must be sorted alphabetically before signing. For POST, the JSON body usually does not need sorting, but must match the sent body exactly.
+
+### Python Implementation (Bybit V5 HMAC)
+
+```python
+import hmac
+import hashlib
+import time
+import requests
+import json
+
+API_KEY = "YOUR_BYBIT_KEY"
+API_SECRET = "YOUR_BYBIT_SECRET"
+BASE_URL = "https://api.bybit.com" # Use "https://api-testnet.bybit.com" for testing
+
+def sign_bybit_request(params, api_key, api_secret, timestamp, recv_window=5000):
+    # 1. Sort parameters alphabetically for GET requests
+    # For POST requests with JSON body, the stringified JSON is used directly
+    if isinstance(params, dict):
+        # Sort keys if it's a query param dict
+        sorted_params = sorted(params.items())
+        query_string = '&'.join([f"{k}={v}" for k, v in sorted_params])
+    else:
+        # If it's already a string (e.g. pre-serialized JSON for POST)
+        query_string = str(params)
+
+    # 2. Construct Sign String
+    sign_str = f"{api_key}{timestamp}{recv_window}{query_string}"
+    
+    # 3. HMAC SHA256
+    signature = hmac.new(
+        bytes(api_secret, "utf-8"),
+        bytes(sign_str, "utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+    
+    return signature
+
+def bybit_v5_request(endpoint, method="GET", params=None, data=None):
+    timestamp = int(time.time() * 1000)
+    recv_window = 5000
+    
+    headers = {
+        "X-BAPI-API-KEY": API_KEY,
+        "X-BAPI-TIMESTAMP": str(timestamp),
+        "X-BAPI-RECV-WINDOW": str(recv_window),
+        "Content-Type": "application/json"
+    }
+    
+    url = f"{BASE_URL}{endpoint}"
+    
+    if method == "GET":
+        # Generate signature for query params
+        sig = sign_bybit_request(params or {}, API_KEY, API_SECRET, timestamp, recv_window)
+        headers["X-BAPI-SIGN"] = sig
+        response = requests.get(url, headers=headers, params=params)
+        
+    elif method == "POST":
+        # For POST, we sign the raw JSON body string
+        # Note: Bybit V5 requires params in the query for some endpoints and body for others. 
+        # This example assumes private API POST where body is used.
+        sig = sign_bybit_request(data or {}, API_KEY, API_SECRET, timestamp, recv_window)
+        headers["X-BAPI-SIGN"] = sig
+        response = requests.post(url, headers=headers, json=data)
+        
+    return response.json()
+
+# Example: Get Wallet Balance (POST in V5)
+# params = {"accountType": "UNIFIED"}
+# print(bybit_v5_request("/v5/account/wallet-balance", "POST", data=params))
+```
+
+---
+
+## 4. Trust Wallet: Web3 Signing (Not API)
+
+Trust Wallet is a non-custodial wallet. It does not have a centralized API for trading like Binance or Bybit. An "autonomous agent" interacting with a Trust Wallet address must interact directly with the blockchain (Ethereum, Solana, BSC, etc.).
+
+For an agent to control a Trust Wallet address, it acts as a "Signer."
+
+### Key Concepts for Agents
+*   **Private Key Management:** The agent needs the wallet's Private Key (or Seed Phrase). This is high-risk.
+*   **Signing Standard:** **EIP-191** (personal_sign) or **eth_signTransaction**.
+*   **Gas Estimation:** Unlike CEXs, the agent must manually estimate gas and set gas prices.
+
+### Python Implementation (Ethereum/BSC Chain)
+
+*Dependency: `web3.py`*
+
+```python
+from web3 import Web3
+from eth_account import Account
+
+# AGENT CONFIGURATION
+# WARNING: Never hardcode private keys in production for swarm agents.
+# Use a secrets manager or KMS.
+PRIVATE_KEY = "YOUR_TRUST_WALLET_PRIVATE_KEY"
+RPC_URL = "https://bsc-dataseed.binance.org/" # Example for BSC Smart Chain
+
+w3 = Web3(Web3.HTTPProvider(RPC_URL))
+account = Account.from_key(PRIVATE_KEY)
+
+def sign_and_send_transaction(to_address, amount_eth):
+    # 1. Build Transaction
+    nonce = w3.eth.get_transaction_count(account.address)
+    tx = {
+        'nonce': nonce,
+        'to': to_address,
+        'value': w3.to_wei(amount_eth, 'ether'),
+        'gas': 21000, # Standard transfer gas
+        'gasPrice': w3.eth.gas_price,
+        'chainId': 56 # BSC Chain ID
+    }
+    
+    # 2. Sign Transaction
+    # This is the "Validation" step. The agent signs locally.
+    signed_tx = w3.eth.account.sign_transaction(tx, PRIVATE_KEY)
+    
+    # 3. Broadcast
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    return w3.to_hex(tx_hash)
+
+# print(sign_and_send_transaction("0xRecipientAddress...", 0.01))
+```
+
+---
+
+## Best Practices for Autonomous Swarm Agents
+
+When deploying swarms that utilize these validation methods, adhere to the following to prevent IP bans or signature failures:
+
+1.  **Clock Synchronization (NTP):**
+    *   All API signatures rely on `serverTime`. If your agent's clock drifts even 1 second from the exchange server, requests will fail with "Timestamp for this request is outside of the recvWindow."
+    *   *Solution:* Run `chrony` or `ntpdate` on every agent node frequently.
+
+2.  **Handling `recvWindow`:**
+    *   For CEXs (Binance/Bybit), if your agent is processing heavy logic before signing, increase the `recvWindow` parameter (default is usually 5000ms) to 10000ms or higher to prevent "Timestamp outside window" errors.
+    *   *Trade-off:* Higher recvWindow slightly increases the risk window for replay attacks, though signatures negate most of this risk.
+
+3.  **Nonce Management:**
+    *   Bybit and some others treat the `timestamp` effectively as a nonce. Ensure your requests are strictly sequential or use strictly increasing timestamps. Parallel requests in a swarm must use unique, increasing timestamps.
+
+4.  **Idempotency Keys:**
+    *   Crucial for swarms. If a network glitch occurs after a signature is sent but before a response is received, the agent might retry.
+    *   Use the `X-MBX-TRACKING-ID` (Binance) or `idempotencyKey` (Bitget/Bybit) headers to ensure that if a request is sent twice, it is only executed once.
+
+5.  **Ed25519 Key Rotation:**
+    *   Since Ed25519 is new, implement a "fallback" mechanism in your agents. If the Ed25519 key returns 401/403, the agent should alert the operator to check if the key type matches the Binance dashboard configuration.
+
+check:https://www.cloddsbot.com/api
+
+
+Below is a comprehensive Python SDK designed for autonomous swarm agents. It implements a modular architecture to bridge the gap between the Centralized Exchange (Binance CEX) and a Web3 Wallet (Trust Wallet/MetaMask) via the blockchain.
+
+### Architecture Overview
+
+1.  **`BinanceAuth`**: Handles the new Ed25519 and legacy HMAC SHA256 signature generation.
+2.  **`BinanceAgent`**: Manages CEX interactions (checking balances, generating deposit addresses, executing withdrawals).
+3.  **`Web3Wallet`**: Manages On-Chain interactions (checking gas, signing transfers, broadcasting transactions).
+4.  **`SwarmBridge`**: The high-level orchestrator that agents use to move funds bidirectionally.
+
+### Prerequisites
+
+```bash
+pip install requests pynacl web3 eth-account
+```
+
+### The SDK Code
+
+```python
+import time
+import hmac
+import hashlib
+import base64
+import urllib.parse
+import requests
+from nacl.signing import SigningKey
+from web3 import Web3
+from eth_account import Account
+from typing import Optional, Dict, Any
+
+# ==============================================================================
+# MODULE 1: AUTHENTICATION & SIGNATURE (Binance Ed25519 Support)
+# ==============================================================================
+
+class BinanceAuth:
+    """
+    Handles authentication for Binance API.
+    Supports the new Ed25519 standard for autonomous agents.
+    """
+    def __init__(self, api_key: str, secret_key: str, key_type: str = "ed25519"):
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.key_type = key_type.lower() # 'ed25519' or 'hmac'
+
+    def _get_timestamp(self):
+        return int(time.time() * 1000)
+
+    def sign_payload(self, method: str, endpoint: str, params: dict = None, body: dict = None) -> tuple:
+        """
+        Generates the signature and headers required for the request.
+        Returns: (headers, full_params_with_sig)
+        """
+        timestamp = self._get_timestamp()
+        
+        # 1. Construct the Signature String
+        # Format: timestamp + method + endpoint + ?query OR body
+        query_string = ""
+        
+        if method == "GET" and params:
+            # Sort params for GET
+            sorted_params = sorted(params.items())
+            query_string = "?" + urllib.parse.urlencode(sorted_params)
+        elif method in ["POST", "DELETE"] and body:
+            # For Binance API, body is usually treated as form-urlencoded string for signing
+            query_string = urllib.parse.urlencode(body)
+            
+        payload = f"{timestamp}{method.upper()}{endpoint}{query_string}"
+
+        # 2. Sign based on Key Type
+        if self.key_type == "ed25519":
+            # Ed25519: Sign bytes -> Base64 Encode
+            try:
+                # Assumes secret_key is the Hex Seed
+                seed = bytes.fromhex(self.secret_key)
+                signing_key = SigningKey(seed)
+                signed = signing_key.sign(payload.encode('utf-8'))
+                signature = base64.b64encode(signed.signature).decode('utf-8')
+            except Exception as e:
+                raise ValueError(f"Ed25519 Signing Failed: {e}. Ensure secret is a valid hex seed.")
+        else:
+            # HMAC SHA256: Hex Encode
+            signature = hmac.new(
+                bytes(self.secret_key, "utf-8"),
+                payload.encode("utf-8"),
+                hashlib.sha256
+            ).hexdigest()
+
+        # 3. Prepare Headers and final payload
+        headers = {
+            "X-MBX-APIKEY": self.api_key,
+            "Content-Type": "application/x-www-form-urlencoded" # Standard for Binance Trade API
+        }
+
+        # Attach signature and timestamp to the data being sent
+        if method == "GET":
+            params["timestamp"] = timestamp
+            params["signature"] = signature
+        else:
+            body["timestamp"] = timestamp
+            body["signature"] = signature
+
+        return headers, body if body else params
+
+# ==============================================================================
+# MODULE 2: BINANCE CEX AGENT
+# ==============================================================================
+
+class BinanceAgent:
+    BASE_URL = "https://api.binance.com" # Use testnet for dev: https://testnet.binance.vision
+
+    def __init__(self, auth: BinanceAuth):
+        self.auth = auth
+
+    def _request(self, method: str, endpoint: str, signed: bool = False, params: dict = None, body: dict = None):
+        url = f"{self.BASE_URL}{endpoint}"
+        headers = {}
+        data = None
+        
+        if signed:
+            headers, payload = self.auth.sign_payload(method, endpoint, params, body)
+            if method in ["POST", "DELETE"]:
+                data = payload
+            else:
+                params = payload
+        else:
+            headers = {"Content-Type": "application/json"}
+
+        response = requests.request(method, url, headers=headers, params=params, data=data)
+        
+        if response.status_code != 200:
+            raise Exception(f"Binance API Error {response.status_code}: {response.text}")
+            
+        return response.json()
+
+    def get_cex_balance(self, asset: str = "USDT"):
+        """Check available balance on Binance."""
+        endpoint = "/api/v3/account"
+        res = self._request("GET", endpoint, signed=True)
+        for bal in res["balances"]:
+            if bal["asset"] == asset:
+                return float(bal["free"])
+        return 0.0
+
+    def get_deposit_address(self, coin: str, network: str):
+        """
+        Get the wallet address to deposit funds INTO Binance.
+        Crucial for Wallet -> CEX transfers.
+        """
+        endpoint = "/sapi/v1/capital/deposit/address"
+        params = {"coin": coin, "network": network}
+        return self._request("GET", endpoint, signed=True, params=params)
+
+    def withdraw_to_wallet(self, coin: str, network: str, address: str, amount: float):
+        """
+        Withdraw funds FROM Binance TO Web3 Wallet.
+        NOTE: Requires 'Withdraw' permission enabled on API Key.
+        """
+        endpoint = "/sapi/v1/capital/withdraw/apply"
+        
+        body = {
+            "coin": coin,
+            "withdrawOrderId": f"SWARM_{int(time.time())}", # Unique ID for idempotency
+            "network": network,
+            "address": address,
+            "amount": amount
+        }
+        
+        return self._request("POST", endpoint, signed=True, body=body)
+
+# ==============================================================================
+# MODULE 3: WEB3 WALLET AGENT (On-Chain)
+# ==============================================================================
+
+class Web3Wallet:
+    def __init__(self, rpc_url: str, private_key: str):
+        self.w3 = Web3(Web3.HTTPProvider(rpc_url))
+        self.account = Account.from_key(private_key)
+        self.address = self.account.address
+
+    def get_balance(self, token_address: Optional[str] = None):
+        """Get native balance (e.g., BNB, ETH) or ERC-20 balance."""
+        if token_address is None:
+            # Native Balance
+            bal_wei = self.w3.eth.get_balance(self.address)
+            return self.w3.from_wei(bal_wei, 'ether')
+        else:
+            # ERC-20 Balance (Minimal ABI)
+            abi = [{"constant":True,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"type":"function"}]
+            contract = self.w3.eth.contract(address=Web3.to_checksum_address(token_address), abi=abi)
+            bal_wei = contract.functions.balanceOf(self.address).call()
+            # Assuming 18 decimals, adjust for USDT (6 decimals) in production
+            return bal_wei / (10**18)
+
+    def transfer(self, to_address: str, amount: float, private_key: str):
+        """
+        Sign and broadcast a transaction on-chain.
+        Used for Wallet -> Binance transfers.
+        """
+        nonce = self.w3.eth.get_transaction_count(self.address)
+        
+        # Dynamic Gas Price
+        gas_price = self.w3.eth.gas_price
+        
+        tx = {
+            'nonce': nonce,
+            'to': Web3.to_checksum_address(to_address),
+            'value': self.w3.to_wei(amount, 'ether'),
+            'gas': 21000, # Standard gas limit for native transfer
+            'gasPrice': gas_price,
+            'chainId': self.w3.eth.chain_id
+        }
+
+        # Sign
+        signed_tx = self.w3.eth.account.sign_transaction(tx, private_key)
+        
+        # Broadcast
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        return self.w3.to_hex(tx_hash)
+
+# ==============================================================================
+# MODULE 4: SWARM BRIDGE (Orchestrator)
+# ==============================================================================
+
+class SwarmBridge:
+    """
+    High-level SDK for Agents to move funds between CEX and Web3.
+    """
+    def __init__(self, binance_auth, web3_rpc, web3_private_key):
+        self.binance = BinanceAgent(binance_auth)
+        self.wallet = Web3Wallet(web3_rpc, web3_private_key)
+
+    def bridge_cex_to_wallet(self, amount: float, coin="USDT", network="BSC"):
+        """
+        Flow: Binance -> On-chain Wallet
+        """
+        print(f"--- Initiating CEX -> Wallet Transfer ({amount} {coin}) ---")
+        
+        # 1. Check CEX Balance
+        cex_bal = self.binance.get_cex_balance(coin)
+        if cex_bal < amount:
+            raise Exception(f"Insufficient Binance Balance. Have {cex_bal}, need {amount}")
+
+        # 2. Execute Withdrawal
+        # Note: 'network' must match Binance codes (e.g., "BSC", "ETH", "ARBITRUM")
+        try:
+            res = self.binance.withdraw_to_wallet(coin, network, self.wallet.address, amount)
+            print(f"Withdrawal Submitted. ID: {res.get('id')}")
+            return res
+        except Exception as e:
+            print(f"Withdrawal Failed: {e}")
+            # Agents should implement retry logic here
+            return None
+
+    def bridge_wallet_to_cex(self, amount: float, coin="USDT", network="BSC"):
+        """
+        Flow: On-chain Wallet -> Binance
+        """
+        print(f"--- Initiating Wallet -> CEX Transfer ({amount} {coin}) ---")
+        
+        # 1. Get Binance Deposit Address
+        deposit_info = self.binance.get_deposit_address(coin, network)
+        binance_addr = deposit_info.get("address")
+        print(f"Target Binance Address: {binance_addr}")
+
+        # 2. Check Wallet Balance (Native BNB/ETH for gas)
+        native_bal = self.wallet.get_balance()
+        print(f"Wallet Native Balance (for gas): {native_bal}")
+        
+        if native_bal <= 0:
+            raise Exception("Insufficient native tokens (BNB/ETH) for gas fees.")
+
+        # 3. Send Transaction
+        # Note: This example transfers NATIVE coins. For USDT (ERC20/BEP20), 
+        # the Web3Wallet class needs a function to build ERC20 tx data.
+        try:
+            tx_hash = self.wallet.transfer(binance_addr, amount, self.wallet.account.key)
+            print(f"Transaction Broadcasted. Hash: {tx_hash}")
+            return tx_hash
+        except Exception as e:
+            print(f"On-chain Transfer Failed: {e}")
+            return None
+
+# ==============================================================================
+# EXAMPLE USAGE FOR AUTONOMOUS AGENT
+# ==============================================================================
+
+if __name__ == "__main__":
+    # CONFIGURATION
+    # SECURITY WARNING: Use Environment Variables in production!
+    BINANCE_API_KEY = "YOUR_API_KEY"
+    # If using Ed25519, paste your PRIVATE SEED HEX here. If HMAC, paste Secret.
+    BINANCE_SECRET_KEY = "YOUR_PRIVATE_SEED_OR_SECRET" 
+    WEB3_PRIVATE_KEY = "YOUR_WALLET_PRIVATE_KEY"
+    RPC_URL = "https://bsc-dataseed.binance.org/" # BSC Network
+
+    # Initialize SDK
+    # Use key_type="hmac" if you haven't migrated to Ed25519 yet
+    auth = BinanceAuth(BINANCE_API_KEY, BINANCE_SECRET_KEY, key_type="ed25519")
+    swarm = SwarmBridge(auth, RPC_URL, WEB3_PRIVATE_KEY)
+
+    # --- SCENARIO 1: Agent decides to move funds from Exchange to Wallet ---
+    # Useful for securing profits or interacting with DeFi
+    # swarm.bridge_cex_to_wallet(amount=0.01, coin="USDT", network="BSC")
+
+    # --- SCENARIO 2: Agent decides to move funds from Wallet to Exchange ---
+    # Useful for consolidating funds or closing positions
+    # swarm.bridge_wallet_to_cex(amount=0.001, coin="BNB", network="BSC")
+```
+
+### Critical Implementation Details for Swarm Agents
+
+1.  **Network Parameter (`network`):**
+    *   When calling `get_deposit_address` or `withdraw_to_wallet`, the `network` parameter is the most common point of failure.
+    *   For USDT, valid values are typically `"BSC"` (BEP20), `"ETH"` (ERC20), `"TRX"` (TRC20), or `"POLYGON"`.
+    *   If the agent sends USDT to a Binance `ETH` address but via the BSC network, funds will be lost.
+
+2.  **Ed25519 vs HMAC:**
+    *   The `BinanceAuth` class automatically detects the key type. Ensure that the `BINANCE_SECRET_KEY` matches the selected `key_type`.
+    *   If using Ed25519, you must provide the **32-byte seed** (hex string) that you used to generate the public key uploaded to Binance.
+
+3.  **Gas Management (Wallet -> CEX):**
+    *   The `Web3Wallet` example uses a simple gas calculation. In a production swarm, agents must check `w3.eth.gas_price` and ensure the wallet has enough native tokens (BNB/ETH) to pay for the transaction, or the transfer will fail.
+
+4.  **Withdrawal Whitelisting:**
+    *   Binance **will block** API withdrawals if the destination address is not on the "Withdrawal Whitelist" in the dashboard.
+    *   **Autonomous Agent Requirement:** You must pre-configure the Trust Wallet address in the Binance API management dashboard before running this code.
+
+5.  **ERC-20 Token Support:**
+    *   The provided `Web3Wallet.transfer` sends native coins (BNB/ETH). To send USDT or other ERC-20 tokens from Wallet -> Binance, the agent must encode the `transfer(address,uint256)` function call data in the transaction `data` field.

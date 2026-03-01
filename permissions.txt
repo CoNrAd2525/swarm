@@ -1,0 +1,18 @@
+Binance API Key Permissions
+---------------------------
+
+API Restrictions:
+- [x] Enable Reading
+- [x] Enable Spot & Margin Trading
+- [x] Enable Margin Loan, Repay & Transfer
+- [x] Enable Internal Transfer
+- [x] Permits Universal Transfer
+- [x] Enable Withdrawals
+- [ ] Enable Symbol Whitelist
+
+IP Access Restrictions:
+- [x] Restrict access to trusted IPs only (Recommended)
+- Whitelisted IPs: 4.148.0.0, 4.149.64.0, 4.149.96.0, 4.149.128.0, 4.150.0.0, 4.150.64.0, 4.150.128.0, 4.150.192.0, 4.150.224.0, 4.151.0.0, 4.152.0.0, 4.154.0.0, 4.156.0.0, 4.175.0.0, 4.180.0.0, 4.207.0.0, 4.208.0.0, 4.210.0.0, 4.210.128.0, 4.227.0.0, 4.227.128.0, 4.231.0.0, 4.231.128.0, 4.236.0.0, 4.236.128.0, 4.242.0.0, 4.242.128.0, 4.245.0.0, 4.245.128.0, 4.246.0.0, 4.246.128.0, 4.249.0.0, 4.249.128.0, 4.255.0.0, 4.255.128.0, 9.163.0.0, 9.169.0.0, 9.169.128.0, 9.234.0.0, 9.234.128.0, 13.64.0.0, 13.65.0.0, 13.66.0.0, 105.74.4.13
+
+Analysis:
+The API key has "Enable Withdrawals" permission. However, the "Restrict access to trusted IPs only" setting is enabled. The API calls are likely failing because the IP address of the server executing the requests is not in the whitelist.

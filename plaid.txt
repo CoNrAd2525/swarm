@@ -1,0 +1,276 @@
+Sandbox
+Learn more in the docs
+Use test credentials and account data to build out and test your Plaid integration.
+
+
+Credentials
+
+Products
+
+Test Users
+Your sample bank account
+You can connect a bank account using the credentials below:
+
+
+username: user_good
+password: pass_good
+For additional pre-populated test accounts, see the Sandbox docs.
+
+
+To get started, see the official Plaid Quickstart.https://plaid.com/docs/quickstart/?_gl=1*1d167aj*_gcl_au*MTA0Nzg4NTI0MC4xNzY5OTM3MDgw*_ga*NjM2MjAwMzI2LjE3Njk5MzcwNzk.*_ga_3V9NV2HMZW*czE3NzA0ODQ5MjkkbzckZzEkdDE3NzA0ODQ5NTQkajM1JGwwJGgxMjIwNjcyMDQ3  Products available in Sandbox
+Assets
+Auth
+Balance
+Enrich
+Identity
+Identity Match
+Identity Verification NOT AVAILABLE
+Income
+Investments
+Investments Refresh
+Investments Move
+Liabilities
+Monitor NOT AVAILABLE
+Payment Initiation
+Signal Transaction Scores
+Statements
+Transactions
+Recurring Transactions
+Transactions Refresh
+
+Test Users
+Use custom users to test flows in the Sandbox environment. To view configuration options, visit the docs. For sample custom user config files, see the custom users GitHub repo. You've created 0 out of your 100 available custom users.
+
+Create a custom Sandbox user
+Your custom users will be displayed here once you create them
+
+DOCS/ https://plaid.com/docs/?_gl=1*4xcjle*_gcl_au*MTA0Nzg4NTI0MC4xNzY5OTM3MDgw*_ga*NjM2MjAwMzI2LjE3Njk5MzcwNzk.*_ga_3V9NV2HMZW*czE3NzA0ODQ5MjkkbzckZzEkdDE3NzA0ODUwODAkajYwJGwwJGgxMjIwNjcyMDQ3
+
+API
+View API version changelog
+Default API version
+Currently, your requests default to 2020-09-14
+Visit the docs to learn more
+
+
+Cancel
+Choose a new default version
+
+Your update will publish immediately, breaking any integrations that still rely on your current default version. View the API version changelog to account for what's changed between versions.
+
+
+API version
+
+Update default version
+Allowed redirect URIs
+Redirect URIs return control to your app after users link to OAuth institutions. This is not necessary if you are using our Android SDK or React Native SDK for Android.
+
+* can be used as a wildcard to indicate subdomains. For example, https://*.example.com/oauth.html
+
+
+Cancel
+Redirect URIs
+
+
+Add new URI
+Enter a URI
+
+Remove URI
+Invalid URI
+
+Save changes
+Allowed Android package names
+
+Webhooks
+
+Cancel
+Event
+This shows webhooks for the products that your team is enabled for. To configure listeners for webhook events not listed here, see the API reference.
+
+Select Event
+Webhook
+Endpoint URL
+
+Configure
+
+Account Verification
+Configure Auth and Identity Match rules to verify account ownership in Link.
+
+Welcome to Account Verification
+
+Account Verification rules let you manage Auth fallback methods (Database Auth, Micro-deposits), Identity Match rules, and verification flows in the Dashboard. With built-in analytics and session-level views, you can track performance, improve conversion, investigate errors, and meet risk and compliance requirements.
+
+Session volume by Auth method
+Over the last 60 days
+
+0
+Total sessions
+0%
+Overall conversion
+Image of a bar chart. Indicates there was no data to display.
+No data
+
+No data for selected time range
+
+Add your first Account Verification rules
+Configure Account Verification rules on any of your Link customizations.
+
+Search all products
+
+All products
+refresh
+Production request under review. You can request more products once you're enabled for Production.
+
+ASSETS
+
+NOT ELIGIBLE
+Point-in-time snapshots of users' finances
+
+Access detailed borrower information directly from their bank account and gather an in-depth snapshot of a borrowers' finances.
+
+AUTH
+
+REQUESTED
+Instantly verify bank accounts
+
+Verify account ownership and share bank account information from 12K+ financial institutions in the U.S., Canada, and Europe.
+
+BALANCE
+
+NOT ELIGIBLE
+Verify real-time account balances
+
+Enables access either via the Balance endpoint, or through the Signal payments risk platform to reduce the risk of insufficient funds.
+
+CONSUMER REPORT - BASE
+
+NOT ELIGIBLE
+Base report for cash flow insights
+
+Fill in the gaps with real-time, consumer-permissioned reports powered by Plaid Check, a consumer reporting agency (US).
+
+INCOME INSIGHTS (ADD ON)
+
+NOT ELIGIBLE
+Assess financial stability with insights
+
+Get details on categorized income streams along with ready-made, model-driven attributes like historical gross and net income (US).
+
+PARTNER INSIGHTS (ADD ON)
+
+NOT ELIGIBLE
+View credit card and mortgage data
+
+Get off-the-shelf cash flow risk scores based on de-identified deposit account data (US).
+
+ENRICH
+
+NOT ELIGIBLE
+Turn messy transaction data into user insights
+
+Cleanse, categorize, and enhance data generated from your card products and bank accounts, or from non-Plaid sources (US, CA).
+
+IDENTITY
+
+NOT ELIGIBLE
+Verify bank account ownership
+
+Verify new user identities using bank data and reduce fraud losses and help prevent account takeover.
+
+IDENTITY MATCH (ADD ON)
+
+NOT ELIGIBLE
+Improve onboarding conversion
+
+Match identity data against the owners' identity information on connected accounts (US, CA, UK, EU).
+
+IDENTITY VERIFICATION
+
+NOT ELIGIBLE
+Verify good users and stop bad ones in seconds
+
+Prevent sophisticated attacks and reduces fraud losses with an anti-fraud engine that analyzes hundreds of risk signals.
+
+INCOME
+
+NOT ELIGIBLE
+Verify income and employment
+
+Choose from one of three methods to securely verify income and employment: payroll, bank, or document uploaded data (US, CA, UK).
+
+INVESTMENTS
+
+NOT ELIGIBLE
+Build a holistic view of a user's investments
+
+Gain insight into a user's investment accounts, including balances, holdings, and transactions that create a change in a holding (US, CA).
+
+INVESTMENTS REFRESH (ADD ON)
+
+NOT ELIGIBLE
+Refresh investments data
+
+Initiate an on-demand extraction to fetch the newest investment holdings and transactions (US).
+
+INVESTMENTS MOVE
+
+NOT ELIGIBLE
+Reduce rejections with broker-sourced data
+
+Streamline transfers with broker-sourced account numbers, account holder names, holdings data, and DTC codes (US, CA).
+
+LIABILITIES
+
+NOT ELIGIBLE
+Access debt information
+
+View account information for credit cards, PayPal credit accounts, private student loans, and mortgages (US, CA).
+
+MONITOR
+
+NOT ELIGIBLE
+Screen for fraud
+
+Detect if your customers are on government watchlists, using modern APIs that reduce false positives and increase efficiency.
+
+SIGNAL TRANSACTION SCORES
+
+NOT ELIGIBLE
+ACH risk assessment and scoring
+
+Enhance your risk program with two predictive scores that indicate the likelihood of an ACH return (US).
+
+STATEMENTS
+
+NOT ELIGIBLE
+Retrieve a PDF copy of a user's financial statement
+
+Simplify the process of collecting documents for loan verification purposes or rental application review purposes, among others (US).
+
+TRANSACTIONS
+
+NOT ELIGIBLE
+View up to 24 months of transactions data
+
+Use Transactions to create budgeting tools and tailored recommendations that help your users achieve their financial goals.
+
+RECURRING TRANSACTIONS (ADD ON)
+
+NOT ELIGIBLE
+Fetch recurring streams
+
+Receive a summary of the recurring expenses and deposits from a user's checking, savings or credit card (US, CA, UK).
+
+TRANSACTIONS REFRESH (ADD ON)
+
+NOT ELIGIBLE
+Refresh transactions data
+
+Initiate an on-demand extraction to fetch the newest transactions. Notifies you proactively when new transactions are available.
+
+TRANSFER
+
+UPGRADE PLAN
+Transfer money safely and quickly
+
+With Plaid Transfer, you can optimize for revenue at every stage of the user

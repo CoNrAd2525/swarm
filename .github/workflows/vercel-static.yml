@@ -1,0 +1,59 @@
+name: Vercel Static Deploy
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'rank/output/**'
+      - 'site/realworldcerts/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install Vercel CLI
+        run: npm i -g vercel
+      - name: Deploy rank/output to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_STATIC_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
+        run: |
+          NAME="${VERCEL_STATIC_PROJECT_NAME:-realworldcerts-site}"
+          if [ -d "rank/output" ]; then
+            cd rank/output
+            if [ -n "$VERCEL_TEAM_ID" ]; then
+              npx vercel pull --environment=production --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" || true
+              npx vercel deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID"
+            else
+              npx vercel pull --environment=production --yes --token "$VERCEL_TOKEN" || true
+              npx vercel deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN"
+            fi
+          else
+            echo "Skipping rank/output deploy: directory not present in repository."
+          fi
+      - name: Deploy site/realworldcerts to Vercel
+        if: ${{ hashFiles('site/realworldcerts/**') != '' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_STATIC_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
+        run: |
+          NAME="${VERCEL_STATIC_PROJECT_NAME:-realworldcerts-site}"
+          cd site/realworldcerts
+          if [ -n "$VERCEL_TEAM_ID" ]; then
+            npx vercel pull --environment=production --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" || true
+            npx vercel deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID"
+          else
+            npx vercel pull --environment=production --yes --token "$VERCEL_TOKEN" || true
+            npx vercel deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN"
+          fi

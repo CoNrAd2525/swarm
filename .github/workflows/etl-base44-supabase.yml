@@ -1,0 +1,42 @@
+name: ETL Base44 to Supabase
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      live:
+        description: "Write to Supabase (true/false)"
+        required: false
+        default: "false"
+      limit:
+        description: "Max records per entity"
+        required: false
+        default: "500"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+      - name: Install deps
+        run: npm ci
+      - name: Run ETL
+        env:
+          BASE44_API_URL: ${{ secrets.BASE44_API_URL }}
+          BASE44_SERVER_URL: ${{ secrets.BASE44_SERVER_URL }}
+          BASE44_APP_ID: ${{ secrets.BASE44_APP_ID }}
+          BASE44_SERVICE_TOKEN: ${{ secrets.BASE44_SERVICE_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BASE44_REVENUE_ENTITY: ${{ secrets.BASE44_REVENUE_ENTITY }}
+          BASE44_PAYOUT_ENTITY: ${{ secrets.BASE44_PAYOUT_ENTITY }}
+          ETL_LIVE: ${{ github.event.inputs.live }}
+          ETL_LIMIT: ${{ github.event.inputs.limit }}
+        run: node scripts/etl/base44-to-supabase.mjs
