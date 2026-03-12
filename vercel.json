@@ -1,7 +1,12 @@
 {
   "version": 2,
+  "builds": [
+    { "src": "rank/output/**", "use": "@vercel/static" },
+    { "src": "api/*.js", "use": "@vercel/node" }
+  ],
   "rewrites": [
     { "source": "/api/base44/(.*)", "destination": "/api/base44-proxy?path=$1" },
-    { "source": "/api/supabase/(.*)", "destination": "/api/supabase-proxy?path=$1" }
+    { "source": "/api/supabase/(.*)", "destination": "/api/supabase-proxy?path=$1" },
+    { "source": "/((?!api).*)", "destination": "/rank/output/$1" }
   ]
 }
