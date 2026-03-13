@@ -30,7 +30,8 @@ Thumbs.db
 settlements/
 exports/
 out/
-rank/
+rank/.git_disabled
+!rank/output/
 rank_mirror/
 dist_rwc/
 logs/

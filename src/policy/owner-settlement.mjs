@@ -20,12 +20,24 @@ export function getPaymentConfiguration() {
 		).toLowerCase() === "true";
 	const priorityEnv =
 		process.env.PAYMENT_ROUTING_PRIORITY ||
-		"bank_transfer,payoneer,crypto,paypal,wise,googlepay";
+		"mpc,safe,bank_transfer,crypto,payoneer,wise,paypal,googlepay";
 	const settlement_priority = priorityEnv
 		.split(/[,\s]+/g)
 		.map((r) => r.trim())
 		.filter(Boolean);
 	const creds = {
+		mpc: {
+			enabled:
+				String(process.env.MPC_ENABLE || "false").toLowerCase() === "true",
+			provider: process.env.MPC_PROVIDER || "FIREBLOCKS",
+			org: process.env.MPC_ORG_NAME || "",
+		},
+		safe: {
+			enabled:
+				String(process.env.SAFE_ENABLE || "false").toLowerCase() === "true",
+			chain: String(process.env.SAFE_CHAIN || "").toUpperCase(),
+			address: process.env.SAFE_ADDRESS || "",
+		},
 		paypal: {
 			clientId: process.env.PAYPAL_CLIENT_ID,
 			clientSecret: process.env.PAYPAL_CLIENT_SECRET,
@@ -135,6 +147,18 @@ export function missingCredentials(route, cfg) {
 		if (!getOwnerAccountForType("paypal")) return true;
 		return false;
 	}
+	if (r === "mpc") {
+		const c = cfg?.creds?.mpc || {};
+		if (!c.enabled) return true;
+		if (!c.provider) return true;
+		return false;
+	}
+	if (r === "safe") {
+		const c = cfg?.creds?.safe || {};
+		if (!c.enabled) return true;
+		if (!c.address) return true;
+		return false;
+	}
 	if (r === "bank_transfer") {
 		const c = cfg?.creds?.bank || {};
 		if (!c.enabled) return true;
@@ -233,6 +257,12 @@ export function getOwnerAccountForType(type) {
 	}
 	if (t === "cryptobox") {
 		return process.env.BINANCE_CRYPTOBOX_URL || null;
+	}
+	if (t === "mpc") {
+		return process.env.MPC_ORG_NAME || process.env.MPC_PROVIDER || null;
+	}
+	if (t === "safe") {
+		return process.env.SAFE_ADDRESS || null;
 	}
 	if (t === "wise") {
 		return normEmail(process.env.OWNER_WISE_EMAIL);

@@ -8,6 +8,17 @@ export function getEffectiveRoutes(_amount, currency) {
 	routes = routes.filter(
 		(r) => !OwnerSettlementEnforcer.missingCredentials(r, cfg),
 	);
+	// Promote MPC/Safe if enabled and present
+	const hasMpc = routes.includes("mpc");
+	const hasSafe = routes.includes("safe");
+	if (hasMpc || hasSafe) {
+		const rest = routes.filter((r) => r !== "mpc" && r !== "safe");
+		routes = [
+			...(hasMpc ? ["mpc"] : []),
+			...(hasSafe ? ["safe"] : []),
+			...rest,
+		];
+	}
 	const smartAvailable = !OwnerSettlementEnforcer.missingCredentials(
 		"smart_contract_owner",
 		cfg,
@@ -33,6 +44,8 @@ export function getEffectiveRoutes(_amount, currency) {
 	const cur = String(currency || "").toUpperCase();
 	if (cur === "USDT") {
 		const order = [
+			"mpc",
+			"safe",
 			"smart_contract_owner",
 			"crypto",
 			"cryptobox",
@@ -56,6 +69,8 @@ export function getEffectiveRoutes(_amount, currency) {
 			const order = [
 				"wise",
 				"bank_transfer",
+				"mpc",
+				"safe",
 				"smart_contract_owner",
 				"crypto",
 				"payoneer",
@@ -69,6 +84,8 @@ export function getEffectiveRoutes(_amount, currency) {
 			// Default bank wire priority
 			const order = [
 				"bank_transfer",
+				"mpc",
+				"safe",
 				"smart_contract_owner",
 				"crypto",
 				"payoneer",

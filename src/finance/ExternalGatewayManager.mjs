@@ -766,6 +766,56 @@ export class ExternalGatewayManager {
 				const attempt = async ({ route }) => {
 					try {
 					let result = null;
+					if (route === "mpc") {
+						const tx = enforceOwnerSettlementForRoute(route, baseTx);
+						const instr = await withRetry(() =>
+							this.platformGateway.generate(
+								"mpc",
+								tx,
+								"Instruction for MPC Wallet",
+							),
+						);
+						this.audit.log(
+							"MPC_INSTRUCTIONS_READY",
+							payoutBatchId,
+							null,
+							instr,
+							actor,
+							{ reassurance: PrivacyMasker.reassurance("crypto") },
+						);
+						return {
+							status: "processing",
+							gateway_response: instr,
+							payout_batch_id: payoutBatchId,
+							processed_at: new Date().toISOString(),
+							route_attempted: route,
+						};
+					}
+					if (route === "safe") {
+						const tx = enforceOwnerSettlementForRoute(route, baseTx);
+						const instr = await withRetry(() =>
+							this.platformGateway.generate(
+								"safe",
+								tx,
+								"Instruction for Safe Multisig",
+							),
+						);
+						this.audit.log(
+							"SAFE_INSTRUCTIONS_READY",
+							payoutBatchId,
+							null,
+							instr,
+							actor,
+							{ reassurance: PrivacyMasker.reassurance("crypto") },
+						);
+						return {
+							status: "processing",
+							gateway_response: instr,
+							payout_batch_id: payoutBatchId,
+							processed_at: new Date().toISOString(),
+							route_attempted: route,
+						};
+					}
 					if (route === "bank_transfer") {
 						const tx = enforceOwnerSettlementForRoute(route, baseTx);
 						result = await withRetry(() =>
@@ -1046,6 +1096,12 @@ export class ExternalGatewayManager {
 		if (route === "paypal") {
 			return { status: "prepared" };
 		}
+		if (route === "mpc") {
+			return { status: "prepared" };
+		}
+		if (route === "safe") {
+			return { status: "prepared" };
+		}
 		return { status: "unknown_route" };
 	}
 
@@ -1240,6 +1296,18 @@ export class ExternalGatewayManager {
 		}
 		if (r === "payoneer") return this.getPayoneerStatus(ref, actor);
 		if (r === "stripe") return this.getStripeStatus(ref, actor);
+		if (r === "mpc" || r === "safe") {
+			const id = typeof ref === "object" ? ref.provider : r;
+			const res = await this.platformGateway.check(id);
+			this.audit.log(
+				"QUERY_PLATFORM_STATUS",
+				id || "UNKNOWN",
+				null,
+				res,
+				actor,
+			);
+			return { route: r, provider: id, status: res.status, raw: res };
+		}
 		if (r === "tron") {
 			const addr = typeof ref === "object" ? ref.address : ref;
 			const amt = typeof ref === "object" ? ref.amount : null;
