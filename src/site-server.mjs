@@ -163,6 +163,17 @@ function start({ port = 8080 } = {}) {
       res.status(500).type("text/plain").send(String(e?.message ?? e));
     }
   });
+  app.get("/robots.txt", (req, res) => {
+    try {
+      const body =
+        "User-agent: *\n" +
+        "Allow: /\n" +
+        "Sitemap: https://www.realworldcerts.com/sitemap.xml\n";
+      res.type("text/plain").send(body);
+    } catch (e) {
+      res.status(500).type("text/plain").send(String(e?.message ?? e));
+    }
+  });
   app.get("/sitemap.xml", (req, res) => {
     try {
       const base = String(process.env.SITE_PUBLIC_URL || "https://www.realworldcerts.com").replace(/\/+$/, "");
@@ -193,6 +204,16 @@ function start({ port = 8080 } = {}) {
     } catch (e) {
       res.status(500).type("text/plain").send(String(e?.message ?? e));
     }
+  });
+  app.get("/news.html", (req, res) => {
+    const html =
+      '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>News | RealWorldCerts</title><link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml"><link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml"><meta name="robots" content="index,follow"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}.glass{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}.wrap{max-width:960px;margin:0 auto;padding:24px}a{color:#f59e0b;text-decoration:none}</style></head><body><main class=\"wrap\"><header class=\"glass\" style=\"border-radius:16px;padding:16px;margin-bottom:16px;\"><h1 style=\"margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent\">News</h1><nav style=\"margin-top:8px;font-size:14px\"><a href=\"/index.html\">Home</a> • <a href=\"/sitemap.xml\">Sitemap</a> • <a href=\"/rss.xml\">RSS</a></nav></header><section class=\"glass\" style=\"border-radius:16px;padding:16px;\"><p>Latest updates and announcements. Subscribe via <a href=\"/rss.xml\">RSS</a>.</p></section></main></body></html>';
+    res.type("text/html").send(html);
+  });
+  app.get("/checkout.html", (req, res) => {
+    const html =
+      '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Checkout | RealWorldCerts</title><meta name="robots" content="index,follow"><link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml"><link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}.glass{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}.wrap{max-width:680px;margin:0 auto;padding:24px}a{color:#f59e0b;text-decoration:none}button{background-image:linear-gradient(90deg,#f59e0b,#f43f5e);border:none;color:#111;padding:12px 16px;border-radius:12px;font-weight:700}</style></head><body><main class=\"wrap\"><header class=\"glass\" style=\"border-radius:16px;padding:16px;margin-bottom:16px;\"><h1 style=\"margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent\">Checkout</h1><nav style=\"margin-top:8px;font-size:14px\"><a href=\"/index.html\">Home</a> • <a href=\"/sitemap.xml\">Sitemap</a> • <a href=\"/rss.xml\">RSS</a></nav></header><section class=\"glass\" style=\"border-radius:16px;padding:16px;\"><p>Secure payment via PayPal is supported. Click below to generate a PayPal payment link.</p><button onclick=\"startPayPal()\">Pay with PayPal</button></section></main><script>async function startPayPal(){try{const res=await fetch('/api/paypal-link?amount=10&item=Course');const json=await res.json();if(json&&json.ok&&json.url){location.href=json.url;}else{alert('Unable to create PayPal link');}}catch(e){alert('Error starting PayPal checkout');}}</script></body></html>';
+    res.type("text/html").send(html);
   });
   app.get("/tutorials.html", (req, res) => {
     const html =
