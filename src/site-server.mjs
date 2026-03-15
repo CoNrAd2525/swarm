@@ -136,6 +136,64 @@ function start({ port = 8080 } = {}) {
 
   const staticRoot = ensureStaticRoot();
   app.use(express.static(staticRoot));
+  app.use("/assets/catalogue", express.static(path.resolve("catalogue")));
+  app.get("/videos/autonome.mp4", (req, res) => {
+    try {
+      const p = path.resolve("Nouveau dossier (3)", "IA__L_Économie_Autonome.mp4");
+      if (!fs.existsSync(p)) {
+        res.status(404).send("NOT_FOUND");
+        return;
+      }
+      res.type("video/mp4");
+      fs.createReadStream(p).pipe(res);
+    } catch (e) {
+      res.status(500).type("text/plain").send(String(e?.message ?? e));
+    }
+  });
+  app.get("/rss.xml", (req, res) => {
+    try {
+      const p = path.join(staticRoot, "feed.xml");
+      if (!fs.existsSync(p)) {
+        res.status(404).type("text/plain").send("NOT_FOUND");
+        return;
+      }
+      res.type("application/rss+xml");
+      res.send(fs.readFileSync(p, "utf8"));
+    } catch (e) {
+      res.status(500).type("text/plain").send(String(e?.message ?? e));
+    }
+  });
+  app.get("/sitemap.xml", (req, res) => {
+    try {
+      const base = String(process.env.SITE_PUBLIC_URL || "https://www.realworldcerts.com").replace(/\/+$/, "");
+      const entries = [];
+      function scan(dir) {
+        const items = fs.readdirSync(dir, { withFileTypes: true });
+        for (const it of items) {
+          const full = path.join(dir, it.name);
+          if (it.isDirectory()) {
+            scan(full);
+          } else if (it.isFile() && it.name.toLowerCase().endsWith(".html")) {
+            const rel = full.replace(staticRoot, "").replace(/\\+/g, "/");
+            const loc = rel === "/index.html" ? `${base}/` : `${base}${rel}`;
+            const stat = fs.statSync(full);
+            const lastmod = new Date(stat.mtimeMs || Date.now()).toISOString();
+            entries.push({ loc, lastmod });
+          }
+        }
+      }
+      scan(staticRoot);
+      const head = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+      const body = entries
+        .map((e) => `  <url>\n    <loc>${e.loc}</loc>\n    <lastmod>${e.lastmod}</lastmod>\n  </url>\n`)
+        .join("");
+      const tail = "</urlset>\n";
+      res.type("application/xml");
+      res.send(head + body + tail);
+    } catch (e) {
+      res.status(500).type("text/plain").send(String(e?.message ?? e));
+    }
+  });
   app.get("/health", (req, res) => {
     res.json({
       ok: true,

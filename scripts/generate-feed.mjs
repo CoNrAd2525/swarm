@@ -32,7 +32,12 @@ function buildFeed(base, items) {
     "    <title>RealWorldCerts News</title>\n" +
     `    <link>${base}/news.html</link>\n` +
     "    <description>Updates from RealWorldCerts</description>\n" +
-    "    <language>en</language>\n";
+    "    <language>en</language>\n" +
+    "    <image>\n" +
+    `      <url>${base}/favicon.ico</url>\n` +
+    "      <title>RealWorldCerts</title>\n" +
+    `      <link>${base}/</link>\n` +
+    "    </image>\n";
   const body = items.map(toItem).join("");
   const tail = "  </channel>\n</rss>\n";
   return head + body + tail;
@@ -42,6 +47,7 @@ function main() {
   const base = process.env.SITE_PUBLIC_URL || "https://realworldcerts.com";
   const dist = path.resolve("dist_rwc");
   const feedPath = path.join(dist, "feed.xml");
+  const rssAliasPath = path.join(dist, "rss.xml");
   const cat = readJson(path.join(dist, "site-data", "catalog.json")) || [];
   const cur = readJson(path.join(dist, "site-data", "curation_index.json")) || [];
 
@@ -65,6 +71,9 @@ function main() {
 
   const feed = buildFeed(base, [...catItems, ...curItems]);
   fs.writeFileSync(feedPath, feed, "utf8");
+  try {
+    fs.writeFileSync(rssAliasPath, feed, "utf8");
+  } catch {}
   process.stdout.write(JSON.stringify({ ok: true, feedPath }) + "\n");
 }
 
