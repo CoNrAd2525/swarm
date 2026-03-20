@@ -1,23 +1,22 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import "dotenv/config";
-import { SwarmMemory } from "./shared-memory.mjs";
-import { AgentReplenisher } from "./agent-replenisher.mjs";
-import { runRevenueSwarm } from "../revenue/swarm-runner.mjs";
+import { spawnSync } from "node:child_process";
+import { parse as csvParse } from "csv-parse/sync";
 import { calculatePosp, writePospProof } from "../consensus/posp.mjs";
-import { loadAims, aimsToMissions, writeMissions } from "./aims-ingest.mjs";
+import { runRevenueSwarm } from "../revenue/swarm-runner.mjs";
+import {
+	checkEgressIp,
+	writeEgressStatus,
+} from "../security/egress-ip-guard.mjs";
+import { AgentReplenisher } from "./agent-replenisher.mjs";
+import { aimsToMissions, loadAims, writeMissions } from "./aims-ingest.mjs";
+import { applyPhase0ToRow } from "./mission-phase0.mjs";
+import { buildMissionPlan, writeMissionPlan } from "./mission-planner.mjs";
 import { pollNews } from "./news-watch.mjs";
 import { checkNewBatches } from "./payoneer-watch.mjs";
 import { writeRoutesStatus } from "./routes-status.mjs";
-import {
-	writeEgressStatus,
-	checkEgressIp,
-} from "../security/egress-ip-guard.mjs";
-import { spawnSync } from "node:child_process";
-import { parse as csvParse } from "csv-parse/sync";
-import { applyPhase0ToRow } from "./mission-phase0.mjs";
-import { buildMissionPlan, writeMissionPlan } from "./mission-planner.mjs";
 
 function parseCsvList(raw) {
 	return String(raw || "")
@@ -127,8 +126,12 @@ function syncBase44Missions() {
 	const allowedCat = allowedMissionCategories();
 	for (const m of base44) {
 		const title = String(m?.title || "").trim();
-		const status = String(m?.status || "").trim().toLowerCase();
-		const category = String(m?.category || "").trim().toLowerCase();
+		const status = String(m?.status || "")
+			.trim()
+			.toLowerCase();
+		const category = String(m?.category || "")
+			.trim()
+			.toLowerCase();
 		const id = String(m?.id || "").trim() || `b44_${Date.now()}`;
 		if (!title) continue;
 		if (!allowedStatus.has(status)) continue;
@@ -191,8 +194,12 @@ function normalizeCsvMission(row) {
 	const title = String(row?.title ?? row?.["Mission Title"] ?? row?.[0] ?? "")
 		.trim()
 		.replace(/^"|"$/g, "");
-	const category = String(row?.category ?? row?.type ?? "").trim().toLowerCase();
-	const status = String(row?.status ?? "").trim().toLowerCase();
+	const category = String(row?.category ?? row?.type ?? "")
+		.trim()
+		.toLowerCase();
+	const status = String(row?.status ?? "")
+		.trim()
+		.toLowerCase();
 	const id =
 		String(row?.id ?? row?.mission_id ?? row?.["Mission ID"] ?? "").trim() ||
 		`csv_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
@@ -289,6 +296,7 @@ function ensurePhase0BootstrapMission() {
 		title: "Self-Setup - DropMagic Identity & API Auth",
 		channel: "infrastructure",
 		priority: "critical",
+		status: "pending",
 		data: {
 			mission_parameters: JSON.stringify({
 				task: "autonomous_registration",
@@ -300,7 +308,10 @@ function ensurePhase0BootstrapMission() {
 				api_config: {
 					action: "generate_api_keys",
 					scope: ["read", "write", "products", "orders", "analytics"],
-					webhook_setup: { enable: true, events: ["order_created", "payment_captured"] },
+					webhook_setup: {
+						enable: true,
+						events: ["order_created", "payment_captured"],
+					},
 				},
 				verification_method: "automated_email_check",
 			}),
@@ -319,6 +330,230 @@ function ensurePhase0BootstrapMission() {
 	indexAddUnique(index, { id: mission.id, file: targetFile });
 	fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
 	return id;
+}
+
+function ensureMission({
+	missionDir,
+	id,
+	title,
+	channel,
+	priority,
+	status,
+	data,
+}) {
+	ensureDir(missionDir);
+	const targetFile = path.join(missionDir, `${id}.json`);
+	if (fs.existsSync(targetFile)) return null;
+	const mission = {
+		id,
+		title,
+		channel,
+		priority,
+		status,
+		data,
+		created_at: new Date().toISOString(),
+	};
+	fs.writeFileSync(targetFile, JSON.stringify(mission, null, 2));
+	const indexPath = path.join(missionDir, "index.json");
+	let index = [];
+	try {
+		if (fs.existsSync(indexPath))
+			index = JSON.parse(fs.readFileSync(indexPath, "utf8"));
+	} catch {
+		index = [];
+	}
+	indexAddUnique(index, { id: mission.id, file: targetFile });
+	fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
+	return id;
+}
+
+export function ensureNextLevelStrategyMissions() {
+	const missionDir = path.resolve("data/swarm/missions");
+	const created = [];
+	const base = {
+		status: "pending",
+		created_at: new Date().toISOString(),
+	};
+	const missions = [
+		{
+			id: "INF-010",
+			title: "Continuity - Encrypted cloud mirror + restore drill",
+			channel: "infrastructure",
+			priority: "critical",
+			...base,
+			data: {
+				mission_parameters: JSON.stringify({
+					task: "continuity",
+					objectives: [
+						"encrypted_cloud_mirror",
+						"restore_drill",
+						"key_separation",
+					],
+					dependent_on: ["INF-001"],
+					guardrails: {
+						no_secrets_in_repo: true,
+						require_restore_proof: true,
+					},
+					deliverables: [
+						"data/swarm/mission-plan.json includes continuity mission ready state",
+						"restore proof stored under data/swarm/continuity",
+					],
+				}),
+			},
+		},
+		{
+			id: "OPS-010",
+			title:
+				"Systemic leverage - Audit swarm tasks, remove redundancy, define microagents",
+			channel: "operations",
+			priority: "high",
+			...base,
+			data: {
+				mission_parameters: JSON.stringify({
+					task: "throughput_audit",
+					dependent_on: ["INF-001"],
+					objectives: [
+						"task_inventory",
+						"redundancy_removal",
+						"microagent_boundaries",
+						"roi_per_task_type",
+					],
+					deliverables: [
+						"data/swarm/agent_audit.json",
+						"data/swarm/microagents_plan.json",
+					],
+				}),
+			},
+		},
+		{
+			id: "INF-011",
+			title:
+				"Dynamic adaptation - Agent scorecards + reinforcement loop policy",
+			channel: "infrastructure",
+			priority: "high",
+			...base,
+			data: {
+				mission_parameters: JSON.stringify({
+					task: "reinforcement_policy",
+					dependent_on: ["OPS-010"],
+					objectives: [
+						"define_success_metrics",
+						"reward_high_performers",
+						"phase_out_underperformers",
+						"keep_human_override",
+					],
+					guardrails: {
+						risk_averse: true,
+						no_unaudited_money_movement: true,
+					},
+					deliverables: ["data/swarm/agent_scorecards.json"],
+				}),
+			},
+		},
+		{
+			id: "MKT-010",
+			title:
+				"Strategic positioning - Influence map (people, platforms, APIs, flows) + access plan",
+			channel: "market_research",
+			priority: "high",
+			...base,
+			data: {
+				mission_parameters: JSON.stringify({
+					task: "influence_map",
+					objectives: [
+						"map_nodes",
+						"identify_amplifiers",
+						"define_access_steps",
+					],
+					guardrails: {
+						no_tos_violations: true,
+						no_impersonation: true,
+					},
+					deliverables: ["data/swarm/influence_map.json"],
+				}),
+			},
+		},
+		{
+			id: "STO-010",
+			title:
+				"Multi-layer monetization - Digital asset store pipeline (legal templates/bundles)",
+			channel: "store_setup",
+			priority: "medium",
+			...base,
+			data: {
+				mission_parameters: JSON.stringify({
+					task: "asset_store_pipeline",
+					dependent_on: ["INF-001"],
+					objectives: [
+						"create_product_templates",
+						"license_policy",
+						"delivery_automation",
+						"refund_support_flow",
+					],
+					guardrails: {
+						only_legal_assets: true,
+						no_plagiarism: true,
+					},
+					deliverables: ["data/swarm/store_pipeline.json"],
+				}),
+			},
+		},
+		{
+			id: "MKT-011",
+			title:
+				"Monetization ladder - Content → lead magnet → email → course → subscription",
+			channel: "marketing",
+			priority: "medium",
+			...base,
+			data: {
+				mission_parameters: JSON.stringify({
+					task: "monetization_ladder",
+					dependent_on: ["STO-010"],
+					objectives: [
+						"content_generation_pipeline",
+						"course_packaging",
+						"subscription_access",
+						"microtransactions_layer",
+					],
+					deliverables: ["data/swarm/monetization_ladder.json"],
+				}),
+			},
+		},
+		{
+			id: "OPS-011",
+			title:
+				"Guardrails - Compliance, unit economics, and execution kill-switches for new streams",
+			channel: "operations",
+			priority: "critical",
+			...base,
+			data: {
+				mission_parameters: JSON.stringify({
+					task: "guardrails",
+					objectives: [
+						"unit_economics_enforcement",
+						"legal_and_tax_checks",
+						"tos_compliance",
+						"manual_approval_for_non_owner_destinations",
+					],
+					deliverables: ["data/swarm/guardrails_policy.json"],
+				}),
+			},
+		},
+	];
+
+	for (const m of missions) {
+		const id = ensureMission({
+			missionDir,
+			id: m.id,
+			title: m.title,
+			channel: m.channel,
+			priority: m.priority,
+			status: m.status,
+			data: m.data,
+		});
+		if (id) created.push(id);
+	}
+	return created;
 }
 
 function loadAgents() {
@@ -347,38 +582,50 @@ async function runCycle({ memory, replenisher, filePath }) {
 	if (missions.length) {
 		writeMissions(missions);
 	}
-		let headhunter = null;
-		try {
-			const hh = spawnSync(process.execPath, ["scripts/headhunter-daemon.mjs"], {
-				cwd: process.cwd(),
-				encoding: "utf8",
-			});
-			try {
-				headhunter = JSON.parse((hh.stdout || "").trim());
-			} catch {
-				headhunter = { ok: false, raw: (hh.stdout || "").trim() };
-			}
-		} catch {
-			headhunter = { ok: false };
-		}
-	const synced = syncBase44Missions();
-	const syncedCsv = syncArchiveCsvMissions();
-	let campaigns = { ok: true, output: null };
+	let headhunter = null;
 	try {
-		const cs = spawnSync(process.execPath, ["scripts/sync-campaigns-from-csv.mjs", "--in", path.join(process.cwd(), "rank", "Campaign_export (5).csv")], {
+		const hh = spawnSync(process.execPath, ["scripts/headhunter-daemon.mjs"], {
 			cwd: process.cwd(),
 			encoding: "utf8",
 		});
+		try {
+			headhunter = JSON.parse((hh.stdout || "").trim());
+		} catch {
+			headhunter = { ok: false, raw: (hh.stdout || "").trim() };
+		}
+	} catch {
+		headhunter = { ok: false };
+	}
+	const _synced = syncBase44Missions();
+	const _syncedCsv = syncArchiveCsvMissions();
+	let campaigns = { ok: true, output: null };
+	try {
+		const cs = spawnSync(
+			process.execPath,
+			[
+				"scripts/sync-campaigns-from-csv.mjs",
+				"--in",
+				path.join(process.cwd(), "rank", "Campaign_export (5).csv"),
+			],
+			{
+				cwd: process.cwd(),
+				encoding: "utf8",
+			},
+		);
 		campaigns.output = (cs.stdout || "").trim();
 	} catch {
 		campaigns = { ok: false };
 	}
 	let payoutPromotion = { ok: true, output: null };
 	try {
-		const prx = spawnSync(process.execPath, ["scripts/promote-offline-payout-requests.mjs"], {
-			cwd: process.cwd(),
-			encoding: "utf8",
-		});
+		const prx = spawnSync(
+			process.execPath,
+			["scripts/promote-offline-payout-requests.mjs"],
+			{
+				cwd: process.cwd(),
+				encoding: "utf8",
+			},
+		);
 		payoutPromotion.output = (prx.stdout || "").trim();
 	} catch {
 		payoutPromotion = { ok: false };
@@ -399,11 +646,17 @@ async function runCycle({ memory, replenisher, filePath }) {
 	} catch {
 		upgradeMissionId = null;
 	}
-	let phase0MissionId = null;
+	let _phase0MissionId = null;
 	try {
-		phase0MissionId = ensurePhase0BootstrapMission();
+		_phase0MissionId = ensurePhase0BootstrapMission();
 	} catch {
-		phase0MissionId = null;
+		_phase0MissionId = null;
+	}
+	let nextLevelMissions = [];
+	try {
+		nextLevelMissions = ensureNextLevelStrategyMissions();
+	} catch {
+		nextLevelMissions = [];
 	}
 	let missionPlanPath = null;
 	try {
@@ -514,13 +767,14 @@ async function runCycle({ memory, replenisher, filePath }) {
 	}
 	const out = {
 		ok: true,
-			headhunter,
+		headhunter,
 		replenish: rep,
 		revenue: rev,
 		campaigns_sync: campaigns,
 		payout_promotion: payoutPromotion,
 		base44_upgrade: upgrade,
 		base44_upgrade_mission_id: upgradeMissionId,
+		next_level_missions_created: nextLevelMissions,
 		posp: { score: posp.score, proof: proofPath },
 		news,
 		payoneer,
