@@ -520,6 +520,65 @@ export function ensureNextLevelStrategyMissions() {
 			},
 		},
 		{
+			id: "INF-012",
+			title:
+				"Autonomous intelligence - Unified metrics pipeline (performance, ops, revenue) + alerting",
+			channel: "infrastructure",
+			priority: "high",
+			...base,
+			data: {
+				mission_parameters: JSON.stringify({
+					task: "metrics_pipeline",
+					dependent_on: ["INF-001", "OPS-010"],
+					objectives: [
+						"define_kpis",
+						"standardize_event_schema",
+						"store_metrics_snapshots",
+						"alert_on_regressions",
+					],
+					guardrails: {
+						no_sensitive_logging: true,
+						no_secrets_in_repo: true,
+					},
+					deliverables: [
+						"data/swarm/metrics_schema.json",
+						"data/swarm/metrics_latest.json",
+						"data/swarm/alerts_latest.json",
+					],
+				}),
+			},
+		},
+		{
+			id: "MKT-012",
+			title:
+				"Preemptive opportunity capture - Forecast signals from public sources + internal KPIs",
+			channel: "market_research",
+			priority: "high",
+			...base,
+			data: {
+				mission_parameters: JSON.stringify({
+					task: "predictive_signals",
+					dependent_on: ["INF-012", "MKT-010"],
+					objectives: [
+						"select_signal_sources",
+						"build_signal_scores",
+						"generate_ranked_opportunity_queue",
+						"auto_create_followup_missions",
+					],
+					guardrails: {
+						public_sources_only: true,
+						no_tos_violations: true,
+						human_override_required_for_spend: true,
+					},
+					deliverables: [
+						"data/swarm/signals_sources.json",
+						"data/swarm/signals_latest.json",
+						"data/swarm/opportunity_queue.json",
+					],
+				}),
+			},
+		},
+		{
 			id: "OPS-011",
 			title:
 				"Guardrails - Compliance, unit economics, and execution kill-switches for new streams",
