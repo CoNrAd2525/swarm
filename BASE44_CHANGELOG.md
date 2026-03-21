@@ -1,5 +1,12 @@
 # Base44 App Update Changelogs
 
+## Version 2026.03.20 - Swarm Supervisor Mission Seeding Hardening
+
+### 🧩 Mission Pipeline Improvements
+- Validated next-level mission dependency graph (missing deps + cycle detection)
+- Backfilled missing mission index entries when mission files already exist
+- Surfaced next-level mission seeding failures via `next_level_missions_error` supervisor output field
+
 ## Version 2026.02.25 - Base44 Coordination & Owner Directive Validation
 
 ### 🚀 Deployment

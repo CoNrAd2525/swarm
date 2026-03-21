@@ -17,6 +17,8 @@ client_secret_*.json
 .tmp_extract_out.json
 backups/snapshot_*/
 backups/mirror/
+backups/doomsday/
+mirrors/
 data/locks/
 data/swarm/
 data/base44_export/offline-store-backup.json

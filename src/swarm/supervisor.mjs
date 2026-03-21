@@ -343,7 +343,22 @@ function ensureMission({
 }) {
 	ensureDir(missionDir);
 	const targetFile = path.join(missionDir, `${id}.json`);
-	if (fs.existsSync(targetFile)) return null;
+	const indexPath = path.join(missionDir, "index.json");
+	let index = [];
+	try {
+		if (fs.existsSync(indexPath))
+			index = JSON.parse(fs.readFileSync(indexPath, "utf8"));
+	} catch {
+		index = [];
+	}
+	if (fs.existsSync(targetFile)) {
+		const before = Array.isArray(index) ? index.length : 0;
+		if (!Array.isArray(index)) index = [];
+		indexAddUnique(index, { id, file: targetFile });
+		if (index.length !== before)
+			fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
+		return null;
+	}
 	const mission = {
 		id,
 		title,
@@ -354,17 +369,85 @@ function ensureMission({
 		created_at: new Date().toISOString(),
 	};
 	fs.writeFileSync(targetFile, JSON.stringify(mission, null, 2));
-	const indexPath = path.join(missionDir, "index.json");
-	let index = [];
-	try {
-		if (fs.existsSync(indexPath))
-			index = JSON.parse(fs.readFileSync(indexPath, "utf8"));
-	} catch {
-		index = [];
-	}
+	if (!Array.isArray(index)) index = [];
 	indexAddUnique(index, { id: mission.id, file: targetFile });
 	fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
 	return id;
+}
+
+function safeParseMissionParameters(missionParameters) {
+	try {
+		if (missionParameters == null) return null;
+		return JSON.parse(String(missionParameters));
+	} catch {
+		return null;
+	}
+}
+
+function extractDependentOn(missionParameters) {
+	const dep = missionParameters?.dependent_on;
+	if (Array.isArray(dep)) return dep.map((d) => String(d));
+	if (typeof dep === "string" && dep.trim()) return [dep.trim()];
+	return [];
+}
+
+function listExistingMissionIds(missionDir) {
+	try {
+		if (!fs.existsSync(missionDir)) return new Set();
+		const out = new Set();
+		for (const f of fs.readdirSync(missionDir)) {
+			if (f === "index.json") continue;
+			if (!f.endsWith(".json")) continue;
+			out.add(f.slice(0, -5));
+		}
+		return out;
+	} catch {
+		return new Set();
+	}
+}
+
+function validateMissionGraph({ missionDir, missions, allowedExternalDeps }) {
+	const errors = [];
+	const missionIds = new Set(missions.map((m) => m.id));
+	const existing = listExistingMissionIds(missionDir);
+	const allowed = allowedExternalDeps || new Set();
+	const known = new Set([...missionIds, ...existing, ...allowed]);
+
+	const edges = new Map();
+	for (const m of missions) {
+		const mp = safeParseMissionParameters(m?.data?.mission_parameters);
+		if (!mp) {
+			errors.push({ id: m?.id, type: "bad_mission_parameters" });
+			continue;
+		}
+		const deps = extractDependentOn(mp);
+		edges.set(
+			m.id,
+			deps.filter((d) => missionIds.has(d)),
+		);
+		for (const d of deps) {
+			if (!known.has(d))
+				errors.push({ id: m.id, type: "missing_dependency", dep: d });
+		}
+	}
+
+	const visiting = new Set();
+	const visited = new Set();
+	function dfs(id, stack) {
+		if (visited.has(id)) return;
+		if (visiting.has(id)) {
+			errors.push({ id, type: "dependency_cycle", cycle: [...stack, id] });
+			return;
+		}
+		visiting.add(id);
+		const deps = edges.get(id) || [];
+		for (const d of deps) dfs(d, [...stack, id]);
+		visiting.delete(id);
+		visited.add(id);
+	}
+	for (const id of missionIds) dfs(id, []);
+
+	return { ok: errors.length === 0, errors };
 }
 
 export function ensureNextLevelStrategyMissions() {
@@ -600,6 +683,16 @@ export function ensureNextLevelStrategyMissions() {
 		},
 	];
 
+	const validation = validateMissionGraph({
+		missionDir,
+		missions,
+		allowedExternalDeps: new Set(["INF-001"]),
+	});
+	if (!validation.ok) {
+		const msg = JSON.stringify(validation.errors.slice(0, 10));
+		throw new Error(`Invalid next-level mission graph: ${msg}`);
+	}
+
 	for (const m of missions) {
 		const id = ensureMission({
 			missionDir,
@@ -712,10 +805,12 @@ async function runCycle({ memory, replenisher, filePath }) {
 		_phase0MissionId = null;
 	}
 	let nextLevelMissions = [];
+	let nextLevelMissionsError = null;
 	try {
 		nextLevelMissions = ensureNextLevelStrategyMissions();
-	} catch {
+	} catch (e) {
 		nextLevelMissions = [];
+		nextLevelMissionsError = String(e?.message || e || "unknown_error");
 	}
 	let missionPlanPath = null;
 	try {
@@ -834,6 +929,7 @@ async function runCycle({ memory, replenisher, filePath }) {
 		base44_upgrade: upgrade,
 		base44_upgrade_mission_id: upgradeMissionId,
 		next_level_missions_created: nextLevelMissions,
+		next_level_missions_error: nextLevelMissionsError,
 		posp: { score: posp.score, proof: proofPath },
 		news,
 		payoneer,
