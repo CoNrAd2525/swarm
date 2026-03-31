@@ -198,6 +198,13 @@ class TraeMemory {
 }
 ```
 
+## Project Learning Notes (RealWorldCerts)
+
+- Hands-free operations: gate settlement with policy checks; refuse to run payouts on secrets risk
+- Secrets safety: scan src/scripts for leaks, generate rotation checklist, keep audit artifacts
+- Plaid readiness: require prod credentials + webhook HMAC secret before enabling Plaid flows
+- Growth loop: capture interactive classroom requests and surface as swarm demand metrics
+
 ## Memory Operations
 
 ### Read Operations

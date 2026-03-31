@@ -1,5 +1,5 @@
-import fs from "node:fs";
 import crypto from "node:crypto";
+import fs from "node:fs";
 import "../load-env.mjs";
 import { computeConstitutionHashFromFile } from "../bootstrap/constitution-validator.mjs";
 
@@ -25,7 +25,6 @@ function sign(hash, pem) {
 }
 
 export async function ensureOwnerSignature() {
-
 	const jsonPath = "./swarm.constitution.json";
 	const hash = computeConstitutionHashFromFile(jsonPath);
 	const sigPath = "./owner.signature";
@@ -53,5 +52,4 @@ export async function ensureOwnerSignature() {
 	const signatureB64 = sign(hash, privatePem);
 	fs.writeFileSync(sigPath, signatureB64, "utf8");
 	return { ok: true, created: true };
-
 }

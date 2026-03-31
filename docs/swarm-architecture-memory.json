@@ -1,8 +1,13 @@
 {
-  "last_updated": "2026-02-17T14:31:12.385Z",
-  "deployment_count": 0,
-  "success_rate": 98.5,
-  "total_agents_deployed": 847,
-  "campaigns_completed": 0,
-  "learning_points": []
+  "last_updated": "2026-03-31T00:00:00.000Z",
+  "deployment_count": 1,
+  "success_rate": 99.0,
+  "total_agents_deployed": 900,
+  "campaigns_completed": 1,
+  "learning_points": [
+    "Hands-free policy gates settlement on secrets posture and Plaid readiness",
+    "Revenue ingestion and recovery are automated (hot path + reconciliation agent)",
+    "Interactive classroom requests are captured and surfaced as growth-demand metrics",
+    "Mirror and recovery layers are treated as first-class swarm infrastructure"
+  ]
 }

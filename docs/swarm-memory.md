@@ -27,3 +27,12 @@
   - Health proofs updated in Mission
   - Metrics for sync and webhook
   - Settlement index prevents duplicate processing
+
+## Recent additions
+
+- Security posture memory:
+  - Secrets scan outputs: logs/security/secrets-summary.json and logs/security/rotation-checklist.md
+  - Policy status: logs/security/policy-status.json used to gate settlement daemons
+- Growth signal memory:
+  - Classroom requests capture: data/classroom/requests.json and logs/classroom_requests.jsonl
+  - Swarm metrics: revenue reports include classroom_requests_total and classroom_requests_24h

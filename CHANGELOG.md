@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-03-31]
+- feat(security): Added automated secrets scan + rotation checklist and policy status outputs
+- feat(payments): Enforced hands-free settlement gating based on security posture and Plaid readiness
+- feat(plaid): Added Plaid preflight readiness checks (prod mode + webhook HMAC requirement)
+- feat(site): Added interactive classroom landing page and request capture endpoint
+- feat(growth): Promoted interactive classroom CTA from auto-generated certification guides
+- feat(swarm): Extended revenue swarm reporting with classroom demand metrics (24h + total)
+- docs: Added OpenMAIC integration notes with licensing and architecture options
+
+## [2026-03-20]
+- feat(swarm): Validated next-level mission dependency graph and surfaced errors in supervisor output
+- feat(swarm): Backfilled missing mission index entries when mission files already exist
+- test(swarm): Added coverage for idempotent seeding + index backfill
+- ops(backups): Refreshed snapshot and doomsday mirror artifacts (local-only; ignored by git)
+
+## [2026-03-14]
+- deploy(vercel): Verified vercel.json to serve rank/output via static routes
+- ops(backups): Created doomsday zip at backups/doomsday/realworldcerts-site-YYYYMMDD-HHmmss.zip
+- ops(mirrors): Prepared local mirrors at mirrors/vercel-public and mirrors/backup-1
+- ops(crypto): Generated Bitget instruction files for owner payouts from archive CSV
+- site(health): Confirmed robots.txt, sitemap.xml, and hubs live on realworldcerts.com
+
 ## [2026-02-25]
 - feat(finance): Prepared historical payout artifacts across all rails (Payoneer, Wise, Bank Wire); added per-batch CSVs under settlements/*/historical and a consolidated settlements/payouts_index.json
 - feat(scripts): Added generate-secondary-payouts-from-manifests.mjs and paypal-send-owner-payout.mjs to automate multi-rail preparation and micro confirmation

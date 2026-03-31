@@ -1,92 +1,54 @@
-import fs from "fs";
-import path from "path";
+import "dotenv/config";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { RotationChecklist } from "../src/security/RotationChecklist.mjs";
+import { SecretsScanner } from "../src/security/SecretsScanner.mjs";
 
-const IGNORE_DIRS = new Set([
-	"node_modules",
-	".git",
-	"dist",
-	"build",
-	".qodo",
-	"archive",
-]);
-const IGNORE_FILES = new Set(["CREDS.txt"]);
-
-function walk(dir) {
-	const out = [];
-	const entries = fs.readdirSync(dir, { withFileTypes: true });
-	for (const e of entries) {
-		const p = path.join(dir, e.name);
-		if (e.isDirectory()) {
-			if (IGNORE_DIRS.has(e.name)) continue;
-			out.push(...walk(p));
-		} else {
-			if (IGNORE_FILES.has(e.name)) continue;
-			out.push(p);
+async function run() {
+	const roots = [path.resolve("src"), path.resolve("scripts")];
+	let total = 0;
+	const bySeverity = { critical: 0, high: 0, medium: 0 };
+	const findings = [];
+	for (const r of roots) {
+		const reportPath = path.join(
+			"logs",
+			"security",
+			`secrets-report-${path.basename(r)}.json`,
+		);
+		const scanner = new SecretsScanner({ root: r, reportPath });
+		await scanner.init();
+		const res = await scanner.scan();
+		total += res.total;
+		bySeverity.critical += res.by_severity.critical;
+		bySeverity.high += res.by_severity.high;
+		bySeverity.medium += res.by_severity.medium;
+		for (const f of res.findings || []) {
+			if (findings.length >= 250) break;
+			findings.push(f);
 		}
 	}
-	return out;
-}
-
-function scanFile(file) {
-	try {
-		const s = fs.readFileSync(file, "utf8");
-		const findings = [];
-		const patterns = [
-			{ name: "api_key_like", re: /\b[a-zA-Z0-9]{32,}\b/g },
-			{
-				name: "secret_assign",
-				re: /(secret|client_secret|api_secret)\s*[:=]\s*['"][^'"]{12,}['"]/gi,
-			},
-			{
-				name: "key_assign",
-				re: /(key|api_key|token)\s*[:=]\s*['"][^'"]{12,}['"]/gi,
-			},
-			{
-				name: "private_key",
-				re: /-----BEGIN (?:RSA|EC|OPENSSH) PRIVATE KEY-----/,
-			},
-		];
-		for (const pat of patterns) {
-			const m = s.match(pat.re);
-			if (m && m.length) {
-				findings.push({ pattern: pat.name, count: m.length });
-			}
-		}
-		return findings;
-	} catch {
-		return [];
-	}
-}
-
-function main() {
-	const root = process.cwd();
-	const files = walk(root);
-	const report = [];
-	for (const f of files) {
-		const findings = scanFile(f);
-		if (findings.length) {
-			report.push({ file: f, findings });
-		}
-	}
-	const outDir = path.resolve("data/security");
-	fs.mkdirSync(outDir, { recursive: true });
-	const outFile = path.join(outDir, `secrets-scan_${Date.now()}.json`);
-	fs.writeFileSync(
-		outFile,
-		JSON.stringify(
-			{ created_at: new Date().toISOString(), items: report },
-			null,
-			2,
-		),
+	const mainReport = {
+		at: new Date().toISOString(),
+		total,
+		by_severity: bySeverity,
+		findings,
+	};
+	await fs.mkdir(path.join("logs", "security"), { recursive: true });
+	await fs.writeFile(
+		path.join("logs", "security", "secrets-summary.json"),
+		JSON.stringify(mainReport, null, 2),
 	);
 	console.log(
-		JSON.stringify({
-			ok: true,
-			file: outFile,
-			total_files: files.length,
-			findings_files: report.length,
-		}),
+		`[Scan] Findings: ${total} (critical=${bySeverity.critical}, high=${bySeverity.high})`,
 	);
+	const checklist = new RotationChecklist({
+		reportPath: path.join("logs", "security", "secrets-summary.json"),
+	});
+	const out = await checklist.generate();
+	console.log(`[Scan] Rotation checklist generated: ${out}`);
 }
 
-main();
+run().catch((e) => {
+	console.error(e);
+	process.exit(1);
+});

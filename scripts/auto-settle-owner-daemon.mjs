@@ -1,17 +1,17 @@
-import { parse } from "csv-parse/sync";
-import { ExternalGatewayManager } from "../src/finance/ExternalGatewayManager.mjs";
-import { buildBase44ServiceClient } from "../src/base44-client.mjs";
-import { getRevenueConfigFromEnv } from "../src/base44-revenue.mjs";
-import { createPayPalPayoutBatch } from "../src/paypal-api.mjs";
-import {
-	validateOwnerDirectiveSetup,
-	preExecutionOwnerCheck,
-	enforceOwnerDirective,
-} from "../src/owner-directive.mjs";
-import { OwnerSettlementEnforcer } from "../src/policy/owner-settlement.mjs";
 import fs from "node:fs";
 import path from "node:path";
+import { parse } from "csv-parse/sync";
 import winston from "winston";
+import { buildBase44ServiceClient } from "../src/base44-client.mjs";
+import { getRevenueConfigFromEnv } from "../src/base44-revenue.mjs";
+import { ExternalGatewayManager } from "../src/finance/ExternalGatewayManager.mjs";
+import {
+	enforceOwnerDirective,
+	preExecutionOwnerCheck,
+	validateOwnerDirectiveSetup,
+} from "../src/owner-directive.mjs";
+import { createPayPalPayoutBatch } from "../src/paypal-api.mjs";
+import { OwnerSettlementEnforcer } from "../src/policy/owner-settlement.mjs";
 
 // ============================================================================
 // LOGGER CONFIGURATION
@@ -70,15 +70,18 @@ class RealAuditLogger {
 			newState,
 			details,
 		};
-		
-		if (event === 'SETTLEMENT_VALUE') {
+
+		if (event === "SETTLEMENT_VALUE") {
 			const logFile = path.join(this.logDir, `settlement_values.jsonl`);
-			fs.appendFileSync(logFile, JSON.stringify(entry) + "\n");
+			fs.appendFileSync(logFile, `${JSON.stringify(entry)}\n`);
 		}
 
-		const logFile = path.join(this.logDir, `${new Date().toISOString().split("T")[0]}.jsonl`);
-		fs.appendFileSync(logFile, JSON.stringify(entry) + "\n");
-		
+		const logFile = path.join(
+			this.logDir,
+			`${new Date().toISOString().split("T")[0]}.jsonl`,
+		);
+		fs.appendFileSync(logFile, `${JSON.stringify(entry)}\n`);
+
 		logger.info(`[AUDIT] ${event} - ${id} - ${actor}`, details || "");
 	}
 }
@@ -89,12 +92,12 @@ class RealExecutor {
 		this.executed = new Map();
 	}
 
-	async execute(idempotencyKey, fn, context) {
+	async execute(idempotencyKey, fn, _context) {
 		if (this.executed.has(idempotencyKey)) {
 			logger.info(`[EXECUTOR] Skipping duplicate execution: ${idempotencyKey}`);
 			return this.executed.get(idempotencyKey);
 		}
-		
+
 		logger.info(`[EXECUTOR] Executing: ${idempotencyKey}`);
 		const result = await fn();
 		this.executed.set(idempotencyKey, result);
@@ -106,7 +109,11 @@ class RealExecutor {
 const realStorage = new RealStorage();
 const realAuditLogger = new RealAuditLogger();
 const realExecutor = new RealExecutor();
-const externalGatewayManager = new ExternalGatewayManager(realStorage, realAuditLogger, realExecutor);
+const externalGatewayManager = new ExternalGatewayManager(
+	realStorage,
+	realAuditLogger,
+	realExecutor,
+);
 
 // ============================================================================
 // CONFIGURATION
@@ -134,15 +141,26 @@ const CONFIG = {
 	// Settlement urgency
 	MAX_SETTLEMENT_DELAY_HOURS: 0.25, // 15 minutes max from verification to settlement
 
-	// Rail preferences (in order) - Force Wise route for stuck Payoneer settlements
-	RAIL_PRIORITY: ["WISE", "BANK_WIRE", "PAYPAL", "PAYONEER", "GOOGLEPAY", "PLAID", "CRYPTO"],
+	// Rail preferences (in order) - Prefer Bank/Wise over Crypto
+	RAIL_PRIORITY: [
+		process.env.FORCE_BANK_WIRE === "true" ? "BANK_WIRE" : null,
+		"BANK_WIRE",
+		"CHEQUE",
+		"WISE",
+		"GOOGLEPAY",
+		"PLAID",
+		"PAYPAL",
+		"PAYONEER",
+		"CRYPTO",
+	].filter(Boolean),
 
 	// Modes
 	ENABLE_IMMEDIATE_SETTLEMENT: true, // Settle as soon as verified
 	ENABLE_EMERGENCY_MODE: false, // Bypass all checks (use with caution)
-	
+
 	// Security: Emergency payment lock
-	EMERGENCY_PAYMENT_LOCK: false, // Set to true to block ALL payments
+	EMERGENCY_PAYMENT_LOCK:
+		(process.env.EMERGENCY_PAYMENT_LOCK || "false").toLowerCase() === "true", // Set to true to block ALL payments
 };
 
 // ============================================================================
@@ -207,28 +225,51 @@ const state = new SettlementState();
  */
 function enforceEmergencyPaymentLock() {
 	if (CONFIG.EMERGENCY_PAYMENT_LOCK) {
-		throw new Error("🚨 EMERGENCY PAYMENT LOCK ACTIVE: All payments blocked due to security concerns. Contact Younes Tsouli immediately at younestsouli2019@gmail.com");
+		throw new Error(
+			"🚨 EMERGENCY PAYMENT LOCK ACTIVE: All payments blocked due to security concerns. Contact Younes Tsouli immediately at younestsouli2019@gmail.com",
+		);
 	}
 }
 
 /**
  * Validate that only authorized owner accounts are being used
  */
-function validateAuthorizedOwnerAccounts(rail, recipientData) {
+function _validateAuthorizedOwnerAccounts(rail, recipientData) {
 	const ownerName = process.env.OWNER_BENEFICIARY_NAME;
-	const authorizedIbans = JSON.parse(process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON || "[]");
-	
+	const authorizedIbans = JSON.parse(
+		process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON || "[]",
+	);
+
 	// Check recipient name matches owner
 	if (recipientData.name && recipientData.name !== ownerName) {
-		throw new Error(`🚨 SECURITY ALERT: Unauthorized recipient name "${recipientData.name}" for ${rail}. Only "${ownerName}" is authorized.`);
+		throw new Error(
+			`🚨 SECURITY ALERT: Unauthorized recipient name "${recipientData.name}" for ${rail}. Only "${ownerName}" is authorized.`,
+		);
 	}
-	
+
+	if (rail === "CHEQUE") {
+		// Cheques are inherently manual, we just ensure the recipient is the owner name
+		if (recipientData.name !== getOwnerAccounts().bank.name) {
+			throw new Error(
+				`🚨 SECURITY ALERT: Unauthorized Cheque recipient "${recipientData.name}". Only owner name allowed.`,
+			);
+		}
+		logger.info(
+			`✅ CHEQUE recipient validation passed for authorized owner: ${recipientData.name}`,
+		);
+		return;
+	}
+
 	// Check IBAN is in authorized list
 	if (recipientData.iban && !authorizedIbans.includes(recipientData.iban)) {
-		throw new Error(`🚨 SECURITY ALERT: Unauthorized IBAN "${recipientData.iban}" for ${rail}. Only authorized IBANs allowed: ${authorizedIbans.join(", ")}`);
+		throw new Error(
+			`🚨 SECURITY ALERT: Unauthorized IBAN "${recipientData.iban}" for ${rail}. Only authorized IBANs allowed: ${authorizedIbans.join(", ")}`,
+		);
 	}
-	
-	logger.info(`✅ ${rail} recipient validation passed for authorized owner account`);
+
+	logger.info(
+		`✅ ${rail} recipient validation passed for authorized owner account`,
+	);
 }
 
 // ============================================================================
@@ -282,6 +323,60 @@ async function startAutoSettlementDaemon() {
 	return intervalId;
 }
 
+async function syncPendingWiseTransfers(gatewayManager) {
+	const base44 = buildBase44ServiceClient();
+	const batchEntity = base44.asServiceRole.entities.PayoutBatch;
+	const itemEntity = base44.asServiceRole.entities.PayoutItem;
+
+	const pendingWiseBatches = await batchEntity
+		.filter(
+			{ payout_method: "WISE", status: "processing" },
+			"-created_date",
+			100,
+			0,
+		)
+		.catch(() => []);
+
+	if (pendingWiseBatches.length === 0) return;
+
+	logger.info(
+		`🔄 Syncing status for ${pendingWiseBatches.length} Wise transfers...`,
+	);
+
+	for (const batch of pendingWiseBatches) {
+		const transferId = batch.notes?.gateway_ref || batch.gateway_ref;
+		if (!transferId) continue;
+
+		try {
+			const status =
+				await gatewayManager.wiseGateway.getTransferStatus(transferId);
+			logger.info(`Transfer ${transferId} status: ${status.status}`);
+
+			if (status.status === "outgoing_payment_sent") {
+				logger.info(
+					`✅ Wise transfer ${transferId} completed! Updating ledger...`,
+				);
+				await batchEntity.update(batch.id, { status: "completed" });
+
+				const items = await itemEntity.filter(
+					{ batch_id: batch.batch_id },
+					"-created_date",
+					1000,
+					0,
+				);
+				for (const item of items) {
+					await itemEntity.update(item.id, { status: "paid_out" });
+				}
+			} else if (status.status === "cancelled") {
+				logger.warn(`❌ Wise transfer ${transferId} was cancelled!`);
+				await batchEntity.update(batch.id, { status: "failed" });
+			}
+		} catch (e) {
+			logger.error(`Error syncing Wise transfer ${transferId}: ${e.message}`);
+		}
+	}
+}
+
 /**
  * Main settlement cycle - runs periodically
  */
@@ -294,37 +389,33 @@ async function performSettlementCycle() {
 
 		// EMERGENCY SECURITY CHECK: Block all payments if lock is active
 		enforceEmergencyPaymentLock();
-		
+
 		// Step 1: Fetch verified revenue events ready for settlement
 		const readyEvents = await queryRevenueEvents({});
 
 		if (readyEvents.length === 0) {
 			logger.info("✅ No events ready for settlement");
+			// Step 1.5: Sync pending Wise transfers even if no new events
+			await syncPendingWiseTransfers(externalGatewayManager);
 			return;
 		}
 
 		logger.info(`📦 Found ${readyEvents.length} events ready for settlement`);
 
-		// Determine recipient based on forced route
-		const forceWiseRoute = (process.env.FORCE_BANK_WIRE === 'true' && process.env.BANK_WIRE_PROVIDER === 'WISE');
-		const recipientItems = readyEvents.map(event => ({
-			amount: event.amount,
-			currency: event.currency,
-			recipient_email: forceWiseRoute ? getOwnerAccounts().wise?.email || getOwnerAccounts().paypal : getOwnerAccounts().paypal,
-			note: `Settlement for event ${event.id}`,
-		}));
+		const grouped = _groupEventsByRail(readyEvents);
+		const rails = CONFIG.RAIL_PRIORITY.filter((r) => grouped[r]?.length > 0);
+		for (const rail of rails) {
+			try {
+				await _processRailBatch(rail, grouped[rail]);
+			} catch (error) {
+				logger.error(`❌ Failed to process ${rail} batch:`, error.message);
+				state.addError(error);
+				// Continue to next rail
+			}
+		}
 
-		const payoutBatchId = `OWNER_SETTLEMENT_${Date.now()}`;
-		const idempotencyKey = `IDEMPOTENCY_${payoutBatchId}`;
-
-		await externalGatewayManager.initiateAutoSettlement(
-			payoutBatchId,
-			recipientItems,
-			idempotencyKey,
-			'AutoSettlementDaemon'
-		);
-
-		realAuditLogger.log('SETTLEMENT_VALUE', payoutBatchId, null, { value: recipientItems.reduce((sum, item) => sum + item.amount, 0), currency: recipientItems[0].currency }, 'System', { message: 'Recording settlement value for Swarm ledger.' });
+		// Step 3: Final status sync
+		await syncPendingWiseTransfers(externalGatewayManager);
 	} catch (error) {
 		logger.error("❌ Settlement cycle error:", error);
 		state.addError(error);
@@ -338,11 +429,17 @@ async function performSettlementCycle() {
 /**
  * Fetches revenue events that are verified and ready for settlement
  */
-async function fetchReadyForSettlement() {
-	const csvPath = path.join(process.cwd(), "archive", "owner_bank_requests.csv");
+async function _fetchReadyForSettlement() {
+	const csvPath = path.join(
+		process.cwd(),
+		"archive",
+		"owner_bank_requests.csv",
+	);
 	logger.info(`Looking for CSV file at: ${csvPath}`);
 	if (!fs.existsSync(csvPath)) {
-		logger.info("✅ No owner_bank_requests.csv file found. No events to settle.");
+		logger.info(
+			"✅ No owner_bank_requests.csv file found. No events to settle.",
+		);
 		return [];
 	}
 
@@ -374,72 +471,104 @@ async function fetchReadyForSettlement() {
 }
 
 async function queryRevenueEvents(query) {
-	logger.info(`[${new Date().toISOString()}] Querying revenue events with: ${JSON.stringify(query)}`);
-		const isOffline = (process.env.BASE44_OFFLINE_MODE || 'false').toLowerCase() === 'true';
-		const base44 = buildBase44ServiceClient();
-		const cfg = getRevenueConfigFromEnv();
-		const entity = base44.asServiceRole.entities[cfg.entityName];
+	logger.info(
+		`[${new Date().toISOString()}] Querying revenue events with: ${JSON.stringify(query)}`,
+	);
 
-		if (isOffline) {
-			logger.info(`[${new Date().toISOString()}] Running in offline mode. Loading all events from the local store.`);
-			// In offline mode, we ignore the 'settled' flag in the initial query
-			const offlineQuery = { ...query };
-			delete offlineQuery.settled;
+	const storePath = path.join(process.cwd(), ".base44-offline-store.json");
+	const hasOfflineStore =
+		fs.existsSync(storePath) && fs.statSync(storePath).size > 1000000; // > 1MB
+	const isOffline =
+		(process.env.BASE44_OFFLINE_MODE || "false").toLowerCase() === "true" ||
+		hasOfflineStore;
 
-			const offlineData = await entity.filter(offlineQuery, "-created_date", 10000, 0).catch(() => []);
-			logger.info(`[${new Date().toISOString()}] Raw offline data: ${JSON.stringify(offlineData, null, 2)}`);
-			if (!Array.isArray(offlineData) || offlineData.length === 0) return [];
-			
-			// In offline mode, we assume events are ready to be settled.
-			// We will map them to the expected structure.
-			const filtered = offlineData
-				.filter(row => !row.settled) // Manually filter out settled events
-				.map((row) => ({
-					id: row.id ?? null,
-					amount: Number(row.amount ?? 0),
-					currency: row.currency ?? cfg.defaultCurrency,
-					verification_proof: row.id, // Use ID as proof for offline
-					status: 'VERIFIED', // Assume verified for offline
-					created_at: row.created_date ?? new Date().toISOString(),
-					metadata: row.metadata ?? {},
-			}));
-			logger.info(`[${new Date().toISOString()}] Filtered offline events: ${JSON.stringify(filtered, null, 2)}`);
-			return filtered.filter(e => e.id && Number.isFinite(e.amount) && e.amount > 0);
+	if (isOffline && !process.env.BASE44_OFFLINE_MODE) {
+		logger.info(
+			`[${new Date().toISOString()}] Large offline store found. Forcing BASE44_OFFLINE_MODE=true`,
+		);
+		process.env.BASE44_OFFLINE_MODE = "true";
+	}
+
+	const base44 = buildBase44ServiceClient();
+	const cfg = getRevenueConfigFromEnv();
+	const entityName = cfg.entityName || "RevenueEvent";
+	const entity = base44.asServiceRole.entities[entityName];
+
+	if (isOffline) {
+		logger.info(
+			`[${new Date().toISOString()}] Running in offline mode. Loading all events from the local store.`,
+		);
+		// In offline mode, we ignore the 'settled' flag in the initial query
+		const offlineQuery = { ...query };
+		delete offlineQuery.settled;
+
+		const offlineData = await entity
+			.filter(offlineQuery, "-created_date", 10000, 0)
+			.catch((e) => {
+				logger.error(
+					`[${new Date().toISOString()}] Offline filter error: ${e.message}`,
+				);
+				return [];
+			});
+
+		if (!Array.isArray(offlineData) || offlineData.length === 0) {
+			logger.info(
+				`[${new Date().toISOString()}] No data found in offline store for ${entityName}`,
+			);
+			return [];
 		}
 
-		const filter = {};
-		if (cfg.fieldMap.status) filter[cfg.fieldMap.status] = "VERIFIED";
-		if (cfg.fieldMap.payoutBatchId)
-			filter[cfg.fieldMap.payoutBatchId] = null;
-		if (cfg.fieldMap.verificationProof)
-			filter[cfg.fieldMap.verificationProof] = { $ne: null };
-		const recs = await entity
-			.filter(filter, "-created_date", 250, 0)
-			.catch(() => []);
-		logger.info(`[${new Date().toISOString()}] Found ${recs.length} revenue events.`);
-		if (!Array.isArray(recs) || recs.length === 0) return [];
-		return recs
+		// In offline mode, we assume events are ready to be settled if they are not settled.
+		// We accept 'verified', 'confirmed', 'VERIFIED', 'CONFIRMED' or undefined status.
+		const filtered = offlineData
+			.filter((row) => {
+				const isSettled =
+					row.settled === true || !!row.payoutBatchId || !!row.payout_batch_id;
+				const status = String(row.status || "").toLowerCase();
+				const isVerified =
+					!row.status || status === "verified" || status === "confirmed";
+				return !isSettled && isVerified;
+			})
 			.map((row) => ({
-				id:
-					row[cfg.fieldMap.externalId] ??
-					row.id ??
-					null,
-				amount: Number(row[cfg.fieldMap.amount] ?? 0),
-				currency:
-					row[cfg.fieldMap.currency] ??
-					cfg.defaultCurrency,
-				verification_proof:
-					row[cfg.fieldMap.verificationProof] ??
-					null,
-				status: row[cfg.fieldMap.status] ?? null,
-				created_at: row[cfg.fieldMap.occurredAt] ?? null,
-			}))
-			.filter(
-				(e) =>
-					e.id &&
-					Number.isFinite(e.amount) &&
-					e.amount > 0,
-			);
+				id: row.id ?? null,
+				amount: Number(row.amount ?? 0),
+				currency: row.currency ?? cfg.defaultCurrency,
+				verification_proof: row.id,
+				status: "VERIFIED",
+				created_at: row.created_date ?? new Date().toISOString(),
+				metadata: row.metadata ?? {},
+			}));
+
+		logger.info(
+			`[${new Date().toISOString()}] Found ${filtered.length} eligible offline events out of ${offlineData.length} total.`,
+		);
+		return filtered.filter(
+			(e) => e.id && Number.isFinite(e.amount) && e.amount > 0,
+		);
+	}
+
+	const filter = {};
+	if (cfg.fieldMap.status) filter[cfg.fieldMap.status] = "VERIFIED";
+	if (cfg.fieldMap.payoutBatchId) filter[cfg.fieldMap.payoutBatchId] = null;
+	if (cfg.fieldMap.verificationProof)
+		filter[cfg.fieldMap.verificationProof] = { $ne: null };
+	const recs = await entity
+		.filter(filter, "-created_date", 250, 0)
+		.catch(() => []);
+	logger.info(
+		`[${new Date().toISOString()}] Found ${recs.length} revenue events.`,
+	);
+	if (!Array.isArray(recs) || recs.length === 0) return [];
+	return recs
+		.map((row) => ({
+			id: row[cfg.fieldMap.externalId] ?? row.id ?? null,
+			amount: Number(row[cfg.fieldMap.amount] ?? 0),
+			currency: row[cfg.fieldMap.currency] ?? cfg.defaultCurrency,
+			verification_proof: row[cfg.fieldMap.verificationProof] ?? null,
+			status: row[cfg.fieldMap.status] ?? null,
+			created_at: row[cfg.fieldMap.occurredAt] ?? null,
+		}))
+		.filter((e) => e.id && Number.isFinite(e.amount) && e.amount > 0);
 }
 
 // ============================================================================
@@ -449,7 +578,7 @@ async function queryRevenueEvents(query) {
 /**
  * Groups events by optimal payment rail
  */
-function groupEventsByRail(events) {
+function _groupEventsByRail(events) {
 	const batches = {};
 
 	for (const event of events) {
@@ -468,7 +597,7 @@ function groupEventsByRail(events) {
 /**
  * Processes a batch of events for a specific rail
  */
-async function processRailBatch(rail, events, options = {}) {
+async function _processRailBatch(rail, events, options = {}) {
 	logger.info(`⚡ Processing ${rail} batch: ${events.length} events`);
 
 	// Step 1: Create payout batch
@@ -513,7 +642,13 @@ async function processRailBatch(rail, events, options = {}) {
 	}
 
 	if (CONFIG.ENABLE_IMMEDIATE_SETTLEMENT || isSundayNow()) {
-		await executeSettlement(rail, batch);
+		const execResult = await executeSettlement(rail, batch);
+		if (execResult?.ok === false) {
+			logger.info(
+				`⏳ Settlement execution not completed for ${rail}: ${String(execResult?.reason ?? "unknown")}`,
+			);
+			return;
+		}
 		await markEventsSettled(
 			events.map((e) => e.id),
 			batch.batch_id,
@@ -537,12 +672,19 @@ async function createPayoutBatch(rail, events, options = {}) {
 	const totalAmount = events.reduce((sum, e) => sum + e.amount, 0);
 	const currency = events[0]?.currency || "USD";
 	const ownerAccounts = getOwnerAccounts();
+	if (rail === "BANK_WIRE" && !ownerAccounts?.bank?.name) {
+		throw new Error("missing_owner_beneficiary_name_for_bank_wire");
+	}
 	const recipient =
 		rail === "PAYPAL"
 			? ownerAccounts.paypal
 			: rail === "BANK_WIRE"
 				? ownerAccounts.bank.rib
-				: ownerAccounts.payoneer.accountId;
+				: rail === "WISE"
+					? ownerAccounts.wise.recipientId || ownerAccounts.wise.email
+					: rail === "CRYPTO"
+						? ownerAccounts.crypto.address
+						: ownerAccounts.payoneer.accountId;
 
 	const batch = {
 		batch_id: `BATCH_${rail}_${Date.now()}`,
@@ -578,9 +720,9 @@ async function createPayoutBatch(rail, events, options = {}) {
 
 	if (shouldWritePayoutLedger()) {
 		const base44 = buildBase44ServiceClient();
-		const payoutBatchEntity = base44.asServiceRole.entities["PayoutBatch"];
-		const payoutItemEntity = base44.asServiceRole.entities["PayoutItem"];
-		const created = await payoutBatchEntity.create({
+		const payoutBatchEntity = base44.asServiceRole.entities.PayoutBatch;
+		const payoutItemEntity = base44.asServiceRole.entities.PayoutItem;
+		const _created = await payoutBatchEntity.create({
 			batch_id: batch.batch_id,
 			status: "pending_approval",
 			total_amount: totalAmount,
@@ -623,8 +765,13 @@ async function approveBatch(batchId) {
 
 	if (shouldWritePayoutLedger()) {
 		const base44 = buildBase44ServiceClient();
-		const entity = base44.asServiceRole.entities["PayoutBatch"];
-		const recs = await entity.filter({ batch_id: batchId }, "-created_date", 1, 0);
+		const entity = base44.asServiceRole.entities.PayoutBatch;
+		const recs = await entity.filter(
+			{ batch_id: batchId },
+			"-created_date",
+			1,
+			0,
+		);
 		if (recs.length > 0) {
 			await entity.update(recs[0].id, { status: "approved" });
 		}
@@ -637,21 +784,28 @@ async function approveBatch(batchId) {
 async function executeSettlement(rail, batch) {
 	logger.info(`🚀 Executing ${rail} settlement...`);
 
+	const storage = new RealStorage();
+	const audit = new RealAuditLogger();
+	const executor = new RealExecutor();
+	const gatewayManager = new ExternalGatewayManager(storage, audit, executor);
+
 	switch (rail) {
 		case "PAYPAL":
 			return await executePayPalSettlement(batch);
 		case "BANK_WIRE":
 			return await executeBankWireSettlement(batch);
-		case "PAYONEER":
-			return await executePayoneerSettlement(batch);
-		case "WISE":
-			return await executeWiseSettlement(batch);
+		case "CHEQUE":
+			return await executeChequeSettlement(batch);
 		case "GOOGLEPAY":
 			return await executeGooglePaySettlement(batch);
 		case "PLAID":
 			return await executePlaidSettlement(batch);
+		case "PAYONEER":
+			return await executePayoneerSettlement(batch);
+		case "WISE":
+			return await executeWiseSettlement(batch, gatewayManager);
 		case "CRYPTO":
-			return await executeCryptoSettlement(batch);
+			return await executeCryptoSettlement(batch, gatewayManager);
 		default:
 			throw new Error(`Unsupported payment rail: ${rail}`);
 	}
@@ -683,8 +837,8 @@ async function executePayPalSettlement(batch) {
 	const paypalBatchId = response?.batch_header?.payout_batch_id ?? null;
 	logger.info("✅ PayPal payout submitted:", paypalBatchId);
 	const base44 = buildBase44ServiceClient();
-	const batchEntity = base44.asServiceRole.entities["PayoutBatch"];
-	const itemEntity = base44.asServiceRole.entities["PayoutItem"];
+	const batchEntity = base44.asServiceRole.entities.PayoutBatch;
+	const itemEntity = base44.asServiceRole.entities.PayoutItem;
 	const recs = await batchEntity.filter(
 		{ batch_id: String(batch.batch_id) },
 		"-created_date",
@@ -713,24 +867,76 @@ async function executePayPalSettlement(batch) {
  * Bank Wire CSV generation
  */
 async function executeBankWireSettlement(batch) {
-	logger.info("🏦 Generating Bank Wire CSV...");
+	logger.info("🏦 Generating Bank Wire Instructions...");
 
-	// Generate bank wire CSV
-	const csv = generateBankWireCSV(batch);
-	const filename = `bank_wire_${batch.batch_id}.csv`;
+	const owner = getOwnerAccounts().bank;
+	const instructions = {
+		batch_id: batch.batch_id,
+		amount: batch.total_amount,
+		currency: batch.currency,
+		beneficiary: {
+			name: owner.name,
+			rib: owner.rib,
+			iban: process.env.OWNER_IBAN || owner.rib,
+			swift: process.env.OWNER_SWIFT || "N/A",
+			bank_name: process.env.OWNER_BANK_NAME || "N/A",
+		},
+		reference: `Settlement ${batch.batch_id}`,
+		status: "PENDING_MANUAL_WIRE",
+		created_at: new Date().toISOString(),
+	};
 
+	const filename = `bank_wire_instruction_${batch.batch_id}.json`;
 	const exportsDir = path.join(process.cwd(), "exports", "bank-wire");
 	fs.mkdirSync(exportsDir, { recursive: true });
-	await fs.promises.writeFile(path.join(exportsDir, filename), csv);
+	await fs.promises.writeFile(
+		path.join(exportsDir, filename),
+		JSON.stringify(instructions, null, 2),
+	);
 
-	// fs.writeFileSync(`./exports/${filename}`, csv);
+	logger.info(`✅ Bank Wire instructions generated: ${filename}`);
+	await updateLedgerForAPISettlement(
+		batch.batch_id,
+		"pending_external_confirmation",
+		`FILE:${filename}`,
+	);
 
-	logger.info(`✅ Bank Wire CSV generated: ${filename}`);
+	return { ok: true, filename, instructions, exported: true };
+}
 
-	// TODO: Update ledger
-	// await updateLedgerForCSVSettlement(batch.batch_id, 'processing');
+/**
+ * Cheque generation
+ */
+async function executeChequeSettlement(batch) {
+	logger.info("🎫 Generating Cheque Issuance Request...");
 
-	return { filename, csv, exported: true };
+	const owner = getOwnerAccounts().bank;
+	const request = {
+		batch_id: batch.batch_id,
+		amount: batch.total_amount,
+		currency: batch.currency,
+		payable_to: owner.name,
+		memo: `Autonomous Settlement ${batch.batch_id}`,
+		status: "PENDING_CHEQUE_MAILING",
+		created_at: new Date().toISOString(),
+	};
+
+	const filename = `cheque_request_${batch.batch_id}.json`;
+	const exportsDir = path.join(process.cwd(), "exports", "cheques");
+	fs.mkdirSync(exportsDir, { recursive: true });
+	await fs.promises.writeFile(
+		path.join(exportsDir, filename),
+		JSON.stringify(request, null, 2),
+	);
+
+	logger.info(`✅ Cheque request generated: ${filename}`);
+	await updateLedgerForAPISettlement(
+		batch.batch_id,
+		"pending_external_confirmation",
+		`FILE:${filename}`,
+	);
+
+	return { ok: true, filename, request, exported: true };
 }
 
 /**
@@ -750,23 +956,41 @@ async function executePayoneerSettlement(batch) {
 
 	logger.info(`✅ Payoneer CSV generated: ${filename}`);
 
-	return { filename, csv };
+	return { ok: true, filename, csv };
 }
 
 /**
- * Wise CSV generation
+ * Wise API execution
  */
-async function executeWiseSettlement(batch) {
-	logger.info("💳 Executing Wise payout...");
-	const csv = generateWiseCSV(batch);
-	const filename = `wise_${batch.batch_id}.csv`;
+async function executeWiseSettlement(batch, gatewayManager) {
+	logger.info("💳 Executing Wise payout via API...");
 
-	const exportsDir = path.join(process.cwd(), "exports", "wise");
-	fs.mkdirSync(exportsDir, { recursive: true });
-	await fs.promises.writeFile(path.join(exportsDir, filename), csv);
-	
-	logger.info(`✅ Wise CSV generated: ${filename}`);
-	return { filename, csv, exported: true };
+	const _ownerAccounts = getOwnerAccounts();
+	const recipient =
+		process.env.OWNER_WISE_RECIPIENT_ID || batch.items[0]?.recipient;
+
+	if (!recipient) {
+		throw new Error("WiseGateway: Missing OWNER_WISE_RECIPIENT_ID");
+	}
+
+	const result = await gatewayManager.wiseGateway.executeTransfer({
+		amount: batch.total_amount,
+		currency: batch.currency,
+		recipient,
+		payoutBatchId: batch.batch_id,
+		description: `Settlement ${batch.batch_id}`,
+	});
+
+	if (result.ok) {
+		logger.info(`✅ Wise payout executed: ${result.transactionId}`);
+		await updateLedgerForAPISettlement(
+			batch.batch_id,
+			"processing",
+			result.transactionId,
+		);
+	}
+
+	return result;
 }
 
 /**
@@ -780,9 +1004,14 @@ async function executeGooglePaySettlement(batch) {
 	const exportsDir = path.join(process.cwd(), "exports", "googlepay");
 	fs.mkdirSync(exportsDir, { recursive: true });
 	await fs.promises.writeFile(path.join(exportsDir, filename), csv);
-	
+
 	logger.info(`✅ GooglePay CSV generated: ${filename}`);
-	return { filename, csv, exported: true };
+	await updateLedgerForAPISettlement(
+		batch.batch_id,
+		"pending_external_confirmation",
+		`FILE:${filename}`,
+	);
+	return { ok: true, filename, csv, exported: true };
 }
 
 /**
@@ -796,25 +1025,98 @@ async function executePlaidSettlement(batch) {
 	const exportsDir = path.join(process.cwd(), "exports", "plaid");
 	fs.mkdirSync(exportsDir, { recursive: true });
 	await fs.promises.writeFile(path.join(exportsDir, filename), csv);
-	
+
 	logger.info(`✅ Plaid CSV generated: ${filename}`);
-	return { filename, csv, exported: true };
+	await updateLedgerForAPISettlement(
+		batch.batch_id,
+		"pending_external_confirmation",
+		`FILE:${filename}`,
+	);
+	return { ok: true, filename, csv, exported: true };
 }
 
 /**
- * Crypto CSV generation
+ * Crypto API execution
  */
-async function executeCryptoSettlement(batch) {
-	logger.info("💳 Executing CRYPTO payout...");
-	const csv = generateCryptoCSV(batch);
-	const filename = `crypto_${batch.batch_id}.csv`;
+async function executeCryptoSettlement(batch, gatewayManager) {
+	logger.info("💳 Executing Crypto payout via API...");
 
-	const exportsDir = path.join(process.cwd(), "exports", "crypto");
-	fs.mkdirSync(exportsDir, { recursive: true });
-	await fs.promises.writeFile(path.join(exportsDir, filename), csv);
-	
-	logger.info(`✅ CRYPTO CSV generated: ${filename}`);
-	return { filename, csv, exported: true };
+	const ownerAccounts = getOwnerAccounts();
+	const destination = ownerAccounts.crypto;
+
+	if (!destination) {
+		throw new Error("CryptoGateway: Missing OWNER_CRYPTO_ADDRESS");
+	}
+
+	const transactions = [
+		{
+			destination,
+			amount: batch.total_amount,
+			network: process.env.CRYPTO_NETWORK || "BEP20",
+			coin: "USDT",
+		},
+	];
+
+	const result = await gatewayManager.cryptoGateway.executeTransfer(
+		transactions,
+		{ provider: "auto" },
+	);
+
+	if (result.status === "SUBMITTED" || result.status === "SUBMITTED_WITH_TX") {
+		logger.info(
+			`✅ Crypto payout submitted via ${result.provider}: ${result.transactionId}`,
+		);
+		await updateLedgerForAPISettlement(
+			batch.batch_id,
+			"processing",
+			result.transactionId,
+		);
+		return {
+			ok: true,
+			transactionId: result.transactionId,
+			provider: result.provider,
+		};
+	}
+
+	return { ok: false, reason: result.status };
+}
+
+/**
+ * Updates ledger for API-based settlements
+ */
+async function updateLedgerForAPISettlement(batchId, status, gatewayRef) {
+	if (!shouldWritePayoutLedger()) return;
+
+	const base44 = buildBase44ServiceClient();
+	const batchEntity = base44.asServiceRole.entities.PayoutBatch;
+	const itemEntity = base44.asServiceRole.entities.PayoutItem;
+
+	const recs = await batchEntity.filter(
+		{ batch_id: batchId },
+		"-created_date",
+		1,
+		0,
+	);
+	if (recs.length > 0) {
+		await batchEntity.update(recs[0].id, {
+			status,
+			gateway_ref: gatewayRef,
+			updated_date: new Date().toISOString(),
+		});
+
+		const itemRecs = await itemEntity.filter(
+			{ batch_id: batchId },
+			"-created_date",
+			1000,
+			0,
+		);
+		for (const item of itemRecs) {
+			await itemEntity.update(item.id, {
+				status,
+				updated_date: new Date().toISOString(),
+			});
+		}
+	}
 }
 
 // ============================================================================
@@ -880,7 +1182,7 @@ function requireLiveMode(action) {
 /**
  * Emergency stop function
  */
-function emergencyStop() {
+function _emergencyStop() {
 	logger.info("🚨 EMERGENCY STOP ACTIVATED");
 	state.running = false;
 	CONFIG.ENABLE_IMMEDIATE_SETTLEMENT = false;
@@ -890,7 +1192,7 @@ function emergencyStop() {
 /**
  * Manual trigger for settlement cycle
  */
-async function triggerManualSettlement() {
+async function _triggerManualSettlement() {
 	logger.info("⚡ Manual settlement triggered");
 	await performSettlementCycle();
 }
@@ -899,7 +1201,7 @@ async function triggerManualSettlement() {
 // CSV GENERATORS
 // ============================================================================
 
-function generateBankWireCSV(batch) {
+function _generateBankWireCSV(batch) {
 	const headers = "Amount,Currency,Recipient Name,Recipient IBAN,Reference";
 	const rows = batch.items.map(
 		(item) =>
@@ -918,7 +1220,7 @@ function generatePayoneerCSV(batch) {
 	return [headers, ...rows].join("\n");
 }
 
-function generateWiseCSV(batch) {
+function _generateWiseCSV(batch) {
 	const headers = "amount,currency,recipientEmail,reference";
 	const rows = batch.items.map(
 		(item) =>
@@ -945,7 +1247,7 @@ function generatePlaidCSV(batch) {
 	return [headers, ...rows].join("\n");
 }
 
-function generateCryptoCSV(batch) {
+function _generateCryptoCSV(batch) {
 	const headers = "amount,currency,address,network,reference";
 	const rows = batch.items.map(
 		(item) =>
@@ -966,20 +1268,28 @@ function getOwnerAccounts() {
 	const accounts = {
 		paypal: OwnerSettlementEnforcer.getOwnerAccountForType("paypal"),
 		bank: {
-			name: process.env.OWNER_BENEFICIARY_NAME,
+			name: String(process.env.OWNER_BENEFICIARY_NAME || "").trim() || null,
 			rib: OwnerSettlementEnforcer.getOwnerAccountForType("bank_transfer"),
+			iban: process.env.OWNER_IBAN || null,
+			swift: process.env.OWNER_SWIFT || null,
+			bank_name: process.env.OWNER_BANK_NAME || null,
+		},
+		plaid: {
+			accountId:
+				process.env.PLAID_OWNER_ACCOUNT_ID ||
+				process.env.OWNER_BANK_ACCOUNT_NUM ||
+				null,
 		},
 		payoneer: {
 			accountId: OwnerSettlementEnforcer.getOwnerAccountForType("payoneer"),
 		},
 		wise: {
 			email: OwnerSettlementEnforcer.getOwnerAccountForType("wise"),
+			recipientId: process.env.OWNER_WISE_RECIPIENT_ID || null,
+			profileId: process.env.WISE_PROFILE_ID || null,
 		},
 		googlepay: {
 			email: OwnerSettlementEnforcer.getOwnerAccountForType("googlepay"),
-		},
-		plaid: {
-			accountId: process.env.PLAID_OWNER_ACCOUNT_ID || null,
 		},
 		crypto: {
 			address: OwnerSettlementEnforcer.getOwnerAccountForType("crypto"),
@@ -994,25 +1304,45 @@ function getOwnerAccounts() {
 function selectOptimalOwnerAccount(amount, currency) {
 	const accounts = getOwnerAccounts();
 	const priority = CONFIG.RAIL_PRIORITY;
+	const paypalReady =
+		!!accounts.paypal &&
+		isPayPalPayoutSendEnabled() &&
+		(process.env.SWARM_LIVE || "false").toLowerCase() === "true";
 
 	for (const rail of priority) {
 		const t = String(rail || "").toLowerCase();
-		if (t === "paypal" && accounts.paypal) return { type: rail };
-		if (t === "bank_wire" && accounts.bank && accounts.bank.rib)
-			return { type: rail };
+		if (t === "paypal" && paypalReady) return { type: "PAYPAL" };
+		if (
+			t === "bank_wire" &&
+			accounts.bank &&
+			(accounts.bank.rib || accounts.bank.iban) &&
+			accounts.bank.name
+		)
+			return { type: "BANK_WIRE" };
+		if (t === "cheque" && accounts.bank && accounts.bank.name)
+			return { type: "CHEQUE" };
 		if (t === "payoneer" && accounts.payoneer && accounts.payoneer.accountId)
-			return { type: rail };
-		if (t === "wise" && accounts.wise && accounts.wise.email)
-			return { type: rail };
+			return { type: "PAYONEER" };
+		if (
+			t === "wise" &&
+			accounts.wise &&
+			(accounts.wise.email || accounts.wise.recipientId)
+		)
+			return { type: "WISE" };
 		if (t === "googlepay" && accounts.googlepay && accounts.googlepay.email)
-			return { type: rail };
+			return { type: "GOOGLEPAY" };
+		if (
+			t === "plaid" &&
+			(process.env.PLAID_ENABLED || "false").toLowerCase() === "true" &&
+			accounts.plaid &&
+			accounts.plaid.accountId
+		)
+			return { type: "PLAID" };
 		if (t === "crypto" && accounts.crypto && accounts.crypto.address)
-			return { type: rail };
+			return { type: "CRYPTO" };
 	}
 
-	throw new Error(
-		`No suitable owner account found for ${amount} ${currency}`,
-	);
+	throw new Error(`No suitable owner account found for ${amount} ${currency}`);
 }
 
 // ============================================================================
@@ -1020,7 +1350,19 @@ function selectOptimalOwnerAccount(amount, currency) {
 // ============================================================================
 
 logger.info("🎯 Starting as standalone daemon...");
-startAutoSettlementDaemon().catch((error) => {
-	logger.error("💥 Daemon startup failed:", error);
-	process.exit(1);
-});
+const isOnce = process.argv.includes("--once");
+if (isOnce) {
+	performSettlementCycle()
+		.then(() => {
+			process.exit(0);
+		})
+		.catch((error) => {
+			logger.error("💥 One-shot settlement cycle failed:", error);
+			process.exit(1);
+		});
+} else {
+	startAutoSettlementDaemon().catch((error) => {
+		logger.error("💥 Daemon startup failed:", error);
+		process.exit(1);
+	});
+}

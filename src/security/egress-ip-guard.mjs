@@ -1,6 +1,6 @@
-import fs from "fs";
-import path from "path";
-import https from "https";
+import fs from "node:fs";
+import https from "node:https";
+import path from "node:path";
 
 function fetchIp(url) {
 	return new Promise((resolve, reject) => {
