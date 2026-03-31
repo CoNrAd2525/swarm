@@ -1,7 +1,7 @@
 name: Deploy Static Site to GitHub Pages
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, release]
   workflow_dispatch:
   schedule:
     - cron: "0 3 * * 1"

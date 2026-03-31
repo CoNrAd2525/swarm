@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+      - main
+      - release
     paths:
       - 'vercel.json'
       - 'api/**'

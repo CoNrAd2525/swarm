@@ -3,7 +3,7 @@ name: Site Container Build
 on:
   workflow_dispatch: {}
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master", "release" ]
     tags: [ "v*" ]
 
 jobs:
