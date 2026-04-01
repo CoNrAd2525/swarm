@@ -35,7 +35,7 @@
     "agent:coordinator": "node ./src/agent-coordinator.mjs",
     "sweep:update:proof": "node ./scripts/update-sweep-proof.mjs",
     "test": "node --test test/*.test.mjs",
-    "lint": "biome check src",
+    "lint": "biome check src --diagnostic-level=error",
     "lint:full": "biome check src scripts",
     "lint:fix": "eslint src scripts --ext .js,.mjs --fix",
     "lint:apply": "biome check --write src scripts",
