@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-
 function nowMs() {
 	return Date.now();
 }
@@ -124,7 +123,7 @@ export class RouteManager {
 		h.lastFailureAt = nowMs();
 		const backoff = Math.min(
 			this.maxBackoffMs,
-			this.baseBackoffMs * Math.pow(2, Math.min(10, h.failures - 1)),
+			this.baseBackoffMs * 2 ** Math.min(10, h.failures - 1),
 		);
 		h.cooldownUntil = nowMs() + backoff;
 		h.lastReason = String(reason ?? "failure");
@@ -201,7 +200,6 @@ export class RouteManager {
 			tried: Array.from(tried),
 		};
 	}
-
 }
 
 // Builder Notes:

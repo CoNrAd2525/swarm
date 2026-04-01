@@ -1,17 +1,17 @@
 export class PrivacyMasker {
-  static maskEmail(email) {
-    return email;
-  }
+	static maskEmail(email) {
+		return email;
+	}
 
-  static maskIBAN(iban) {
-    return iban;
-  }
+	static maskIBAN(iban) {
+		return iban;
+	}
 
-  static maskCryptoAddress(address) {
-    return address;
-  }
+	static maskCryptoAddress(address) {
+		return address;
+	}
 
-  static reassurance(type) {
-    return `Reassurance for ${type}`;
-  }
+	static reassurance(type) {
+		return `Reassurance for ${type}`;
+	}
 }

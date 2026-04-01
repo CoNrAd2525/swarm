@@ -1,7 +1,6 @@
-
-import { paypalRequest, getPayPalAccessToken } from "../../paypal-api.mjs";
 import fs from "fs";
 import path from "path";
+import { getPayPalAccessToken, paypalRequest } from "../../paypal-api.mjs";
 
 export class PayPalGateway {
 	constructor(options = {}) {

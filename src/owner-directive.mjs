@@ -4,7 +4,9 @@ function getOwnerAccounts() {
 		process.env.OWNER_BANK_RIB ?? process.env.OWNER_BANK_ACCOUNT ?? "",
 	).trim();
 	const payoneer = String(
-		process.env.OWNER_PAYONEER_ACCOUNT_ID ?? process.env.OWNER_PAYONEER_ID ?? "",
+		process.env.OWNER_PAYONEER_ACCOUNT_ID ??
+			process.env.OWNER_PAYONEER_ID ??
+			"",
 	).trim();
 	const crypto = String(
 		process.env.OWNER_CRYPTO_ADDRESS ?? process.env.OWNER_TRUST_WALLET ?? "",
@@ -15,13 +17,15 @@ function getOwnerAccounts() {
 }
 
 export function validateOwnerDirectiveSetup() {
-	const { paypal, bank, payoneer, crypto, wise, googlepay } = getOwnerAccounts();
+	const { paypal, bank, payoneer, crypto, wise, googlepay } =
+		getOwnerAccounts();
 	const ok = Boolean(paypal || bank || payoneer || crypto || wise || googlepay);
 	return { ok, accounts: { paypal, bank, payoneer, crypto, wise, googlepay } };
 }
 
 export function enforceOwnerDirective(recipient, recipientType) {
-	const { paypal, bank, payoneer, crypto, wise, googlepay } = getOwnerAccounts();
+	const { paypal, bank, payoneer, crypto, wise, googlepay } =
+		getOwnerAccounts();
 	const r = String(recipient ?? "").trim();
 	const t = String(recipientType ?? "").toLowerCase();
 	const allowed = new Set(
@@ -37,7 +41,8 @@ export function enforceOwnerDirective(recipient, recipientType) {
 }
 
 export async function preExecutionOwnerCheck({ batch }) {
-	const { paypal, bank, payoneer, crypto, wise, googlepay } = getOwnerAccounts();
+	const { paypal, bank, payoneer, crypto, wise, googlepay } =
+		getOwnerAccounts();
 	const allowed = new Set(
 		[paypal, bank, payoneer, crypto, wise, googlepay].filter(Boolean),
 	);

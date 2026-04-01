@@ -1,6 +1,6 @@
-import { stringify as csvStringify } from "csv-stringify";
 import fs from "node:fs";
 import path from "node:path";
+import { stringify as csvStringify } from "csv-stringify";
 
 export function buildWebscrLink({
 	amount,
@@ -21,10 +21,7 @@ export function buildWebscrLink({
 	return `https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=${business}&amount=${amt}&currency_code=${cur}${note}`;
 }
 
-export function generatePayerLinks(
-	payers,
-	{ businessEmail, merchantId } = {},
-) {
+export function generatePayerLinks(payers, { businessEmail, merchantId } = {}) {
 	const businessParam = String(merchantId ?? "").trim()
 		? String(merchantId)
 		: String(businessEmail ?? process.env.OWNER_PAYPAL_EMAIL ?? "");

@@ -21,13 +21,18 @@ export function normalizeMissionType(v) {
 }
 
 export function getMissionParametersFromRow(row) {
-	const mp = row?.mission_parameters ?? row?.missionParameters ?? row?.params ?? null;
+	const mp =
+		row?.mission_parameters ?? row?.missionParameters ?? row?.params ?? null;
 	return safeParseJson(mp) ?? null;
 }
 
 export function isPhase0Mission({ id, type }) {
 	const t = normalizeMissionType(type);
-	return String(id || "").trim().toUpperCase() === "INF-001" || t === "infrastructure";
+	return (
+		String(id || "")
+			.trim()
+			.toUpperCase() === "INF-001" || t === "infrastructure"
+	);
 }
 
 export function isRevenueGeneratingMission({ type, missionParameters }) {
@@ -56,8 +61,14 @@ export function isRevenueGeneratingMission({ type, missionParameters }) {
 	return false;
 }
 
-export function ensurePhase0Dependency(missionParameters, phase0Id = "INF-001") {
-	const mp = missionParameters && typeof missionParameters === "object" ? { ...missionParameters } : {};
+export function ensurePhase0Dependency(
+	missionParameters,
+	phase0Id = "INF-001",
+) {
+	const mp =
+		missionParameters && typeof missionParameters === "object"
+			? { ...missionParameters }
+			: {};
 	const cur = mp.dependent_on ?? mp.dependentOn ?? null;
 	const p0 = String(phase0Id || "INF-001").trim();
 	if (!p0) return mp;

@@ -1,10 +1,10 @@
+import { DeadmanSwitch } from "./DeadmanSwitch.mjs";
+import { DomainAutonomy } from "./DomainAutonomy.mjs";
 import { IntentInvariant } from "./IntentInvariant.mjs";
 import { PowerGradient } from "./PowerGradient.mjs";
-import { TransparencyCost } from "./TransparencyCost.mjs";
-import { DomainAutonomy } from "./DomainAutonomy.mjs";
 import { ReputationLedger } from "./ReputationLedger.mjs";
-import { DeadmanSwitch } from "./DeadmanSwitch.mjs";
 import { RevenuePriority } from "./RevenuePriority.mjs";
+import { TransparencyCost } from "./TransparencyCost.mjs";
 
 export class GovernanceGate {
 	constructor() {
@@ -67,4 +67,3 @@ export class GovernanceGate {
 		return { ok: true };
 	}
 }
-

@@ -3,7 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import express from "express";
 import { buildBase44ServiceClient } from "./base44-client.mjs";
-import { appendClassroomRequest } from "./classroom/ClassroomRequests.mjs";
+import {
+	appendClassroomRequest,
+	getClassroomRequestMetrics,
+} from "./classroom/ClassroomRequests.mjs";
 import { buildWebscrLink } from "./paypal-links.mjs";
 import { cspSecurityMiddleware } from "./security-middleware.mjs";
 
@@ -744,6 +747,10 @@ function start({ port = 8080 } = {}) {
 		express.json({ limit: "20kb" }),
 		async (req, res) => {
 			try {
+				if (!checkAllowlist(req)) {
+					res.status(403).json({ ok: false, error: "forbidden" });
+					return;
+				}
 				if (!checkRateLimit(req)) {
 					res.status(429).json({ ok: false, error: "rate_limited" });
 					return;
@@ -787,6 +794,22 @@ function start({ port = 8080 } = {}) {
 			}
 		},
 	);
+	app.get("/api/classroom/metrics", async (req, res) => {
+		try {
+			if (!checkAllowlist(req)) {
+				res.status(403).json({ ok: false, error: "forbidden" });
+				return;
+			}
+			if (!checkRateLimit(req)) {
+				res.status(429).json({ ok: false, error: "rate_limited" });
+				return;
+			}
+			const m = await getClassroomRequestMetrics({});
+			res.json({ ok: true, total: m.total, last24h: m.last_window });
+		} catch (e) {
+			res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+		}
+	});
 	app.get("/owner-dashboard.html", (_req, res) => {
 		const nonce = res.locals?.cspNonce || "";
 		const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Owner Dashboard | RealWorldCerts</title><meta name="robots" content="noindex,nofollow"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}.glass{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}.wrap{max-width:1100px;margin:0 auto;padding:24px}a{color:#f59e0b;text-decoration:none}.badge{display:inline-block;padding:4px 8px;border-radius:9999px;font-size:12px}.b-unconf{background:#1f2937}.b-prov{background:#10b981}.b-set{background:#f59e0b}input,button{padding:8px 12px;border-radius:8px;border:1px solid #333;background:#111;color:#fff;outline:none}</style></head><body><main class="wrap"><header class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><h1 style="margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent">Owner Dashboard</h1><nav style="margin-top:8px;font-size:14px"><a href="/index.html">Home</a> • <a href="/sitemap.xml">Sitemap</a> • <a href="/rss.xml">RSS</a></nav></header><section class="glass" style="border-radius:16px;padding:16px; margin-bottom:16px;"><label>Lookup ref: <input id="refInput" placeholder="rwc_xxx"/></label> <label>Days ± <input id="daysInput" type="number" min="0" max="30" value="7" style="width:80px"/></label> <label>Amount tol <input id="tolInput" type="number" min="0" step="0.01" value="0.01" style="width:100px"/></label> <button id="lookupBtn">Check</button> <span id="result"></span></section><section class="glass" style="border-radius:16px;padding:16px; margin-bottom:16px;"><div>Upload payout CSV</div><input id="csvFile" type="file" accept=".csv" /> <button id="uploadBtn">Upload</button> <span id="uploadRes"></span></section><section class="glass" style="border-radius:16px;padding:16px;"><p>Recent PayPal proofs and computed revenue states.</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Ref</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">IPN</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Webhook</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Payout</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">State</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Viewer</th></tr></thead><tbody id="rows"></tbody></table></section></main><script nonce="${nonce}">async function fetchJSON(u){const r=await fetch(u);return r.json()}function badge(s){if(s==='SETTLED_OWNER'){return '<span class="badge b-set">SETTLED_OWNER</span>'}if(s==='VERIFIED_PROVIDER'){return '<span class="badge b-prov">VERIFIED_PROVIDER</span>'}return '<span class="badge b-unconf">UNCONFIRMED</span>'}function viewer(ref){return '<a href="/owner-proof.html?ref='+encodeURIComponent(ref)+'" target="_blank">Open</a>'}async function loadList(){const proofs=await fetchJSON('/api/proofs/paypal-ipn');const customs=[...new Set((proofs.items||[]).map(x=>String(x.custom||'')).filter(Boolean))];const rows=document.getElementById('rows');rows.innerHTML='';for(const ref of customs.slice(0,100)){const s=await fetchJSON('/api/revenue/state?ref='+encodeURIComponent(ref));const tr=document.createElement('tr');tr.innerHTML='<td style="padding:8px;border-bottom:1px solid #222">'+ref+'</td><td style="padding:8px;border-bottom:1px solid #222">'+(s.details?.ipn_count||0)+'</td><td style="padding:8px;border-bottom:1px solid #222">'+(s.details?.webhook_count||0)+'</td><td style="padding:8px;border-bottom:1px solid #222">'+(s.details?.payout_mention?"Yes":"No")+'</td><td style="padding:8px;border-bottom:1px solid #222">'+badge(s.state)+'</td><td style="padding:8px;border-bottom:1px solid #222">'+viewer(ref)+'</td>';rows.appendChild(tr)}}async function lookup(){const ref=document.getElementById('refInput').value.trim();const days=document.getElementById('daysInput').value.trim();const tol=document.getElementById('tolInput').value.trim();if(!ref){return}const qs='&days='+(days||'7')+'&amount_tol='+(tol||'0.01');const s=await fetchJSON('/api/revenue/state?ref='+encodeURIComponent(ref)+qs);const slot=document.getElementById('result');slot.innerHTML=badge(s.state)+' IPN:'+(s.details?.ipn_count||0)+' WH:'+(s.details?.webhook_count||0)+' Payout:'+(s.details?.payout_mention?"Yes":"No")}async function uploadCsv(){const el=document.getElementById('csvFile');const resSpan=document.getElementById('uploadRes');if(!el.files||!el.files[0]){resSpan.textContent='No file';return}const f=el.files[0];const t=await f.text();const r=await fetch('/api/proofs/payouts/upload',{method:'POST',headers:{'content-type':'text/csv'},body:t});const j=await r.json();if(j&&j.ok){resSpan.textContent='Uploaded '+j.saved+' lines:'+j.lines;loadList()}else{resSpan.textContent='Upload failed'}}document.getElementById('lookupBtn').addEventListener('click',lookup);document.getElementById('uploadBtn').addEventListener('click',uploadCsv);loadList();</script></body></html>`;

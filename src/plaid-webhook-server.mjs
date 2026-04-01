@@ -1,7 +1,7 @@
-import http from "node:http";
-import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import http from "node:http";
+import path from "node:path";
 import { parseArgs } from "./utils/cli.mjs";
 
 function safeReadJson(file) {
@@ -90,8 +90,9 @@ function appendLedgerUpdate(evt) {
 					.update(raw, "utf8")
 					.digest("hex");
 				const hdrs = evt?.headers || {};
-				const provided =
-					String(hdrs["plaid-signature"] || hdrs["x-plaid-signature"] || "").trim();
+				const provided = String(
+					hdrs["plaid-signature"] || hdrs["x-plaid-signature"] || "",
+				).trim();
 				if (provided) signatureValid = provided === calc;
 			} catch {
 				signatureValid = false;

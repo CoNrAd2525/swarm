@@ -93,8 +93,11 @@ export class BankWireGateway {
 
 	async executeTransfer(transactions) {
 		this.ensureReady();
-		const { amount: _amount, currency: _currency, reference: _reference } =
-			this.normalizeTransactions(transactions);
+		const {
+			amount: _amount,
+			currency: _currency,
+			reference: _reference,
+		} = this.normalizeTransactions(transactions);
 
 		// LIVE provider integration not implemented here by design.
 		// To enable, implement submit to your bank API and return provider refs.

@@ -1,6 +1,6 @@
-import { ExternalGatewayManager } from "./ExternalGatewayManager.mjs";
 import { AppendOnlyHmacLogger } from "../audit/AppendOnlyHmacLogger.mjs";
 import { StorageManager } from "../storage/StorageManager.mjs"; // Assuming it exists
+import { ExternalGatewayManager } from "./ExternalGatewayManager.mjs";
 
 export class AdvancedFinancialManager {
 	constructor() {

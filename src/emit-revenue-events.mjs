@@ -2,25 +2,25 @@ import fs from "node:fs";
 import "dotenv/config";
 import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 import readline from "node:readline";
-import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import {
-	createBase44RevenueEventIdempotent,
-	getRevenueConfigFromEnv,
-} from "./base44-revenue.mjs";
-import { OwnerSettlementEnforcer } from "./policy/owner-settlement.mjs";
+import { gzipSync } from "node:zlib";
+import { buildBase44Client } from "./base44-client.mjs";
 import {
 	createBase44EarningIdempotent,
 	getEarningConfigFromEnv,
 } from "./base44-earning.mjs";
-import { buildBase44Client } from "./base44-client.mjs";
+import {
+	createBase44RevenueEventIdempotent,
+	getRevenueConfigFromEnv,
+} from "./base44-revenue.mjs";
 import {
 	createPayPalPayoutBatch,
 	getPayoutBatchDetails,
 } from "./paypal-api.mjs";
+import { OwnerSettlementEnforcer } from "./policy/owner-settlement.mjs";
 
 function parseArgs(argv) {
 	const args = {};
@@ -957,8 +957,11 @@ function addOwnerRecipientsToPolicy(policy) {
 		getEnvFirst(["OWNER_PAYPAL_EMAIL", "OWNER_PAYPAL"]) ?? null,
 	);
 	const ownerPayoneer = normalizeEmailAddress(
-		getEnvFirst(["OWNER_PAYONEER_EMAIL", "OWNER_PAYONEER_ID", "OWNER_PAYONEER_ACCOUNT_ID"]) ??
-			null,
+		getEnvFirst([
+			"OWNER_PAYONEER_EMAIL",
+			"OWNER_PAYONEER_ID",
+			"OWNER_PAYONEER_ACCOUNT_ID",
+		]) ?? null,
 	);
 	const ownerBank = normalizeBankAccount(
 		getEnvFirst(["OWNER_BANK_RIB", "OWNER_BANK_ACCOUNT", "OWNER_BANK_IBAN"]) ??
@@ -1893,7 +1896,10 @@ async function reportApprovedBatches(base44) {
 	return batches;
 }
 
-async function submitPayPalPayoutBatch(base44, { batchId, args: _args, dryRun }) {
+async function submitPayPalPayoutBatch(
+	base44,
+	{ batchId, args: _args, dryRun },
+) {
 	const payoutBatchCfg = getPayoutBatchConfigFromEnv();
 	const payoutItemCfg = getPayoutItemConfigFromEnv();
 	const batchEntity = base44.asServiceRole.entities[payoutBatchCfg.entityName];
@@ -2369,19 +2375,18 @@ async function syncPayPalBatchToLedger(
 			const revenueEventId =
 				internal?.[payoutItemCfg.fieldMap.revenueEventId] ?? null;
 			if (revenueEventId) {
-				const proof =
-					transactionId
-						? {
-								type: "paypal_payouts",
-								transaction_id: String(transactionId),
-								synced_at: new Date().toISOString(),
-							}
-						: {
-								type: "paypal_payouts_relaxed",
-								policy: "relaxed",
-								reason: "missing_transaction_id",
-								synced_at: new Date().toISOString(),
-							};
+				const proof = transactionId
+					? {
+							type: "paypal_payouts",
+							transaction_id: String(transactionId),
+							synced_at: new Date().toISOString(),
+						}
+					: {
+							type: "paypal_payouts_relaxed",
+							policy: "relaxed",
+							reason: "missing_transaction_id",
+							synced_at: new Date().toISOString(),
+						};
 				revenueUpdates.push({
 					revenueEventId: String(revenueEventId),
 					patch: {

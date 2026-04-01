@@ -5,7 +5,6 @@ import { URL } from "url";
  * @param {import('http').ServerResponse} res
  */
 export function addSecurityHeaders(res) {
-
 	res.setHeader(
 		"Content-Security-Policy",
 		"default-src 'self'; script-src 'self'; frame-ancestors 'none';",
@@ -21,7 +20,6 @@ export function addSecurityHeaders(res) {
 	// Additional defense-in-depth
 	res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
 	res.setHeader("Cross-Origin-Resource-Policy", "same-site");
-
 }
 
 /**

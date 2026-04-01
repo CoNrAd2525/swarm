@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import { maybeSendAlert } from "./alerts.mjs";
 import { buildBase44ServiceClient } from "./base44-client.mjs";
 import { getPayPalAccessToken } from "./paypal-api.mjs";
-import { maybeSendAlert } from "./alerts.mjs";
 import { parseArgs } from "./utils/cli.mjs";
 
 function sleep(ms) {

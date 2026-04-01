@@ -1,10 +1,10 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import "./load-env.mjs";
-import { buildBase44ServiceClient } from "./base44-client.mjs";
-import settlementDaemon from "../reports/auto_settlement_daemon.js";
 import { spawnSync } from "node:child_process";
+import settlementDaemon from "../reports/auto_settlement_daemon.js";
+import { buildBase44ServiceClient } from "./base44-client.mjs";
 
 function log(msg) {
 	process.stdout.write(`${msg}\n`);

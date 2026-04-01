@@ -47,10 +47,9 @@ function buildOwnerVaultInstruction({ amount, currency, payoutBatchId }) {
 	const tokenDecimalsRaw =
 		process.env.OWNER_VAULT_TOKEN_DECIMALS || process.env.USDT_DECIMALS;
 	const tokenDecimals = tokenDecimalsRaw ? Number(tokenDecimalsRaw) : 18;
-	const to =
-		String(
-			process.env.OWNER_CRYPTO_BEP20 || process.env.TRUST_WALLET_ADDRESS || "",
-		).trim();
+	const to = String(
+		process.env.OWNER_CRYPTO_BEP20 || process.env.TRUST_WALLET_ADDRESS || "",
+	).trim();
 	const contractAddress = String(
 		process.env.OWNER_VAULT_CONTRACT_ADDRESS || "",
 	).trim();
@@ -90,20 +89,20 @@ function buildOwnerVaultInstruction({ amount, currency, payoutBatchId }) {
 }
 
 export class ExternalGatewayManager {
-  constructor(storage, auditLogger, executor) {
-    this.storage = storage;
-    this.audit = auditLogger;
-    this.executor = executor;
-    this.paypalGateway = new PayPalGateway({ audit: this.audit });
-    this.cryptoGateway = new CryptoGateway({ audit: this.audit });
-    this.bankGateway = new BankWireGateway({ audit: this.audit });
-    this.payoneerGateway = new PayoneerGateway({ audit: this.audit });
-    this.stripeGateway = new StripeGateway({ audit: this.audit });
-    this.wiseGateway = new WiseGateway({ audit: this.audit });
-    this.tronGateway = new TronGateway({ audit: this.audit });
-    this.platformGateway = new InstructionGateway({ audit: this.audit });
-    // Route failover manager is loaded lazily to avoid import cycles
-    this._routeManager = null;
+	constructor(storage, auditLogger, executor) {
+		this.storage = storage;
+		this.audit = auditLogger;
+		this.executor = executor;
+		this.paypalGateway = new PayPalGateway({ audit: this.audit });
+		this.cryptoGateway = new CryptoGateway({ audit: this.audit });
+		this.bankGateway = new BankWireGateway({ audit: this.audit });
+		this.payoneerGateway = new PayoneerGateway({ audit: this.audit });
+		this.stripeGateway = new StripeGateway({ audit: this.audit });
+		this.wiseGateway = new WiseGateway({ audit: this.audit });
+		this.tronGateway = new TronGateway({ audit: this.audit });
+		this.platformGateway = new InstructionGateway({ audit: this.audit });
+		// Route failover manager is loaded lazily to avoid import cycles
+		this._routeManager = null;
 		this.minGasConfig = {
 			BSC: Number(process.env.MIN_GAS_BSC || "0.01"),
 			TRON: Number(process.env.MIN_GAS_TRON || "20"),
@@ -341,11 +340,7 @@ export class ExternalGatewayManager {
 		);
 
 		return saved;
-    }
-
-
-
-
+	}
 
 	/**
 	 * 3. Get PayPal Balance
@@ -740,8 +735,10 @@ export class ExternalGatewayManager {
 				const forceWise =
 					String(process.env.FORCE_BANK_WIRE || "").toLowerCase() === "true" &&
 					String(process.env.BANK_WIRE_PROVIDER || "").toUpperCase() === "WISE";
-				
-				const routes = forceWise ? ['wise'] : getEffectiveRoutes(amount0, currency0);
+
+				const routes = forceWise
+					? ["wise"]
+					: getEffectiveRoutes(amount0, currency0);
 				this.audit.log(
 					"ROUTES_SELECTED",
 					payoutBatchId,
@@ -765,193 +762,214 @@ export class ExternalGatewayManager {
 
 				const attempt = async ({ route }) => {
 					try {
-					let result = null;
-					if (route === "bank_transfer") {
-						const tx = enforceOwnerSettlementForRoute(route, baseTx);
-						result = await withRetry(() =>
-							this.bankGateway.executeTransfer(tx),
-						);
-						this.audit.log(
-							"BANK_WIRE_PREPARED",
-							payoutBatchId,
-							null,
-							result,
-							actor,
-							{ reassurance: PrivacyMasker.reassurance("bank_wire") },
-						);
-						return {
-							status: "processing",
-							gateway_response: result,
-							payout_batch_id: payoutBatchId,
-							processed_at: new Date().toISOString(),
-							route_attempted: route,
-						};
-					}
-					if (route === "crypto") {
-						const tx = enforceOwnerSettlementForRoute(route, baseTx);
-						result = await withRetry(() =>
-							this.cryptoGateway.executeTransfer(tx),
-						);
-						this.audit.log(
-							"CRYPTO_TRANSFER_PREPARED",
-							payoutBatchId,
-							null,
-							result,
-							actor,
-							{ reassurance: PrivacyMasker.reassurance("crypto") },
-						);
-						return {
-							status: "processing",
-							gateway_response: result,
-							payout_batch_id: payoutBatchId,
-							processed_at: new Date().toISOString(),
-							route_attempted: route,
-						};
-					}
-					if (route === "smart_contract_owner") {
-						const total = baseTx.reduce(
-							(sum, t) => sum + Number(t.amount || 0),
-							0,
-						);
-						const instrPayload = buildOwnerVaultInstruction({
-							amount: total,
-							currency: currency0,
-							payoutBatchId,
-						});
-						const instr = await withRetry(() =>
-							this.platformGateway.create(instrPayload, {
-								dir: "settlements/owner_vault",
-								prefix: "owner_vault",
-							}),
-						);
-						this.audit.log(
-							"OWNER_VAULT_INSTRUCTIONS_READY",
-							payoutBatchId,
-							null,
-							instr,
-							actor,
-						);
-						return {
-							status: "processing",
-							gateway_response: instr,
-							payout_batch_id: payoutBatchId,
-							processed_at: new Date().toISOString(),
-							route_attempted: route,
-						};
-					}
-					if (route === "payoneer") {
-						const tx = enforceOwnerSettlementForRoute(route, baseTx);
-						result = await withRetry(() =>
-							this.payoneerGateway.executeTransfer(tx),
-						);
-						this.audit.log(
-							"PAYONEER_TRANSFER_PREPARED",
-							payoutBatchId,
-							null,
-							result,
-							actor,
-							{ reassurance: PrivacyMasker.reassurance("payoneer") },
-						);
-						return {
-							status: "processing",
-							gateway_response: result,
-							payout_batch_id: payoutBatchId,
-							processed_at: new Date().toISOString(),
-							route_attempted: route,
-						};
-					}
-					if (route === "payoneer_standard") {
-						const tx = enforceOwnerSettlementForRoute("payoneer", baseTx);
-						const instr = await withRetry(() =>
-							this.platformGateway.generate(
-								"payoneer",
-								tx,
-								"Instruction for Payoneer Standard",
-							),
-						);
-						this.audit.log(
-							"PAYONEER_STANDARD_INSTRUCTIONS_READY",
-							payoutBatchId,
-							null,
-							instr,
-							actor,
-							{ reassurance: PrivacyMasker.reassurance("payoneer") },
-						);
-						return {
-							status: "processing",
-							gateway_response: instr,
-							payout_batch_id: payoutBatchId,
-							processed_at: new Date().toISOString(),
-							route_attempted: route,
-						};
-					}
-					if (route === "stripe") {
-						const tx = enforceOwnerSettlementForRoute(route, baseTx);
-						result = await withRetry(() =>
-							this.stripeGateway.executeTransfer(tx),
-						);
-						this.audit.log(
-							"STRIPE_TRANSFER_PREPARED",
-							payoutBatchId,
-							null,
-							result,
-							actor,
-							{ reassurance: PrivacyMasker.reassurance("stripe") },
-						);
-						return {
-							status: "processing",
-							gateway_response: result,
-							payout_batch_id: payoutBatchId,
-							processed_at: new Date().toISOString(),
-							route_attempted: route,
-						};
-					}
-					if (route === 'wise') {
-						const tx = enforceOwnerSettlementForRoute(route, baseTx);
-						result = await withRetry(() => this.wiseGateway.executeTransfer({ payoutBatchId, transactions: tx, actor }));
-						this.audit.log('WISE_TRANSFER_PREPARED', payoutBatchId, null, result, actor, { reassurance: PrivacyMasker.reassurance('wise') });
-						return { status: 'processing', gateway_response: result, payout_batch_id: payoutBatchId, processed_at: new Date().toISOString(), route_attempted: route };
-					}
-					if (route === "paypal") {
-						if (shouldAvoidPayPal()) {
-							throw new Error("paypal_disallowed_by_policy");
+						let result = null;
+						if (route === "bank_transfer") {
+							const tx = enforceOwnerSettlementForRoute(route, baseTx);
+							result = await withRetry(() =>
+								this.bankGateway.executeTransfer(tx),
+							);
+							this.audit.log(
+								"BANK_WIRE_PREPARED",
+								payoutBatchId,
+								null,
+								result,
+								actor,
+								{ reassurance: PrivacyMasker.reassurance("bank_wire") },
+							);
+							return {
+								status: "processing",
+								gateway_response: result,
+								payout_batch_id: payoutBatchId,
+								processed_at: new Date().toISOString(),
+								route_attempted: route,
+							};
 						}
-						const tx = enforceOwnerSettlementForRoute(route, baseTx);
-						const paypalTx = tx.map((t) => ({
-							amount: t.amount,
-							currency: t.currency,
-							destination: t.destination,
-							reference: t.reference,
-						}));
-						const resultPayPal = await withRetry(() =>
-							this.paypalGateway.executePayout(paypalTx),
-						);
-						const masked = paypalTx.map((t) => ({
-							amount: t.amount,
-							currency: t.currency,
-							masked_destination: PrivacyMasker.maskEmail(t.destination),
-						}));
-						this.audit.log(
-							"PAYPAL_PAYOUT_EXECUTED",
-							payoutBatchId,
-							null,
-							resultPayPal,
-							actor,
-							{
-								masked_recipients: masked,
-								reassurance: PrivacyMasker.reassurance("paypal"),
-							},
-						);
-						return {
-							status:
-								resultPayPal.status === "IN_TRANSIT" ? "success" : "processing",
-							gateway_response: resultPayPal,
-							payout_batch_id: payoutBatchId,
-							processed_at: new Date().toISOString(),
-							route_attempted: route,
-						};
-					}
-					throw new Error(`unknown_route:${route}`);
+						if (route === "crypto") {
+							const tx = enforceOwnerSettlementForRoute(route, baseTx);
+							result = await withRetry(() =>
+								this.cryptoGateway.executeTransfer(tx),
+							);
+							this.audit.log(
+								"CRYPTO_TRANSFER_PREPARED",
+								payoutBatchId,
+								null,
+								result,
+								actor,
+								{ reassurance: PrivacyMasker.reassurance("crypto") },
+							);
+							return {
+								status: "processing",
+								gateway_response: result,
+								payout_batch_id: payoutBatchId,
+								processed_at: new Date().toISOString(),
+								route_attempted: route,
+							};
+						}
+						if (route === "smart_contract_owner") {
+							const total = baseTx.reduce(
+								(sum, t) => sum + Number(t.amount || 0),
+								0,
+							);
+							const instrPayload = buildOwnerVaultInstruction({
+								amount: total,
+								currency: currency0,
+								payoutBatchId,
+							});
+							const instr = await withRetry(() =>
+								this.platformGateway.create(instrPayload, {
+									dir: "settlements/owner_vault",
+									prefix: "owner_vault",
+								}),
+							);
+							this.audit.log(
+								"OWNER_VAULT_INSTRUCTIONS_READY",
+								payoutBatchId,
+								null,
+								instr,
+								actor,
+							);
+							return {
+								status: "processing",
+								gateway_response: instr,
+								payout_batch_id: payoutBatchId,
+								processed_at: new Date().toISOString(),
+								route_attempted: route,
+							};
+						}
+						if (route === "payoneer") {
+							const tx = enforceOwnerSettlementForRoute(route, baseTx);
+							result = await withRetry(() =>
+								this.payoneerGateway.executeTransfer(tx),
+							);
+							this.audit.log(
+								"PAYONEER_TRANSFER_PREPARED",
+								payoutBatchId,
+								null,
+								result,
+								actor,
+								{ reassurance: PrivacyMasker.reassurance("payoneer") },
+							);
+							return {
+								status: "processing",
+								gateway_response: result,
+								payout_batch_id: payoutBatchId,
+								processed_at: new Date().toISOString(),
+								route_attempted: route,
+							};
+						}
+						if (route === "payoneer_standard") {
+							const tx = enforceOwnerSettlementForRoute("payoneer", baseTx);
+							const instr = await withRetry(() =>
+								this.platformGateway.generate(
+									"payoneer",
+									tx,
+									"Instruction for Payoneer Standard",
+								),
+							);
+							this.audit.log(
+								"PAYONEER_STANDARD_INSTRUCTIONS_READY",
+								payoutBatchId,
+								null,
+								instr,
+								actor,
+								{ reassurance: PrivacyMasker.reassurance("payoneer") },
+							);
+							return {
+								status: "processing",
+								gateway_response: instr,
+								payout_batch_id: payoutBatchId,
+								processed_at: new Date().toISOString(),
+								route_attempted: route,
+							};
+						}
+						if (route === "stripe") {
+							const tx = enforceOwnerSettlementForRoute(route, baseTx);
+							result = await withRetry(() =>
+								this.stripeGateway.executeTransfer(tx),
+							);
+							this.audit.log(
+								"STRIPE_TRANSFER_PREPARED",
+								payoutBatchId,
+								null,
+								result,
+								actor,
+								{ reassurance: PrivacyMasker.reassurance("stripe") },
+							);
+							return {
+								status: "processing",
+								gateway_response: result,
+								payout_batch_id: payoutBatchId,
+								processed_at: new Date().toISOString(),
+								route_attempted: route,
+							};
+						}
+						if (route === "wise") {
+							const tx = enforceOwnerSettlementForRoute(route, baseTx);
+							result = await withRetry(() =>
+								this.wiseGateway.executeTransfer({
+									payoutBatchId,
+									transactions: tx,
+									actor,
+								}),
+							);
+							this.audit.log(
+								"WISE_TRANSFER_PREPARED",
+								payoutBatchId,
+								null,
+								result,
+								actor,
+								{ reassurance: PrivacyMasker.reassurance("wise") },
+							);
+							return {
+								status: "processing",
+								gateway_response: result,
+								payout_batch_id: payoutBatchId,
+								processed_at: new Date().toISOString(),
+								route_attempted: route,
+							};
+						}
+						if (route === "paypal") {
+							if (shouldAvoidPayPal()) {
+								throw new Error("paypal_disallowed_by_policy");
+							}
+							const tx = enforceOwnerSettlementForRoute(route, baseTx);
+							const paypalTx = tx.map((t) => ({
+								amount: t.amount,
+								currency: t.currency,
+								destination: t.destination,
+								reference: t.reference,
+							}));
+							const resultPayPal = await withRetry(() =>
+								this.paypalGateway.executePayout(paypalTx),
+							);
+							const masked = paypalTx.map((t) => ({
+								amount: t.amount,
+								currency: t.currency,
+								masked_destination: PrivacyMasker.maskEmail(t.destination),
+							}));
+							this.audit.log(
+								"PAYPAL_PAYOUT_EXECUTED",
+								payoutBatchId,
+								null,
+								resultPayPal,
+								actor,
+								{
+									masked_recipients: masked,
+									reassurance: PrivacyMasker.reassurance("paypal"),
+								},
+							);
+							return {
+								status:
+									resultPayPal.status === "IN_TRANSIT"
+										? "success"
+										: "processing",
+								gateway_response: resultPayPal,
+								payout_batch_id: payoutBatchId,
+								processed_at: new Date().toISOString(),
+								route_attempted: route,
+							};
+						}
+						throw new Error(`unknown_route:${route}`);
 					} catch (e) {
 						this.audit.log(
 							"ROUTE_FAILURE",

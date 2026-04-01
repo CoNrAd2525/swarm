@@ -1,68 +1,61 @@
 import fs from "node:fs/promises";
 import "dotenv/config";
-import path from "node:path";
-import os from "node:os";
-import crypto from "node:crypto";
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
+import fsSync from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildBase44ServiceClient } from "./base44-client.mjs";
-import { getPayPalAccessToken } from "./paypal-api.mjs";
-import { maybeSendAlert } from "./alerts.mjs";
-import { enforceAuthorityProtocol as _enforceAuthorityProtocol } from "./authority.mjs";
-import { AgentHealthMonitor as _AgentHealthMonitor } from "./swarm/health-monitor.mjs";
-import { ConfigManager as _ConfigManager } from "./swarm/config-manager.mjs";
-import { SwarmMemory as _SwarmMemory } from "./swarm/shared-memory.mjs";
-import { RailOptimizer as _RailOptimizer } from "./swarm/rail-optimizer.mjs";
-import { TaskManager as _TaskManager } from "./swarm/task-manager.mjs";
-import { globalRecorder as _globalRecorder } from "./swarm/flight-recorder.mjs";
-import { LearningAgent as _LearningAgent } from "./swarm/learning-agent.mjs";
-import { runRevenueSwarm as _runRevenueSwarm } from "./revenue/swarm-runner.mjs";
-import { runFullBackup as _runFullBackup } from "./backup-runner.mjs";
-import {
-	runSystemIntegritySync as _runSystemIntegritySync,
-} from "./system-integrity.mjs";
-import { threatMonitor as _threatMonitor } from "./security/threat-monitor.mjs";
-import {
-	regulatoryMonitor as _regulatoryMonitor,
-} from "./contingency/regulatory-monitor.mjs";
-import { NetworkGuard } from "./security/NetworkGuard.mjs";
-import { runDoomsdayExport as _runDoomsdayExport } from "./real/ledger/doomsday-export.mjs";
-import { enforceOwnerDirective as _enforceOwnerDirective } from "./owner-directive.mjs";
 import { AutonomousAgentUpgrader } from "./agents/autonomous-upgrader.mjs";
 import { StrategicScout } from "./agents/strategic-scout.mjs";
-import { MissionOrchestrator } from "./swarm/mission-orchestrator.mjs";
-import { startSupervisor as startSwarmSupervisor } from "./swarm/supervisor.mjs";
+import { maybeSendAlert } from "./alerts.mjs";
 import { recordAudit } from "./audit-trail.mjs";
-import fsSync from "node:fs";
+import { enforceAuthorityProtocol as _enforceAuthorityProtocol } from "./authority.mjs";
 import {
-	normalizeIntervalMs,
 	loadAutonomousConfig,
+	normalizeIntervalMs,
 	resolveRuntimeConfig,
 } from "./autonomous-config.mjs";
 import { SelfHealer } from "./autonomous-healer.mjs";
+import { runFullBackup as _runFullBackup } from "./backup-runner.mjs";
+import { buildBase44ServiceClient } from "./base44-client.mjs";
+import { regulatoryMonitor as _regulatoryMonitor } from "./contingency/regulatory-monitor.mjs";
 import { ExternalPayerEnforcer } from "./finance/ExternalPayerEnforcer.mjs";
 import { ReplenishmentProtocol } from "./finance/ReplenishmentProtocol.mjs";
 import { LocalSwarmStore } from "./local-store.mjs";
+import { enforceOwnerDirective as _enforceOwnerDirective } from "./owner-directive.mjs";
+import { getPayPalAccessToken } from "./paypal-api.mjs";
+import { runDoomsdayExport as _runDoomsdayExport } from "./real/ledger/doomsday-export.mjs";
+import { runRevenueSwarm as _runRevenueSwarm } from "./revenue/swarm-runner.mjs";
+import { NetworkGuard } from "./security/NetworkGuard.mjs";
+import { threatMonitor as _threatMonitor } from "./security/threat-monitor.mjs";
+import { ConfigManager as _ConfigManager } from "./swarm/config-manager.mjs";
+import { globalRecorder as _globalRecorder } from "./swarm/flight-recorder.mjs";
+import { AgentHealthMonitor as _AgentHealthMonitor } from "./swarm/health-monitor.mjs";
+import { LearningAgent as _LearningAgent } from "./swarm/learning-agent.mjs";
+import { MissionOrchestrator } from "./swarm/mission-orchestrator.mjs";
+import { RailOptimizer as _RailOptimizer } from "./swarm/rail-optimizer.mjs";
+import { SwarmMemory as _SwarmMemory } from "./swarm/shared-memory.mjs";
+import { startSupervisor as startSwarmSupervisor } from "./swarm/supervisor.mjs";
+import { TaskManager as _TaskManager } from "./swarm/task-manager.mjs";
+import { runSystemIntegritySync as _runSystemIntegritySync } from "./system-integrity.mjs";
 
 const healer = new SelfHealer();
 const enforcer = new ExternalPayerEnforcer();
 const replenisher = new ReplenishmentProtocol();
 
 // Initialize modules
-(async () => { 
-    try { 
-        await enforcer.init();
-        await replenisher.init();
-    } catch (e) { 
-        console.error("Module init failed", e); 
-    } 
+(async () => {
+	try {
+		await enforcer.init();
+		await replenisher.init();
+	} catch (e) {
+		console.error("Module init failed", e);
+	}
 })();
 
 async function runNodeScript(scriptRelPath, scriptArgs, { env } = {}) {
-	const extraEnv =
-		env && typeof env === "object"
-			? env
-			: {};
+	const extraEnv = env && typeof env === "object" ? env : {};
 	return new Promise((resolve) => {
 		const child = spawn(process.execPath, [scriptRelPath, ...scriptArgs], {
 			cwd: process.cwd(),
@@ -91,16 +84,16 @@ async function runNodeScript(scriptRelPath, scriptArgs, { env } = {}) {
 				} catch {}
 			}
 
-            // AUTONOMOUS SELF-HEALING HOOK
-            if (code !== 0) {
-                const combinedError = `${stdout}\n${stderr}`;
-                const healed = await healer.attemptHeal(combinedError);
-                if (healed) {
-                    // In a real loop, we might retry immediately.
-                    // For now, we log the heal so the next cycle succeeds.
-                    stderr += "\n[Daemon] SelfHealer applied a fix based on this error.";
-                }
-            }
+			// AUTONOMOUS SELF-HEALING HOOK
+			if (code !== 0) {
+				const combinedError = `${stdout}\n${stderr}`;
+				const healed = await healer.attemptHeal(combinedError);
+				if (healed) {
+					// In a real loop, we might retry immediately.
+					// For now, we log the heal so the next cycle succeeds.
+					stderr += "\n[Daemon] SelfHealer applied a fix based on this error.";
+				}
+			}
 
 			resolve({ code: Number(code ?? 1), stdout, stderr, lastJson });
 		});
@@ -364,32 +357,38 @@ async function atomicWriteJson(filePath, value) {
 }
 
 async function maybeRunStrategicScouting(cfg, state) {
-  const enabled = cfg?.strategicScouting?.enabled !== false;
-  if (!enabled) return { ok: true, skipped: true, reason: "disabled" };
-  
-  const nowMs = Date.now();
-  const lastAt = Number(state.lastScoutAt ?? 0) || 0;
-  const intervalMs = Number(cfg?.strategicScouting?.intervalMs ?? 14400000) || 14400000; // 4 hours
+	const enabled = cfg?.strategicScouting?.enabled !== false;
+	if (!enabled) return { ok: true, skipped: true, reason: "disabled" };
 
-  if (nowMs - lastAt < intervalMs) {
-    return { ok: true, skipped: true, reason: "interval" };
-  }
+	const nowMs = Date.now();
+	const lastAt = Number(state.lastScoutAt ?? 0) || 0;
+	const intervalMs =
+		Number(cfg?.strategicScouting?.intervalMs ?? 14400000) || 14400000; // 4 hours
 
-  try {
-    const scout = new StrategicScout();
-    const proposal = await scout.runCycle();
-    state.lastScoutAt = nowMs;
-    
-    if (proposal) {
-        const filename = `proposal_${Date.now()}.json`;
-        const filepath = path.resolve(process.cwd(), 'exports', 'proposals', filename);
-        await atomicWriteJson(filepath, proposal);
-        return { ok: true, proposalPath: filepath };
-    }
-    return { ok: true, found: false };
-  } catch (e) {
-    return { ok: false, error: e?.message ?? String(e) };
-  }
+	if (nowMs - lastAt < intervalMs) {
+		return { ok: true, skipped: true, reason: "interval" };
+	}
+
+	try {
+		const scout = new StrategicScout();
+		const proposal = await scout.runCycle();
+		state.lastScoutAt = nowMs;
+
+		if (proposal) {
+			const filename = `proposal_${Date.now()}.json`;
+			const filepath = path.resolve(
+				process.cwd(),
+				"exports",
+				"proposals",
+				filename,
+			);
+			await atomicWriteJson(filepath, proposal);
+			return { ok: true, proposalPath: filepath };
+		}
+		return { ok: true, found: false };
+	} catch (e) {
+		return { ok: false, error: e?.message ?? String(e) };
+	}
 }
 
 async function _maybeRunAutonomousOptimization(cfg, state) {
@@ -507,7 +506,8 @@ async function startSwarmSupervisorIfEnabled(cfg, state) {
 	// Ensure agents registry exists; if missing or empty, sync from Base44
 	try {
 		const swarmDir = path.resolve("data/swarm");
-		if (!fsSync.existsSync(swarmDir)) fsSync.mkdirSync(swarmDir, { recursive: true });
+		if (!fsSync.existsSync(swarmDir))
+			fsSync.mkdirSync(swarmDir, { recursive: true });
 		const swarmFile = path.join(swarmDir, "agents.json");
 		let needSync = true;
 		if (fsSync.existsSync(swarmFile)) {
@@ -798,7 +798,8 @@ async function maybeRunMissionOrchestration(cfg, state) {
 			} catch {}
 		}
 
-		if (proposals.length === 0) return { ok: true, skipped: true, reason: "no_proposals" };
+		if (proposals.length === 0)
+			return { ok: true, skipped: true, reason: "no_proposals" };
 
 		const orchestrator = new MissionOrchestrator();
 		const results = await orchestrator.processProposals(proposals);
@@ -1012,17 +1013,17 @@ const localStore = new LocalSwarmStore();
 
 async function checkHealthOnce(cfg) {
 	let mode = cfg.offline.enabled ? "offline" : "auto";
-    const useLocalStore = process.env.SWARM_MODE === "local";
+	const useLocalStore = process.env.SWARM_MODE === "local";
 
-    if (useLocalStore) {
-        await localStore.init();
-        return {
-            at: nowIso(),
-            ok: true,
-            mode: "local",
-            details: { base44: "bypassed_local", paypal: "live_check_skipped" }
-        };
-    }
+	if (useLocalStore) {
+		await localStore.init();
+		return {
+			at: nowIso(),
+			ok: true,
+			mode: "local",
+			details: { base44: "bypassed_local", paypal: "live_check_skipped" },
+		};
+	}
 
 	let paypalOk = false;
 	let paypalErr = null;
@@ -1993,20 +1994,23 @@ async function runTick(cfg, state) {
 		);
 	}
 
-  if (cfg.tasks.monitorPayoneerStatus === true || cfg.monitor?.payoneerStatus === true) {
-    const res = await runNodeScript("./scripts/monitor-prq-status.mjs", [], { env: {} });
-    const payload =
-      res.lastJson ??
-      {
-        ok: false,
-        error:
-          res?.stderr?.trim() ||
-          res?.stdout?.trim() ||
-          "monitor_prq_status_failed",
-      };
-    out.results.monitorPayoneerStatus = payload;
-    await recordAudit("monitor_prq_status", payload).catch(() => {});
-  }
+	if (
+		cfg.tasks.monitorPayoneerStatus === true ||
+		cfg.monitor?.payoneerStatus === true
+	) {
+		const res = await runNodeScript("./scripts/monitor-prq-status.mjs", [], {
+			env: {},
+		});
+		const payload = res.lastJson ?? {
+			ok: false,
+			error:
+				res?.stderr?.trim() ||
+				res?.stdout?.trim() ||
+				"monitor_prq_status_failed",
+		};
+		out.results.monitorPayoneerStatus = payload;
+		await recordAudit("monitor_prq_status", payload).catch(() => {});
+	}
 
 	if (cfg.tasks.createPayoutBatches) {
 		if (isFreezeActive(state)) {
@@ -2457,16 +2461,26 @@ async function main() {
 	if (process.env.NODE_ENV !== "test") {
 		try {
 			// Check if we can parse ourselves without syntax errors
-			const selfCheckResult = await runNodeScript("src/autonomous-daemon.mjs", ["--check"], { env: process.env });
+			const selfCheckResult = await runNodeScript(
+				"src/autonomous-daemon.mjs",
+				["--check"],
+				{ env: process.env },
+			);
 			if (!selfCheckResult.ok) {
-				console.error("Self-check failed: syntax error detected, attempting auto-repair");
+				console.error(
+					"Self-check failed: syntax error detected, attempting auto-repair",
+				);
 				// In a real implementation, this would attempt to fix common syntax issues
 				// For now, we'll just log and continue
-				process.stderr.write(`${JSON.stringify({ ok: false, at: nowIso(), error: "Self-check failed", details: selfCheckResult.error })}\n`);
+				process.stderr.write(
+					`${JSON.stringify({ ok: false, at: nowIso(), error: "Self-check failed", details: selfCheckResult.error })}\n`,
+				);
 			}
 		} catch (e) {
 			// Self-check failed, but we can still try to run in safe mode
-			process.stderr.write(`${JSON.stringify({ ok: false, at: nowIso(), error: "Self-check error", details: e.message })}\n`);
+			process.stderr.write(
+				`${JSON.stringify({ ok: false, at: nowIso(), error: "Self-check error", details: e.message })}\n`,
+			);
 		}
 	}
 
@@ -2475,10 +2489,12 @@ async function main() {
 	});
 	const cfg = resolveRuntimeConfig(args, loaded.config);
 
-	// SAFE MODE: If configuration is invalid or missing critical components, 
+	// SAFE MODE: If configuration is invalid or missing critical components,
 	// run in minimal safe mode to prevent system damage
 	if (!cfg || !cfg.tasks) {
-		process.stderr.write(`${JSON.stringify({ ok: false, at: nowIso(), error: "Invalid configuration detected, entering safe mode" })}\n`);
+		process.stderr.write(
+			`${JSON.stringify({ ok: false, at: nowIso(), error: "Invalid configuration detected, entering safe mode" })}\n`,
+		);
 		// In safe mode, we only run basic health checks without money-moving operations
 		const safeCfg = {
 			...cfg,
@@ -2490,7 +2506,7 @@ async function main() {
 				autoSubmitPayPalPayoutBatches: false,
 				syncPayPalLedgerBatches: false,
 				autoSettleOwnerPayoneer: false,
-			}
+			},
 		};
 		// Continue with safe configuration
 		Object.assign(cfg, safeCfg);
@@ -2622,14 +2638,19 @@ async function main() {
 			const startH = Number(
 				process.env.AUTONOMOUS_ACTIVE_START_UTC ??
 					process.env.AUTONOMOUS_PAYOUT_WINDOW_START_UTC ??
-					(cfg.payout?.windowUtc?.startHourUtc ?? 0),
+					cfg.payout?.windowUtc?.startHourUtc ??
+					0,
 			);
 			const endH = Number(
 				process.env.AUTONOMOUS_ACTIVE_END_UTC ??
 					process.env.AUTONOMOUS_PAYOUT_WINDOW_END_UTC ??
-					(cfg.payout?.windowUtc?.endHourUtc ?? 0),
+					cfg.payout?.windowUtc?.endHourUtc ??
+					0,
 			);
-			const activeOk = isWithinWindowUtc({ startHourUtc: startH, endHourUtc: endH });
+			const activeOk = isWithinWindowUtc({
+				startHourUtc: startH,
+				endHourUtc: endH,
+			});
 			const loopCfg = activeOk
 				? cfg
 				: {
@@ -2675,7 +2696,7 @@ async function main() {
 		const exp =
 			state.consecutiveFailures <= 0
 				? 1
-				: Math.min(8, Math.pow(2, state.consecutiveFailures));
+				: Math.min(8, 2 ** state.consecutiveFailures);
 		const delay = Math.min(max, Math.max(1000, Math.floor(base * exp)));
 		await sleep(delay);
 	} while (!stop);

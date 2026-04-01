@@ -1,8 +1,8 @@
-import ccxt from "ccxt";
-import fs from "node:fs";
-import path from "node:path";
-import https from "node:https";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import https from "node:https";
+import path from "node:path";
+import ccxt from "ccxt";
 
 function getCcxtTimeoutMs() {
 	const raw =
@@ -39,7 +39,13 @@ async function withdrawUSDTBEP20(address, amount) {
 	});
 	try {
 		const params = { network: "BSC" };
-		const r = await binance.withdraw("USDT", amount, address, undefined, params);
+		const r = await binance.withdraw(
+			"USDT",
+			amount,
+			address,
+			undefined,
+			params,
+		);
 		return r;
 	} catch (e) {
 		throw new Error(
@@ -89,7 +95,9 @@ async function listWithdrawals(startTime) {
 }
 
 function mapBitgetChain(raw) {
-	const v = String(raw || "").trim().toLowerCase();
+	const v = String(raw || "")
+		.trim()
+		.toLowerCase();
 	if (v === "bep20" || v === "bsc") return "BSC";
 	if (v === "erc20" || v === "eth") return "ETH";
 	if (v === "trc20" || v === "tron") return "TRON";

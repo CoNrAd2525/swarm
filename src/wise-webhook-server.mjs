@@ -1,5 +1,5 @@
-import http from "node:http";
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import { parseArgs } from "./utils/cli.mjs";
 
@@ -93,12 +93,15 @@ async function main() {
 	const args = parseArgs(process.argv);
 	const port = Number(args.port ?? process.env.WISE_WEBHOOK_PORT ?? "5056");
 	const pathPrefix =
-		String(args.path ?? process.env.WISE_WEBHOOK_PATH ?? "/callback") || "/callback";
+		String(args.path ?? process.env.WISE_WEBHOOK_PATH ?? "/callback") ||
+		"/callback";
 	const server = buildServer({ port, pathPrefix });
 	server.listen(port, () => {
 		process.stdout.write(
-			JSON.stringify({ ok: true, listening: `http://localhost:${port}${pathPrefix}` }) +
-				"\n",
+			JSON.stringify({
+				ok: true,
+				listening: `http://localhost:${port}${pathPrefix}`,
+			}) + "\n",
 		);
 	});
 }

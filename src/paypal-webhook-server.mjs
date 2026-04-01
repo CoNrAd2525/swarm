@@ -1,26 +1,26 @@
-import http from "node:http";
-import crypto from "node:crypto";
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
+import http from "node:http";
+import { maybeSendAlert } from "./alerts.mjs";
 import { buildBase44ServiceClient } from "./base44-client.mjs";
-import {
-	addSecurityHeaders,
-	validateRequest,
-	validateAuth,
-} from "./security-middleware.mjs";
-import { LocalSwarmStore } from "./local-store.mjs"; // PATCH: Import local store
-import {
-	extractPayPalWebhookHeaders,
-	verifyPayPalWebhookSignature,
-	getPayPalAccessToken,
-	paypalRequest,
-} from "./paypal-api.mjs";
-import { mapPayPalWebhookToRevenueEvent } from "./paypal-event-mapper.mjs";
 import {
 	createBase44RevenueEventIdempotent,
 	getRevenueConfigFromEnv,
 } from "./base44-revenue.mjs";
-import { maybeSendAlert } from "./alerts.mjs";
 import { createDedupeStore } from "./dedupe-store.mjs";
+import { LocalSwarmStore } from "./local-store.mjs"; // PATCH: Import local store
+import {
+	extractPayPalWebhookHeaders,
+	getPayPalAccessToken,
+	paypalRequest,
+	verifyPayPalWebhookSignature,
+} from "./paypal-api.mjs";
+import { mapPayPalWebhookToRevenueEvent } from "./paypal-event-mapper.mjs";
+import {
+	addSecurityHeaders,
+	validateAuth,
+	validateRequest,
+} from "./security-middleware.mjs";
 import { parseArgs } from "./utils/cli.mjs";
 
 function getEnvOrThrow(name) {

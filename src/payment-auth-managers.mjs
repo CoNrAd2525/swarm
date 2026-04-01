@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import "dotenv/config";
 // PayPal Authentication Manager
 class PayPalAuthManager {
 	constructor() {
@@ -6,10 +6,11 @@ class PayPalAuthManager {
 		this.tokenExpiry = null;
 		this.clientId = process.env.PAYPAL_CLIENT_ID;
 		this.clientSecret = process.env.PAYPAL_CLIENT_SECRET;
-		this.environment = process.env.PAYPAL_ENVIRONMENT || 'sandbox';
-		this.baseUrl = this.environment === 'live' 
-			? 'https://api.paypal.com' 
-			: 'https://api.sandbox.paypal.com';
+		this.environment = process.env.PAYPAL_ENVIRONMENT || "sandbox";
+		this.baseUrl =
+			this.environment === "live"
+				? "https://api.paypal.com"
+				: "https://api.sandbox.paypal.com";
 	}
 
 	async getAccessToken() {
@@ -24,52 +25,55 @@ class PayPalAuthManager {
 
 	async refreshAccessToken() {
 		if (!this.clientId || !this.clientSecret) {
-			throw new Error('PayPal credentials not configured');
+			throw new Error("PayPal credentials not configured");
 		}
 
 		try {
-			const auth = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
-			
+			const auth = Buffer.from(
+				`${this.clientId}:${this.clientSecret}`,
+			).toString("base64");
+
 			const response = await fetch(`${this.baseUrl}/v1/oauth2/token`, {
-				method: 'POST',
+				method: "POST",
 				headers: {
-					'Authorization': `Basic ${auth}`,
-					'Content-Type': 'application/x-www-form-urlencoded',
-					'Accept': 'application/json'
+					Authorization: `Basic ${auth}`,
+					"Content-Type": "application/x-www-form-urlencoded",
+					Accept: "application/json",
 				},
-				body: 'grant_type=client_credentials'
+				body: "grant_type=client_credentials",
 			});
 
 			if (!response.ok) {
 				const errorData = await response.text();
-				throw new Error(`PayPal auth failed: ${response.status} - ${errorData}`);
+				throw new Error(
+					`PayPal auth failed: ${response.status} - ${errorData}`,
+				);
 			}
 
 			const data = await response.json();
-			
+
 			this.accessToken = data.access_token;
 			// Set expiry 5 minutes before actual expiry for safety
-			this.tokenExpiry = Date.now() + ((data.expires_in - 300) * 1000);
-			
-			console.log('🔑 PayPal access token refreshed successfully');
+			this.tokenExpiry = Date.now() + (data.expires_in - 300) * 1000;
+
+			console.log("🔑 PayPal access token refreshed successfully");
 			return this.accessToken;
-			
 		} catch (error) {
-			console.error('❌ PayPal authentication error:', error.message);
+			console.error("❌ PayPal authentication error:", error.message);
 			throw error;
 		}
 	}
 
 	async makeAuthenticatedRequest(endpoint, options = {}) {
 		const token = await this.getAccessToken();
-		
+
 		const response = await fetch(`${this.baseUrl}${endpoint}`, {
 			...options,
 			headers: {
 				...options.headers,
-				'Authorization': `Bearer ${token}`,
-				'Content-Type': 'application/json'
-			}
+				Authorization: `Bearer ${token}`,
+				"Content-Type": "application/json",
+			},
 		});
 
 		if (!response.ok) {
@@ -81,29 +85,30 @@ class PayPalAuthManager {
 	}
 }
 
-// Wise Authentication Manager  
+// Wise Authentication Manager
 class WiseAuthManager {
 	constructor() {
 		this.apiKey = process.env.WISE_API_KEY;
 		this.profileId = process.env.WISE_PROFILE_ID;
-		this.environment = process.env.WISE_ENVIRONMENT || 'sandbox';
-		this.baseUrl = this.environment === 'live'
-			? 'https://api.wise.com'
-			: 'https://api.sandbox.transferwise.tech';
+		this.environment = process.env.WISE_ENVIRONMENT || "sandbox";
+		this.baseUrl =
+			this.environment === "live"
+				? "https://api.wise.com"
+				: "https://api.sandbox.transferwise.tech";
 	}
 
 	async makeAuthenticatedRequest(endpoint, options = {}) {
 		if (!this.apiKey) {
-			throw new Error('Wise API key not configured');
+			throw new Error("Wise API key not configured");
 		}
 
 		const response = await fetch(`${this.baseUrl}${endpoint}`, {
 			...options,
 			headers: {
 				...options.headers,
-				'Authorization': `Bearer ${this.apiKey}`,
-				'Content-Type': 'application/json'
-			}
+				Authorization: `Bearer ${this.apiKey}`,
+				"Content-Type": "application/json",
+			},
 		});
 
 		if (!response.ok) {
@@ -116,10 +121,12 @@ class WiseAuthManager {
 
 	async getProfile() {
 		if (!this.profileId) {
-			throw new Error('Wise profile ID not configured');
+			throw new Error("Wise profile ID not configured");
 		}
 
-		const response = await this.makeAuthenticatedRequest(`/v1/profiles/${this.profileId}`);
+		const response = await this.makeAuthenticatedRequest(
+			`/v1/profiles/${this.profileId}`,
+		);
 		return await response.json();
 	}
 }
@@ -129,24 +136,25 @@ class BinanceAuthManager {
 	constructor() {
 		this.apiKey = process.env.BINANCE_API_KEY;
 		this.apiSecret = process.env.BINANCE_API_SECRET;
-		this.environment = process.env.BINANCE_ENVIRONMENT || 'testnet';
-		this.baseUrl = this.environment === 'live'
-			? 'https://api.binance.com'
-			: 'https://testnet.binance.vision';
+		this.environment = process.env.BINANCE_ENVIRONMENT || "testnet";
+		this.baseUrl =
+			this.environment === "live"
+				? "https://api.binance.com"
+				: "https://testnet.binance.vision";
 	}
 
 	async makeAuthenticatedRequest(endpoint, options = {}) {
 		if (!this.apiKey) {
-			throw new Error('Binance API key not configured');
+			throw new Error("Binance API key not configured");
 		}
 
 		const response = await fetch(`${this.baseUrl}${endpoint}`, {
 			...options,
 			headers: {
 				...options.headers,
-				'X-MBX-APIKEY': this.apiKey,
-				'Content-Type': 'application/json'
-			}
+				"X-MBX-APIKEY": this.apiKey,
+				"Content-Type": "application/json",
+			},
 		});
 
 		if (!response.ok) {
@@ -158,7 +166,7 @@ class BinanceAuthManager {
 	}
 
 	async testConnection() {
-		const response = await this.makeAuthenticatedRequest('/api/v3/ping');
+		const response = await this.makeAuthenticatedRequest("/api/v3/ping");
 		return await response.json();
 	}
 }
@@ -167,43 +175,46 @@ class BinanceAuthManager {
 class BankingCircleAuthManager {
 	constructor() {
 		this.apiKey = process.env.BANKING_CIRCLE_API_KEY || process.env.BC_API_KEY;
-		this.environment = process.env.BANKING_CIRCLE_ENVIRONMENT || 'sandbox';
-		this.baseUrl = this.environment === 'live'
-			? 'https://api.bankingcircle.com'
-			: 'https://sandbox.bankingcircle.com';
+		this.environment = process.env.BANKING_CIRCLE_ENVIRONMENT || "sandbox";
+		this.baseUrl =
+			this.environment === "live"
+				? "https://api.bankingcircle.com"
+				: "https://sandbox.bankingcircle.com";
 	}
 
 	async makeAuthenticatedRequest(endpoint, options = {}) {
 		if (!this.apiKey) {
-			throw new Error('Banking Circle API key not configured');
+			throw new Error("Banking Circle API key not configured");
 		}
 
 		const response = await fetch(`${this.baseUrl}${endpoint}`, {
 			...options,
 			headers: {
 				...options.headers,
-				'Authorization': `Bearer ${this.apiKey}`,
-				'Content-Type': 'application/json'
-			}
+				Authorization: `Bearer ${this.apiKey}`,
+				"Content-Type": "application/json",
+			},
 		});
 
 		if (!response.ok) {
 			const errorData = await response.text();
-			throw new Error(`Banking Circle API error: ${response.status} - ${errorData}`);
+			throw new Error(
+				`Banking Circle API error: ${response.status} - ${errorData}`,
+			);
 		}
 
 		return response;
 	}
 
 	async getAccounts() {
-		const response = await this.makeAuthenticatedRequest('/v2/accounts');
+		const response = await this.makeAuthenticatedRequest("/v2/accounts");
 		return await response.json();
 	}
 }
 
-export { 
-	PayPalAuthManager, 
-	WiseAuthManager, 
-	BinanceAuthManager, 
-	BankingCircleAuthManager 
+export {
+	PayPalAuthManager,
+	WiseAuthManager,
+	BinanceAuthManager,
+	BankingCircleAuthManager,
 };

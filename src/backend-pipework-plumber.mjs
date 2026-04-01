@@ -1,15 +1,15 @@
 import "dotenv/config";
-import express from "express";
-import bodyParser from "body-parser";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
-import {
-	buildBase44ServiceClient,
-	buildBase44Client,
-} from "./base44-client.mjs";
+import bodyParser from "body-parser";
+import express from "express";
 import { fileURLToPath } from "url";
+import {
+	buildBase44Client,
+	buildBase44ServiceClient,
+} from "./base44-client.mjs";
 
 function ensureDir(p) {
 	if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
@@ -196,31 +196,29 @@ function buildSettlementOps() {
 export function createApp() {
 	const app = express();
 	app.use(bodyParser.json({ limit: "1mb" }));
-		app.use((req, _res, next) => {
-			console.log(`[BackendPlumber] ${req.method} ${req.path}`);
-			next();
-		});
+	app.use((req, _res, next) => {
+		console.log(`[BackendPlumber] ${req.method} ${req.path}`);
+		next();
+	});
 	app.use((req, res, next) => {
 		if (req.path === "/" || req.path === "") {
-			res
-				.type("application/json")
-				.send(
-					JSON.stringify({
-						ok: true,
-						service: "backend-plumber",
-						endpoints: [
-							"GET /api/owner/:entity",
-							"GET /api/owner/:entity/:id",
-							"POST /api/owner/:entity",
-							"PATCH /api/owner/:entity/:id",
-							"GET /api/agents/status",
-							"POST /api/agents/mission",
-							"POST /api/webhooks/paypal",
-							"POST /api/webhooks/stripe",
-							"POST /api/settlement/orchestrate",
-						],
-					}),
-				);
+			res.type("application/json").send(
+				JSON.stringify({
+					ok: true,
+					service: "backend-plumber",
+					endpoints: [
+						"GET /api/owner/:entity",
+						"GET /api/owner/:entity/:id",
+						"POST /api/owner/:entity",
+						"PATCH /api/owner/:entity/:id",
+						"GET /api/agents/status",
+						"POST /api/agents/mission",
+						"POST /api/webhooks/paypal",
+						"POST /api/webhooks/stripe",
+						"POST /api/settlement/orchestrate",
+					],
+				}),
+			);
 			return;
 		}
 		next();
@@ -230,23 +228,25 @@ export function createApp() {
 	const webhooks = buildWebhooks();
 	const settlement = buildSettlementOps();
 
-  app.get("/", (_req, res) => {
-    res.type("application/json").send(JSON.stringify({
-      ok: true,
-      service: "backend-plumber",
-      endpoints: [
-        "GET /api/owner/:entity",
-        "GET /api/owner/:entity/:id",
-        "POST /api/owner/:entity",
-        "PATCH /api/owner/:entity/:id",
-        "GET /api/agents/status",
-        "POST /api/agents/mission",
-        "POST /api/webhooks/paypal",
-        "POST /api/webhooks/stripe",
-        "POST /api/settlement/orchestrate"
-      ]
-    }));
-  });
+	app.get("/", (_req, res) => {
+		res.type("application/json").send(
+			JSON.stringify({
+				ok: true,
+				service: "backend-plumber",
+				endpoints: [
+					"GET /api/owner/:entity",
+					"GET /api/owner/:entity/:id",
+					"POST /api/owner/:entity",
+					"PATCH /api/owner/:entity/:id",
+					"GET /api/agents/status",
+					"POST /api/agents/mission",
+					"POST /api/webhooks/paypal",
+					"POST /api/webhooks/stripe",
+					"POST /api/settlement/orchestrate",
+				],
+			}),
+		);
+	});
 
 	app.get("/api/owner/:entity", async (req, res) => {
 		try {
@@ -337,25 +337,23 @@ export function createApp() {
 	});
 
 	app.get(/.*/, (_req, res) => {
-		res
-			.type("application/json")
-			.send(
-				JSON.stringify({
-					ok: true,
-					service: "backend-plumber",
-					endpoints: [
-						"GET /api/owner/:entity",
-						"GET /api/owner/:entity/:id",
-						"POST /api/owner/:entity",
-						"PATCH /api/owner/:entity/:id",
-						"GET /api/agents/status",
-						"POST /api/agents/mission",
-						"POST /api/webhooks/paypal",
-						"POST /api/webhooks/stripe",
-						"POST /api/settlement/orchestrate",
-					],
-				}),
-			);
+		res.type("application/json").send(
+			JSON.stringify({
+				ok: true,
+				service: "backend-plumber",
+				endpoints: [
+					"GET /api/owner/:entity",
+					"GET /api/owner/:entity/:id",
+					"POST /api/owner/:entity",
+					"PATCH /api/owner/:entity/:id",
+					"GET /api/agents/status",
+					"POST /api/agents/mission",
+					"POST /api/webhooks/paypal",
+					"POST /api/webhooks/stripe",
+					"POST /api/settlement/orchestrate",
+				],
+			}),
+		);
 	});
 
 	return app;

@@ -1,5 +1,5 @@
-import { lookupIntent, recordResolution } from "./semantic-cache.mjs";
 import { createExperienceEnvelope } from "./axp-schema.mjs";
+import { lookupIntent, recordResolution } from "./semantic-cache.mjs";
 
 export class RailOptimizer {
 	optimize(context = {}) {

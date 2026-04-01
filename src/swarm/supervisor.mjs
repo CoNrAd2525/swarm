@@ -2,22 +2,22 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
-import { SwarmMemory } from "./shared-memory.mjs";
-import { AgentReplenisher } from "./agent-replenisher.mjs";
-import { runRevenueSwarm } from "../revenue/swarm-runner.mjs";
+import { spawnSync } from "node:child_process";
+import { parse as csvParse } from "csv-parse/sync";
 import { calculatePosp, writePospProof } from "../consensus/posp.mjs";
-import { loadAims, aimsToMissions, writeMissions } from "./aims-ingest.mjs";
+import { runRevenueSwarm } from "../revenue/swarm-runner.mjs";
+import {
+	checkEgressIp,
+	writeEgressStatus,
+} from "../security/egress-ip-guard.mjs";
+import { AgentReplenisher } from "./agent-replenisher.mjs";
+import { aimsToMissions, loadAims, writeMissions } from "./aims-ingest.mjs";
+import { applyPhase0ToRow } from "./mission-phase0.mjs";
+import { buildMissionPlan, writeMissionPlan } from "./mission-planner.mjs";
 import { pollNews } from "./news-watch.mjs";
 import { checkNewBatches } from "./payoneer-watch.mjs";
 import { writeRoutesStatus } from "./routes-status.mjs";
-import {
-	writeEgressStatus,
-	checkEgressIp,
-} from "../security/egress-ip-guard.mjs";
-import { spawnSync } from "node:child_process";
-import { parse as csvParse } from "csv-parse/sync";
-import { applyPhase0ToRow } from "./mission-phase0.mjs";
-import { buildMissionPlan, writeMissionPlan } from "./mission-planner.mjs";
+import { SwarmMemory } from "./shared-memory.mjs";
 
 function parseCsvList(raw) {
 	return String(raw || "")
@@ -127,8 +127,12 @@ function syncBase44Missions() {
 	const allowedCat = allowedMissionCategories();
 	for (const m of base44) {
 		const title = String(m?.title || "").trim();
-		const status = String(m?.status || "").trim().toLowerCase();
-		const category = String(m?.category || "").trim().toLowerCase();
+		const status = String(m?.status || "")
+			.trim()
+			.toLowerCase();
+		const category = String(m?.category || "")
+			.trim()
+			.toLowerCase();
 		const id = String(m?.id || "").trim() || `b44_${Date.now()}`;
 		if (!title) continue;
 		if (!allowedStatus.has(status)) continue;
@@ -191,8 +195,12 @@ function normalizeCsvMission(row) {
 	const title = String(row?.title ?? row?.["Mission Title"] ?? row?.[0] ?? "")
 		.trim()
 		.replace(/^"|"$/g, "");
-	const category = String(row?.category ?? row?.type ?? "").trim().toLowerCase();
-	const status = String(row?.status ?? "").trim().toLowerCase();
+	const category = String(row?.category ?? row?.type ?? "")
+		.trim()
+		.toLowerCase();
+	const status = String(row?.status ?? "")
+		.trim()
+		.toLowerCase();
 	const id =
 		String(row?.id ?? row?.mission_id ?? row?.["Mission ID"] ?? "").trim() ||
 		`csv_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
@@ -300,7 +308,10 @@ function ensurePhase0BootstrapMission() {
 				api_config: {
 					action: "generate_api_keys",
 					scope: ["read", "write", "products", "orders", "analytics"],
-					webhook_setup: { enable: true, events: ["order_created", "payment_captured"] },
+					webhook_setup: {
+						enable: true,
+						events: ["order_created", "payment_captured"],
+					},
 				},
 				verification_method: "automated_email_check",
 			}),
@@ -347,38 +358,50 @@ async function runCycle({ memory, replenisher, filePath }) {
 	if (missions.length) {
 		writeMissions(missions);
 	}
-		let headhunter = null;
+	let headhunter = null;
+	try {
+		const hh = spawnSync(process.execPath, ["scripts/headhunter-daemon.mjs"], {
+			cwd: process.cwd(),
+			encoding: "utf8",
+		});
 		try {
-			const hh = spawnSync(process.execPath, ["scripts/headhunter-daemon.mjs"], {
-				cwd: process.cwd(),
-				encoding: "utf8",
-			});
-			try {
-				headhunter = JSON.parse((hh.stdout || "").trim());
-			} catch {
-				headhunter = { ok: false, raw: (hh.stdout || "").trim() };
-			}
+			headhunter = JSON.parse((hh.stdout || "").trim());
 		} catch {
-			headhunter = { ok: false };
+			headhunter = { ok: false, raw: (hh.stdout || "").trim() };
 		}
+	} catch {
+		headhunter = { ok: false };
+	}
 	const synced = syncBase44Missions();
 	const syncedCsv = syncArchiveCsvMissions();
 	let campaigns = { ok: true, output: null };
 	try {
-		const cs = spawnSync(process.execPath, ["scripts/sync-campaigns-from-csv.mjs", "--in", path.join(process.cwd(), "rank", "Campaign_export (5).csv")], {
-			cwd: process.cwd(),
-			encoding: "utf8",
-		});
+		const cs = spawnSync(
+			process.execPath,
+			[
+				"scripts/sync-campaigns-from-csv.mjs",
+				"--in",
+				path.join(process.cwd(), "rank", "Campaign_export (5).csv"),
+			],
+			{
+				cwd: process.cwd(),
+				encoding: "utf8",
+			},
+		);
 		campaigns.output = (cs.stdout || "").trim();
 	} catch {
 		campaigns = { ok: false };
 	}
 	let payoutPromotion = { ok: true, output: null };
 	try {
-		const prx = spawnSync(process.execPath, ["scripts/promote-offline-payout-requests.mjs"], {
-			cwd: process.cwd(),
-			encoding: "utf8",
-		});
+		const prx = spawnSync(
+			process.execPath,
+			["scripts/promote-offline-payout-requests.mjs"],
+			{
+				cwd: process.cwd(),
+				encoding: "utf8",
+			},
+		);
 		payoutPromotion.output = (prx.stdout || "").trim();
 	} catch {
 		payoutPromotion = { ok: false };
@@ -514,7 +537,7 @@ async function runCycle({ memory, replenisher, filePath }) {
 	}
 	const out = {
 		ok: true,
-			headhunter,
+		headhunter,
 		replenish: rep,
 		revenue: rev,
 		campaigns_sync: campaigns,

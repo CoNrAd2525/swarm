@@ -11,8 +11,7 @@ function isPlaceholderValue(value) {
 function getEnvOrThrow(name) {
 	const v = process.env[name];
 	const s = v == null ? "" : String(v).trim();
-	if (!s)
-		throw new Error(`Missing required env var: ${name}`);
+	if (!s) throw new Error(`Missing required env var: ${name}`);
 	if (isPlaceholderValue(s))
 		throw new Error(`Missing required env var: ${name}`);
 	return s;
@@ -28,9 +27,7 @@ function base64BasicAuth(clientId, clientSecret) {
 	const token = Buffer.from(
 		`${String(clientId).trim()}:${String(clientSecret).trim()}`,
 		"utf8",
-	).toString(
-		"base64",
-	);
+	).toString("base64");
 	return `Basic ${token}`;
 }
 

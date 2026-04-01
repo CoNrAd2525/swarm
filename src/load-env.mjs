@@ -30,7 +30,7 @@ export function loadEnv() {
 					) {
 						val = val.slice(1, -1);
 					}
-					if (!Object.prototype.hasOwnProperty.call(process.env, key)) {
+					if (!Object.hasOwn(process.env, key)) {
 						process.env[key] = val;
 					}
 				}

@@ -3,7 +3,6 @@
 // It provides methods for obfuscating API calls, sanitizing logs, and breaking traffic patterns.
 
 class DiscretionModule {
-
 	constructor() {
 		// Initialization logic for the module
 	}

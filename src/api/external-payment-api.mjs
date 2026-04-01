@@ -1,3 +1,8 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { AppendOnlyHmacLogger } from "../audit/AppendOnlyHmacLogger.mjs";
+import { enforceAuthorityProtocol } from "../authority.mjs";
 import { AdvancedFinancialManager } from "../finance/AdvancedFinancialManager.mjs";
 import {
 	enforceOwnerDirective,
@@ -7,11 +12,6 @@ import {
 	calculateUnitEconomics,
 	enforceUnitEconomics,
 } from "../unit-economics.mjs";
-import { AppendOnlyHmacLogger } from "../audit/AppendOnlyHmacLogger.mjs";
-import { enforceAuthorityProtocol } from "../authority.mjs";
-import crypto from "node:crypto";
-import path from "node:path";
-import fs from "node:fs";
 
 function getEnvBool(name, def = false) {
 	const v = process.env[name];

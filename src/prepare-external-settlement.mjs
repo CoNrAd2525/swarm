@@ -4,8 +4,8 @@ import {
 	updateBase44EarningById,
 } from "./base44-earning.mjs";
 import {
-	getExternalSettlementConfigFromEnv,
 	createBase44ExternalSettlementIdempotent,
+	getExternalSettlementConfigFromEnv,
 } from "./base44-external-settlement.mjs";
 
 function parseArgs(argv) {

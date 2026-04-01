@@ -1,6 +1,6 @@
-import { Spot } from "@binance/connector";
-import https from "node:https";
 import crypto from "node:crypto";
+import https from "node:https";
+import { Spot } from "@binance/connector";
 import "dotenv/config";
 
 /**
@@ -35,7 +35,11 @@ export class BinanceClient {
 		return Date.now() + (this._timeOffset || 0);
 	}
 
-	async withdrawUSDTBEP20({ address, amount, name: _name = "AutonomousSettlement" }) {
+	async withdrawUSDTBEP20({
+		address,
+		amount,
+		name: _name = "AutonomousSettlement",
+	}) {
 		return this.withdrawUsingServerTime({
 			coin: "USDT",
 			address,
@@ -63,8 +67,7 @@ export class BinanceClient {
 		);
 		const qs = entries
 			.map(
-				([k, v]) =>
-					`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`,
+				([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`,
 			)
 			.join("&");
 		const sig = crypto
@@ -74,7 +77,13 @@ export class BinanceClient {
 		return { qs, sig };
 	}
 
-	async withdrawUsingServerTime({ coin, address, amount, network, name: _name }) {
+	async withdrawUsingServerTime({
+		coin,
+		address,
+		amount,
+		network,
+		name: _name,
+	}) {
 		await this.ensureTimeOffset(true);
 		const params = {
 			coin: String(coin || "USDT"),
@@ -247,5 +256,4 @@ export class BinanceClient {
 	}
 }
 
-export const binanceClient = new BinanceClient()
-
+export const binanceClient = new BinanceClient();

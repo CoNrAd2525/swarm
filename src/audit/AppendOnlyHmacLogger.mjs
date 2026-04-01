@@ -1,6 +1,6 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import crypto from "node:crypto";
 
 function hmac(text) {
 	const key = String(process.env.APPEND_LOG_SECRET || "");

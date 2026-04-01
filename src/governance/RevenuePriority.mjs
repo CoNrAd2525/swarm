@@ -76,23 +76,24 @@ export class RevenuePriority {
 
 			let revenue = 0;
 
-		for (const file of files) {
-			try {
-				const content = fs.readFileSync(path.join(this.baseDir, file), "utf8");
-				const event = JSON.parse(content);
+			for (const file of files) {
+				try {
+					const content = fs.readFileSync(
+						path.join(this.baseDir, file),
+						"utf8",
+					);
+					const event = JSON.parse(content);
 
-				if (new Date(event.timestamp).getTime() > sevenDaysAgo) {
-					if (
-						event.amount &&
-						(event.status === "verified" || event.status === "settled")
-					) {
-						revenue += parseFloat(event.amount);
+					if (new Date(event.timestamp).getTime() > sevenDaysAgo) {
+						if (
+							event.amount &&
+							(event.status === "verified" || event.status === "settled")
+						) {
+							revenue += parseFloat(event.amount);
+						}
 					}
-				}
-			} catch {
-				continue;
+				} catch {}
 			}
-		}
 
 			this.cache = {
 				lastCheck: now,

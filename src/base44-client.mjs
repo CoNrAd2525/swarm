@@ -1,7 +1,7 @@
-import dotenv from "dotenv";
-import { createClient } from "@base44/sdk";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createClient } from "@base44/sdk";
+import dotenv from "dotenv";
 
 dotenv.config({ override: true });
 
@@ -97,14 +97,14 @@ function matchesFilter(record, filter) {
 	for (const [k, v] of Object.entries(filter)) {
 		const rv = record?.[k];
 
-		if (typeof v === 'object' && v !== null) {
-			if ('$ne' in v) {
+		if (typeof v === "object" && v !== null) {
+			if ("$ne" in v) {
 				if (rv === v.$ne) return false;
 			}
-			if ('$lt' in v) {
+			if ("$lt" in v) {
 				if (rv >= v.$lt) return false;
 			}
-			if ('$gt' in v) {
+			if ("$gt" in v) {
 				if (rv <= v.$gt) return false;
 			}
 			// Add other operators as needed
@@ -382,11 +382,19 @@ function getOnlineAuth() {
 		const inferred = inferAppIdFromServiceToken(serviceToken);
 		if (inferred) appId = normalizeAppIdInput(inferred);
 	}
-	if (!appId) throw new Error("Missing Base44 app id (set BASE44_APP_ID or supply BASE44_API_KEY with appId)");
-	if (!serviceToken) throw new Error("Missing Base44 service token (set BASE44_SERVICE_TOKEN or supply BASE44_API_KEY)");
+	if (!appId)
+		throw new Error(
+			"Missing Base44 app id (set BASE44_APP_ID or supply BASE44_API_KEY with appId)",
+		);
+	if (!serviceToken)
+		throw new Error(
+			"Missing Base44 service token (set BASE44_SERVICE_TOKEN or supply BASE44_API_KEY)",
+		);
 	const tokenApp = inferAppIdFromServiceToken(serviceToken);
 	if (tokenApp && !appIdEquivalent(appId, tokenApp)) {
-		console.error("[Base44Client] Warning: BASE44_APP_ID does not match token app id");
+		console.error(
+			"[Base44Client] Warning: BASE44_APP_ID does not match token app id",
+		);
 	}
 	return { appId, serviceToken };
 }

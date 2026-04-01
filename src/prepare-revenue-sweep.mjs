@@ -1,7 +1,7 @@
 import "dotenv/config";
 import fs from "node:fs";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { buildBase44Client } from "./base44-client.mjs";
@@ -781,8 +781,9 @@ async function createPayoutRequest(base44, cfg, payload, { dryRun }) {
 		return created;
 	} catch (err) {
 		const fallbackEnabled =
-			(process.env.BASE44_PAYOUT_REQUESTS_FALLBACK_OFFLINE ?? "true").toLowerCase() ===
-			"true";
+			(
+				process.env.BASE44_PAYOUT_REQUESTS_FALLBACK_OFFLINE ?? "true"
+			).toLowerCase() === "true";
 		if (!fallbackEnabled) throw err;
 		const offline = buildBase44Client({ mode: "offline" });
 		const offlineEntity = offline.asServiceRole.entities[cfg.payoutEntityName];

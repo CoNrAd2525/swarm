@@ -51,8 +51,7 @@ function parseDependenciesFromMissionParams(params) {
 	const mp = safeJsonParse(params) || {};
 	const dep = mp.dependent_on ?? mp.dependentOn ?? null;
 	if (dep == null) return [];
-	if (Array.isArray(dep))
-		return dep.map((x) => normalizeId(x)).filter(Boolean);
+	if (Array.isArray(dep)) return dep.map((x) => normalizeId(x)).filter(Boolean);
 	const s = normalizeId(dep);
 	return s ? [s] : [];
 }
@@ -148,7 +147,10 @@ export function buildMissionPlan({
 	return { at: new Date().toISOString(), summary, missions };
 }
 
-export function writeMissionPlan(plan, outPath = "data/swarm/mission-plan.json") {
+export function writeMissionPlan(
+	plan,
+	outPath = "data/swarm/mission-plan.json",
+) {
 	const abs = path.resolve(outPath);
 	fs.mkdirSync(path.dirname(abs), { recursive: true });
 	fs.writeFileSync(abs, JSON.stringify(plan, null, 2));

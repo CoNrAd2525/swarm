@@ -17,11 +17,12 @@ function parseCredsLines(lines) {
 		const t = String(lineRaw || "").trim();
 		if (!t) continue;
 		let m = t.match(/^\s*\$env\s*:\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/);
-		if (!m)
-			m = t.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*[:=]\s*(.+)$/);
+		if (!m) m = t.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*[:=]\s*(.+)$/);
 		if (!m) continue;
 		const name = String(m[1] || "").trim();
-		const v = String(m[2] || "").trim().replace(/^["']|["']$/g, "");
+		const v = String(m[2] || "")
+			.trim()
+			.replace(/^["']|["']$/g, "");
 		if (!name) continue;
 		if (isPlaceholderValue(v)) continue;
 		out.set(name, v);
@@ -34,7 +35,8 @@ export function loadCredsFromCredsTxt({
 	override = false,
 } = {}) {
 	try {
-		if (!fs.existsSync(credsPath)) return { ok: false, loaded: 0, path: credsPath };
+		if (!fs.existsSync(credsPath))
+			return { ok: false, loaded: 0, path: credsPath };
 		const raw = fs.readFileSync(credsPath, "utf8");
 		const lines = raw.split(/\r?\n/g);
 		const kv = parseCredsLines(lines);
