@@ -6,6 +6,10 @@ function requestsPath(cwd = process.cwd()) {
 	return path.join(cwd, "data", "classroom", "requests.json");
 }
 
+function statusPath(cwd = process.cwd()) {
+	return path.join(cwd, "data", "classroom", "status.json");
+}
+
 function lockPath(cwd = process.cwd()) {
 	return path.join(cwd, "data", "locks", "classroom_requests.lock");
 }
@@ -108,4 +112,48 @@ export async function getClassroomRequestMetrics({
 		(r) => Number(r?.at || 0) >= cutoff,
 	).length;
 	return { total: requests.length, last_window: lastWindow };
+}
+
+export async function readClassroomStatus({ cwd = process.cwd() } = {}) {
+	try {
+		const p = statusPath(cwd);
+		const raw = await fs.readFile(p, "utf8");
+		const doc = JSON.parse(raw);
+		if (doc && typeof doc === "object" && !Array.isArray(doc)) return doc;
+		return {};
+	} catch {
+		return {};
+	}
+}
+
+export async function setClassroomRequestStatus(
+	id,
+	patch,
+	{ cwd = process.cwd() } = {},
+) {
+	return await withFileLock(
+		async () => {
+			const p = statusPath(cwd);
+			await fs.mkdir(path.dirname(p), { recursive: true });
+			const current = await readClassroomStatus({ cwd });
+			const k = String(id || "").trim();
+			if (!k) throw new Error("missing_id");
+			const prev =
+				current[k] &&
+				typeof current[k] === "object" &&
+				!Array.isArray(current[k])
+					? current[k]
+					: {};
+			current[k] = {
+				...prev,
+				...patch,
+				updated_at: new Date().toISOString(),
+			};
+			const tmp = `${p}.tmp`;
+			await fs.writeFile(tmp, JSON.stringify(current, null, 2), "utf8");
+			await fs.rename(tmp, p);
+			return { ok: true, id: k };
+		},
+		{ cwd },
+	);
 }

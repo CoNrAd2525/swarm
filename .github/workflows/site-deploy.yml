@@ -19,6 +19,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Policy gate (secrets + Plaid readiness)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install deps (policy gate)
+        run: npm ci
+      - name: Run policy gate
+        run: node scripts/policy-gate.mjs
+
       - name: Render .env file
         run: |
           echo "OWNER=${{ github.repository_owner }}" > .env
