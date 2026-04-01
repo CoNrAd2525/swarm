@@ -3,8 +3,6 @@ name: Vercel Static Deploy
 on:
   push:
     branches:
-      - master
-      - main
       - release
     paths:
       - 'rank/output/**'

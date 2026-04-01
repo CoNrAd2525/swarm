@@ -2,7 +2,7 @@ name: Site Deploy
 
 on:
   push:
-    branches: [main, master, release]
+    branches: [release]
   workflow_dispatch:
     inputs:
       environment:
@@ -24,14 +24,21 @@ jobs:
         with:
           node-version: "20"
       - name: Install deps (policy gate)
-        run: npm ci
+        run: npm ci --omit=dev
       - name: Run policy gate
         run: node scripts/policy-gate.mjs
+      - name: Upload policy status artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: policy-status
+          path: logs/security/policy-status.json
 
       - name: Render .env file
         run: |
           echo "OWNER=${{ github.repository_owner }}" > .env
           echo "PAYPAL_OWNER_EMAIL=${{ secrets.PAYPAL_OWNER_EMAIL }}" >> .env
+          echo "OWNER_DASH_TOKEN=${{ secrets.OWNER_DASH_TOKEN }}" >> .env
           cat .env
 
       - name: Copy files to server
@@ -69,6 +76,7 @@ jobs:
         run: |
           echo "OWNER=${{ github.repository_owner }}" > .env
           echo "PAYPAL_OWNER_EMAIL=${{ secrets.STAGING_PAYPAL_OWNER_EMAIL }}" >> .env
+          echo "OWNER_DASH_TOKEN=${{ secrets.OWNER_DASH_TOKEN }}" >> .env
           cat .env
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7

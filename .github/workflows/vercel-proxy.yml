@@ -3,8 +3,6 @@ name: Vercel Proxy Deploy
 on:
   push:
     branches:
-      - master
-      - main
       - release
     paths:
       - 'vercel.json'
