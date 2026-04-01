@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { buildBase44ServiceClient } from "../base44-client.mjs";
+import { getClassroomRequestMetrics } from "../classroom/ClassroomRequests.mjs";
 
 /**
  * MISSION RUNNER AGENT (v1.0)
@@ -78,18 +79,18 @@ export class MissionRunnerAgent {
 
 		switch (channel) {
 			case "classroom_growth": {
-				let total = 0;
-				let last24h = 0;
+				const metrics = await getClassroomRequestMetrics({});
+				const total = metrics.total;
+				const last24h = metrics.last_window;
+				let threshold = 10;
 				try {
-					const reqPath = path.resolve("data", "classroom", "requests.json");
-					const doc = JSON.parse(await fs.readFile(reqPath, "utf8"));
-					const reqs = Array.isArray(doc?.requests) ? doc.requests : [];
-					total = reqs.length;
-					const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-					last24h = reqs.filter((r) => Number(r?.at || 0) >= cutoff).length;
+					const raw = String(mission?.data?.mission_parameters || "");
+					const mp = JSON.parse(raw);
+					threshold = Number(mp?.signals?.daily_threshold || 10);
+					if (!Number.isFinite(threshold) || threshold < 1) threshold = 10;
 				} catch {}
 
-				if (last24h >= 10) {
+				if (last24h >= threshold) {
 					const followupPath = path.resolve(
 						"data",
 						"swarm",

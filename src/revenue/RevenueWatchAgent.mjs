@@ -1,7 +1,7 @@
-import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { buildBase44ServiceClient } from "../base44-client.mjs";
+import { getClassroomRequestMetrics } from "../classroom/ClassroomRequests.mjs";
 
 /**
  * REVENUE WATCH AGENT (v1.0)
@@ -77,9 +77,10 @@ export class RevenueWatchAgent {
 
 		// Aggregate Earnings from mirrors (Simulated)
 		const mirrorsPath = path.join(process.cwd(), "data", "mirror-sites.json");
-		const mirrorsData = fsSync.existsSync(mirrorsPath)
-			? JSON.parse(await fs.readFile(mirrorsPath, "utf8"))
-			: { mirrors: [] };
+		let mirrorsData = { mirrors: [] };
+		try {
+			mirrorsData = JSON.parse(await fs.readFile(mirrorsPath, "utf8"));
+		} catch {}
 
 		let mirrorRevenue = 0;
 		for (const mirror of mirrorsData.mirrors) {
@@ -91,33 +92,15 @@ export class RevenueWatchAgent {
 			);
 		}
 
-		let classroom_requests_total = 0;
-		let classroom_requests_24h = 0;
-		try {
-			const reqPath = path.join(
-				process.cwd(),
-				"data",
-				"classroom",
-				"requests.json",
-			);
-			if (fsSync.existsSync(reqPath)) {
-				const doc = JSON.parse(await fs.readFile(reqPath, "utf8"));
-				const reqs = Array.isArray(doc?.requests) ? doc.requests : [];
-				classroom_requests_total = reqs.length;
-				const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-				classroom_requests_24h = reqs.filter(
-					(r) => Number(r?.at || 0) >= cutoff,
-				).length;
-			}
-		} catch {}
+		const classroom = await getClassroomRequestMetrics({});
 
 		const report = {
 			timestamp: Date.now(),
 			main_site_verified: totalVerified,
 			main_site_pending: pendingSettlement,
 			mirror_swarm_earnings: mirrorRevenue,
-			classroom_requests_total,
-			classroom_requests_24h,
+			classroom_requests_total: classroom.total,
+			classroom_requests_24h: classroom.last_window,
 			total_ecosystem_earnings: totalVerified + mirrorRevenue,
 			mission_forecast: (totalVerified / 24) * 1.15, // Simple projection
 			currency: "USD",

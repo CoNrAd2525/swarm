@@ -21,6 +21,7 @@ data/locks/
 data/swarm/
 data/base44_export/offline-store-backup.json
 data/financial/settlement_ledger.json
+data/classroom/
 test_*.js
 test_*.mjs
 node_modules/

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import express from "express";
 import { buildBase44ServiceClient } from "./base44-client.mjs";
+import { appendClassroomRequest } from "./classroom/ClassroomRequests.mjs";
 import { buildWebscrLink } from "./paypal-links.mjs";
 import { cspSecurityMiddleware } from "./security-middleware.mjs";
 
@@ -772,23 +773,7 @@ function start({ port = 8080 } = {}) {
 					ip_hash: sha256Hex(`ip:${ip}`),
 					ua,
 				};
-				const dir = path.resolve("data", "classroom");
-				const jsonPath = path.join(dir, "requests.json");
-				fs.mkdirSync(dir, { recursive: true });
-				let doc = { requests: [] };
-				try {
-					if (fs.existsSync(jsonPath)) {
-						doc = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
-					}
-				} catch {
-					doc = { requests: [] };
-				}
-				doc.requests = Array.isArray(doc.requests) ? doc.requests : [];
-				doc.requests.push(record);
-				if (doc.requests.length > 2000) {
-					doc.requests = doc.requests.slice(doc.requests.length - 2000);
-				}
-				fs.writeFileSync(jsonPath, JSON.stringify(doc, null, 2), "utf8");
+				await appendClassroomRequest(record);
 				const logDir = path.resolve("logs");
 				fs.mkdirSync(logDir, { recursive: true });
 				fs.appendFileSync(
@@ -824,6 +809,7 @@ function start({ port = 8080 } = {}) {
 				"/courses.html",
 				"/news.html",
 				"/checkout.html",
+				"/interactive-classroom",
 			];
 			for (const p of dynamicPages) {
 				entries.push({
