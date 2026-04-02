@@ -146,3 +146,18 @@ export function getPlaidItemById(
 		(loaded.items || []).find((x) => String(x?.item_id || "") === id) || null;
 	return { ok: true, file: loaded.file, item: it };
 }
+
+export function removePlaidItem(
+	item_id,
+	{ env = process.env, cwd = process.cwd() } = {},
+) {
+	const loaded = loadPlaidItems({ env, cwd });
+	if (!loaded.ok)
+		return { ok: false, reason: loaded.reason, file: loaded.file };
+	const id = String(item_id || "").trim();
+	if (!id) return { ok: false, reason: "missing_item_id", file: loaded.file };
+	const items = Array.isArray(loaded.items) ? loaded.items : [];
+	const filtered = items.filter((x) => String(x?.item_id || "") !== id);
+	const saved = savePlaidItems(filtered, { env, cwd });
+	return saved.ok ? { ok: true, file: saved.file, removed: id } : saved;
+}

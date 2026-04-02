@@ -16,6 +16,7 @@ import {
 	getPlaidItemById,
 	getPlaidStoreMeta,
 	loadPlaidItems,
+	removePlaidItem,
 	upsertPlaidItem,
 } from "./plaid/PlaidStore.mjs";
 import { cspSecurityMiddleware } from "./security-middleware.mjs";
@@ -61,6 +62,13 @@ function getBearer(req) {
 	if (!h) return "";
 	const m = /^Bearer\s+(.+)$/i.exec(h);
 	return m ? String(m[1] || "").trim() : "";
+}
+
+function parseCommaList(s) {
+	return String(s || "")
+		.split(",")
+		.map((x) => x.trim())
+		.filter(Boolean);
 }
 
 function start({ port = 8080 } = {}) {
@@ -122,6 +130,20 @@ function start({ port = 8080 } = {}) {
 			.split(",")
 			.map((x) => x.trim())
 			.filter(Boolean);
+	}
+	function resolvePlaidAllowedProducts() {
+		const raw = String(process.env.PLAID_ALLOWED_PRODUCTS || "auth").trim();
+		const items = parseCommaList(raw).map((x) => x.toLowerCase());
+		return items.length ? Array.from(new Set(items)) : ["auth"];
+	}
+	function filterPlaidProducts(requested) {
+		const allow = resolvePlaidAllowedProducts();
+		const req = (requested || []).map((x) => String(x || "").toLowerCase());
+		return {
+			allowed: allow,
+			requested: req,
+			chosen: req.filter((p) => allow.includes(p)),
+		};
 	}
 
 	app.get("/status.json", (_req, res) => {
@@ -914,10 +936,20 @@ function start({ port = 8080 } = {}) {
 					return;
 				}
 				const client = new PlaidClient({});
-				const products = parseStringArray(
+				const productsRaw = parseStringArray(
 					req.body?.products,
 					parseStringArray(process.env.PLAID_PRODUCTS, ["auth"]),
 				);
+				const f = filterPlaidProducts(productsRaw);
+				if (f.chosen.length === 0) {
+					res.status(400).json({
+						ok: false,
+						error: "product_not_allowed",
+						allowed: f.allowed,
+						requested: f.requested,
+					});
+					return;
+				}
 				const country_codes = parseStringArray(
 					req.body?.country_codes,
 					parseStringArray(process.env.PLAID_COUNTRY_CODES, ["US"]),
@@ -929,7 +961,7 @@ function start({ port = 8080 } = {}) {
 					safeStr(process.env.PLAID_REDIRECT_URI || "", 200) || null;
 				const out = await client.createLinkToken({
 					client_user_id,
-					products,
+					products: f.chosen,
 					country_codes,
 					webhook,
 					redirect_uri,
@@ -957,6 +989,11 @@ function start({ port = 8080 } = {}) {
 					res.status(429).json({ ok: false, error: "rate_limited" });
 					return;
 				}
+				const meta = getPlaidStoreMeta({});
+				if (!meta.key_present) {
+					res.status(412).json({ ok: false, error: "missing_plaidbox_key" });
+					return;
+				}
 				const public_token = safeStr(req.body?.public_token || "", 400);
 				if (!public_token) {
 					res.status(400).json({ ok: false, error: "missing_public_token" });
@@ -964,7 +1001,7 @@ function start({ port = 8080 } = {}) {
 				}
 				const client = new PlaidClient({});
 				const out = await client.exchangePublicToken(public_token);
-				const meta =
+				const metaPatch =
 					req.body?.meta && typeof req.body.meta === "object"
 						? req.body.meta
 						: {};
@@ -972,7 +1009,7 @@ function start({ port = 8080 } = {}) {
 					{
 						item_id: out.item_id,
 						access_token: out.access_token,
-						meta,
+						meta: metaPatch,
 					},
 					{},
 				);
@@ -983,6 +1020,37 @@ function start({ port = 8080 } = {}) {
 					return;
 				}
 				res.json({ ok: true, item_id: out.item_id });
+			} catch (e) {
+				res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+			}
+		},
+	);
+	app.post(
+		"/api/plaid/item/remove",
+		express.json({ limit: "10kb" }),
+		async (req, res) => {
+			try {
+				if (!checkOwnerAuth(req)) {
+					res.status(401).json({ ok: false, error: "unauthorized" });
+					return;
+				}
+				if (!checkAllowlist(req)) {
+					res.status(403).json({ ok: false, error: "forbidden" });
+					return;
+				}
+				if (!checkRateLimit(req)) {
+					res.status(429).json({ ok: false, error: "rate_limited" });
+					return;
+				}
+				const item_id = safeStr(req.body?.item_id || "", 120);
+				const out = removePlaidItem(item_id, {});
+				if (!out.ok) {
+					res
+						.status(412)
+						.json({ ok: false, error: out.reason || "store_locked" });
+					return;
+				}
+				res.json({ ok: true, removed: out.removed });
 			} catch (e) {
 				res.status(500).json({ ok: false, error: String(e?.message ?? e) });
 			}
