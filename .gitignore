@@ -23,7 +23,6 @@ data/base44_export/offline-store-backup.json
 data/financial/settlement_ledger.json
 data/classroom/
 data/plaid/
-data/locks/
 test_*.js
 test_*.mjs
 node_modules/

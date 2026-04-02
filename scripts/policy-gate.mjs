@@ -30,13 +30,20 @@ function main() {
 
 	const plaid = run(process.execPath, ["scripts/plaid-preflight.mjs"]);
 	const plaidLiveReady = plaid.code === 0;
+	const requirePlaid =
+		String(process.env.POLICY_REQUIRE_PLAID || "").toLowerCase() === "true";
+	const blockOnPlaid = requirePlaid && !plaidLiveReady;
 
 	const status = {
-		ok: !blockPayments,
+		ok: !blockPayments && !blockOnPlaid,
 		at: new Date().toISOString(),
 		block_payments: blockPayments,
-		reasons: blockPayments ? ["secrets_scan_findings"] : [],
+		reasons: [
+			...(blockPayments ? ["secrets_scan_findings"] : []),
+			...(blockOnPlaid ? ["plaid_preflight_failed"] : []),
+		],
 		plaid_live_ready: plaidLiveReady,
+		require_plaid: requirePlaid,
 		secrets_scan_exit: secrets.code,
 		plaid_preflight_exit: plaid.code,
 	};
@@ -52,9 +59,8 @@ function main() {
 	}
 
 	process.stdout.write(`${JSON.stringify(status)}\n`);
-	if (blockPayments) process.exit(9);
+	if (blockPayments || blockOnPlaid) process.exit(9);
 	process.exit(0);
 }
 
 main();
-
