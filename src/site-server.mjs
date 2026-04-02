@@ -11,6 +11,13 @@ import {
 	setClassroomRequestStatus,
 } from "./classroom/ClassroomRequests.mjs";
 import { buildWebscrLink } from "./paypal-links.mjs";
+import { PlaidClient } from "./plaid/PlaidClient.mjs";
+import {
+	getPlaidItemById,
+	getPlaidStoreMeta,
+	loadPlaidItems,
+	upsertPlaidItem,
+} from "./plaid/PlaidStore.mjs";
 import { cspSecurityMiddleware } from "./security-middleware.mjs";
 
 function getEnvEmail() {
@@ -105,6 +112,16 @@ function start({ port = 8080 } = {}) {
 		const bearer = getBearer(req);
 		const header = String(req.headers["x-owner-token"] || "").trim();
 		return bearer === ownerDashToken || header === ownerDashToken;
+	}
+	function parseStringArray(v, fallback = []) {
+		if (Array.isArray(v))
+			return v.map((x) => String(x || "").trim()).filter(Boolean);
+		const s = String(v || "").trim();
+		if (!s) return fallback;
+		return s
+			.split(",")
+			.map((x) => x.trim())
+			.filter(Boolean);
 	}
 
 	app.get("/status.json", (_req, res) => {
@@ -827,6 +844,202 @@ function start({ port = 8080 } = {}) {
 			res.status(500).json({ ok: false, error: String(e?.message ?? e) });
 		}
 	});
+
+	app.get("/api/plaid/store", async (req, res) => {
+		try {
+			if (!checkOwnerAuth(req)) {
+				res.status(401).json({ ok: false, error: "unauthorized" });
+				return;
+			}
+			if (!checkAllowlist(req)) {
+				res.status(403).json({ ok: false, error: "forbidden" });
+				return;
+			}
+			const meta = getPlaidStoreMeta({});
+			const loaded = loadPlaidItems({});
+			res.json({
+				ok: true,
+				store: meta,
+				items: loaded.ok ? loaded.items.length : 0,
+				locked: loaded.ok ? false : loaded.reason,
+			});
+		} catch (e) {
+			res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+		}
+	});
+	app.get("/api/plaid/items", async (req, res) => {
+		try {
+			if (!checkOwnerAuth(req)) {
+				res.status(401).json({ ok: false, error: "unauthorized" });
+				return;
+			}
+			if (!checkAllowlist(req)) {
+				res.status(403).json({ ok: false, error: "forbidden" });
+				return;
+			}
+			const loaded = loadPlaidItems({});
+			if (!loaded.ok) {
+				res
+					.status(412)
+					.json({ ok: false, error: loaded.reason || "store_locked" });
+				return;
+			}
+			const items = loaded.items.map((it) => ({
+				item_id: it.item_id,
+				created_at: it.created_at || null,
+				updated_at: it.updated_at || null,
+				meta: it.meta || {},
+				has_access_token: Boolean(it.access_token),
+			}));
+			res.json({ ok: true, items });
+		} catch (e) {
+			res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+		}
+	});
+	app.post(
+		"/api/plaid/link_token",
+		express.json({ limit: "30kb" }),
+		async (req, res) => {
+			try {
+				if (!checkOwnerAuth(req)) {
+					res.status(401).json({ ok: false, error: "unauthorized" });
+					return;
+				}
+				if (!checkAllowlist(req)) {
+					res.status(403).json({ ok: false, error: "forbidden" });
+					return;
+				}
+				if (!checkRateLimit(req)) {
+					res.status(429).json({ ok: false, error: "rate_limited" });
+					return;
+				}
+				const client = new PlaidClient({});
+				const products = parseStringArray(
+					req.body?.products,
+					parseStringArray(process.env.PLAID_PRODUCTS, ["auth"]),
+				);
+				const country_codes = parseStringArray(
+					req.body?.country_codes,
+					parseStringArray(process.env.PLAID_COUNTRY_CODES, ["US"]),
+				);
+				const client_user_id = safeStr(req.body?.client_user_id || "owner", 80);
+				const webhook =
+					safeStr(process.env.PLAID_WEBHOOK_URL || "", 200) || null;
+				const redirect_uri =
+					safeStr(process.env.PLAID_REDIRECT_URI || "", 200) || null;
+				const out = await client.createLinkToken({
+					client_user_id,
+					products,
+					country_codes,
+					webhook,
+					redirect_uri,
+				});
+				res.json({ ok: true, ...out });
+			} catch (e) {
+				res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+			}
+		},
+	);
+	app.post(
+		"/api/plaid/exchange_public_token",
+		express.json({ limit: "30kb" }),
+		async (req, res) => {
+			try {
+				if (!checkOwnerAuth(req)) {
+					res.status(401).json({ ok: false, error: "unauthorized" });
+					return;
+				}
+				if (!checkAllowlist(req)) {
+					res.status(403).json({ ok: false, error: "forbidden" });
+					return;
+				}
+				if (!checkRateLimit(req)) {
+					res.status(429).json({ ok: false, error: "rate_limited" });
+					return;
+				}
+				const public_token = safeStr(req.body?.public_token || "", 400);
+				if (!public_token) {
+					res.status(400).json({ ok: false, error: "missing_public_token" });
+					return;
+				}
+				const client = new PlaidClient({});
+				const out = await client.exchangePublicToken(public_token);
+				const meta =
+					req.body?.meta && typeof req.body.meta === "object"
+						? req.body.meta
+						: {};
+				const saved = upsertPlaidItem(
+					{
+						item_id: out.item_id,
+						access_token: out.access_token,
+						meta,
+					},
+					{},
+				);
+				if (!saved.ok) {
+					res
+						.status(412)
+						.json({ ok: false, error: saved.reason || "store_locked" });
+					return;
+				}
+				res.json({ ok: true, item_id: out.item_id });
+			} catch (e) {
+				res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+			}
+		},
+	);
+	app.post(
+		"/api/plaid/accounts",
+		express.json({ limit: "10kb" }),
+		async (req, res) => {
+			try {
+				if (!checkOwnerAuth(req)) {
+					res.status(401).json({ ok: false, error: "unauthorized" });
+					return;
+				}
+				if (!checkAllowlist(req)) {
+					res.status(403).json({ ok: false, error: "forbidden" });
+					return;
+				}
+				if (!checkRateLimit(req)) {
+					res.status(429).json({ ok: false, error: "rate_limited" });
+					return;
+				}
+				const item_id = safeStr(req.body?.item_id || "", 120);
+				const it = getPlaidItemById(item_id, {});
+				if (!it.ok) {
+					res
+						.status(412)
+						.json({ ok: false, error: it.reason || "store_locked" });
+					return;
+				}
+				if (!it.item?.access_token) {
+					res.status(404).json({ ok: false, error: "missing_access_token" });
+					return;
+				}
+				const client = new PlaidClient({});
+				const out = await client.accountsGet(it.item.access_token);
+				const accounts = Array.isArray(out?.accounts)
+					? out.accounts.map((a) => ({
+							account_id: a.account_id || null,
+							name: a.name || null,
+							official_name: a.official_name || null,
+							type: a.type || null,
+							subtype: a.subtype || null,
+							mask: a.mask || null,
+						}))
+					: [];
+				res.json({
+					ok: true,
+					item_id,
+					accounts,
+					request_id: out?.request_id || null,
+				});
+			} catch (e) {
+				res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+			}
+		},
+	);
 	app.get("/api/classroom/queue", async (req, res) => {
 		try {
 			if (!checkOwnerAuth(req)) {
@@ -890,7 +1103,7 @@ function start({ port = 8080 } = {}) {
 			return;
 		}
 		const nonce = res.locals?.cspNonce || "";
-		const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Owner Dashboard | RealWorldCerts</title><meta name="robots" content="noindex,nofollow"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}.glass{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}.wrap{max-width:1100px;margin:0 auto;padding:24px}a{color:#f59e0b;text-decoration:none}.badge{display:inline-block;padding:4px 8px;border-radius:9999px;font-size:12px}.b-unconf{background:#1f2937}.b-prov{background:#10b981}.b-set{background:#f59e0b}input,button,select{padding:8px 12px;border-radius:8px;border:1px solid #333;background:#111;color:#fff;outline:none}</style></head><body><main class="wrap"><header class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><h1 style="margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent">Owner Dashboard</h1><nav style="margin-top:8px;font-size:14px"><a href="/index.html">Home</a> • <a href="/sitemap.xml">Sitemap</a> • <a href="/rss.xml">RSS</a></nav></header><section class="glass" style="border-radius:16px;padding:16px; margin-bottom:16px;"><h3 style="margin:0 0 10px 0">Classroom Requests Queue</h3><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;"><button id="clsRefresh">Refresh</button><span id="clsMeta" style="font-size:12px;color:#bdbdbd"></span></div><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #333">At</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Cert</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Goal</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">State</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Action</th></tr></thead><tbody id="clsRows"></tbody></table></section><section class="glass" style="border-radius:16px;padding:16px; margin-bottom:16px;"><label>Lookup ref: <input id="refInput" placeholder="rwc_xxx"/></label> <label>Days ± <input id="daysInput" type="number" min="0" max="30" value="7" style="width:80px"/></label> <label>Amount tol <input id="tolInput" type="number" min="0" step="0.01" value="0.01" style="width:100px"/></label> <button id="lookupBtn">Check</button> <span id="result"></span></section><section class="glass" style="border-radius:16px;padding:16px; margin-bottom:16px;"><div>Upload payout CSV</div><input id="csvFile" type="file" accept=".csv" /> <button id="uploadBtn">Upload</button> <span id="uploadRes"></span></section><section class="glass" style="border-radius:16px;padding:16px;"><p>Recent PayPal proofs and computed revenue states.</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Ref</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">IPN</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Webhook</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Payout</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">State</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Viewer</th></tr></thead><tbody id="rows"></tbody></table></section></main><script nonce="${nonce}">let ownerToken=localStorage.getItem('owner_token')||'';async function fetchJSON(u,init){const i=init||{};i.headers=i.headers||{};if(ownerToken){i.headers['X-Owner-Token']=ownerToken}let r=await fetch(u,i);if(r.status===401){const t=prompt('Owner token');if(t){ownerToken=String(t||'').trim();localStorage.setItem('owner_token',ownerToken);i.headers['X-Owner-Token']=ownerToken;r=await fetch(u,i)}}return r.json()}function badge(s){if(s==='SETTLED_OWNER'){return '<span class="badge b-set">SETTLED_OWNER</span>'}if(s==='VERIFIED_PROVIDER'){return '<span class="badge b-prov">VERIFIED_PROVIDER</span>'}return '<span class="badge b-unconf">UNCONFIRMED</span>'}function viewer(ref){return '<a href="/owner-proof.html?ref='+encodeURIComponent(ref)+'" target="_blank">Open</a>'}function fmtAt(ms){try{return new Date(ms).toISOString()}catch{return ''}}async function loadClassroom(){const data=await fetchJSON('/api/classroom/queue');const rows=document.getElementById('clsRows');const meta=document.getElementById('clsMeta');rows.innerHTML='';if(!data||!data.ok){meta.textContent='Queue unavailable';return}meta.textContent='Loaded '+(data.items||[]).length+' items';for(const it of (data.items||[]).slice(0,50)){const tr=document.createElement('tr');const state=(it.status&&it.status.state)||'';tr.innerHTML='<td style=\"padding:8px;border-bottom:1px solid #222\">'+fmtAt(it.at)+'</td>'+'<td style=\"padding:8px;border-bottom:1px solid #222\">'+String(it.cert||'')+'</td>'+'<td style=\"padding:8px;border-bottom:1px solid #222\">'+String(it.goal||'')+'</td>'+'<td style=\"padding:8px;border-bottom:1px solid #222\"><select data-id=\"'+String(it.id||'')+'\" class=\"clsState\"><option value=\"\">(none)</option><option value=\"new\">new</option><option value=\"triaged\">triaged</option><option value=\"fulfilled\">fulfilled</option><option value=\"blocked\">blocked</option></select></td>'+'<td style=\"padding:8px;border-bottom:1px solid #222\"><button data-id=\"'+String(it.id||'')+'\" class=\"clsSave\">Save</button></td>';rows.appendChild(tr);const sel=tr.querySelector('select');if(sel){sel.value=state}}}async function saveClassroom(id){const sel=document.querySelector('select[data-id=\"'+id+'\"]');const state=sel?sel.value:'';await fetchJSON('/api/classroom/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,state})});await loadClassroom()}async function loadList(){const proofs=await fetchJSON('/api/proofs/paypal-ipn');const customs=[...new Set((proofs.items||[]).map(x=>String(x.custom||'')).filter(Boolean))];const rows=document.getElementById('rows');rows.innerHTML='';for(const ref of customs.slice(0,100)){const s=await fetchJSON('/api/revenue/state?ref='+encodeURIComponent(ref));const tr=document.createElement('tr');tr.innerHTML='<td style=\"padding:8px;border-bottom:1px solid #222\">'+ref+'</td><td style=\"padding:8px;border-bottom:1px solid #222\">'+(s.details?.ipn_count||0)+'</td><td style=\"padding:8px;border-bottom:1px solid #222\">'+(s.details?.webhook_count||0)+'</td><td style=\"padding:8px;border-bottom:1px solid #222\">'+(s.details?.payout_mention?\"Yes\":\"No\")+'</td><td style=\"padding:8px;border-bottom:1px solid #222\">'+badge(s.state)+'</td><td style=\"padding:8px;border-bottom:1px solid #222\">'+viewer(ref)+'</td>';rows.appendChild(tr)}}async function lookup(){const ref=document.getElementById('refInput').value.trim();const days=document.getElementById('daysInput').value.trim();const tol=document.getElementById('tolInput').value.trim();if(!ref){return}const qs='&days='+(days||'7')+'&amount_tol='+(tol||'0.01');const s=await fetchJSON('/api/revenue/state?ref='+encodeURIComponent(ref)+qs);const slot=document.getElementById('result');slot.innerHTML=badge(s.state)+' IPN:'+(s.details?.ipn_count||0)+' WH:'+(s.details?.webhook_count||0)+' Payout:'+(s.details?.payout_mention?\"Yes\":\"No\")}async function uploadCsv(){const el=document.getElementById('csvFile');const resSpan=document.getElementById('uploadRes');if(!el.files||!el.files[0]){resSpan.textContent='No file';return}const f=el.files[0];const t=await f.text();const r=await fetch('/api/proofs/payouts/upload',{method:'POST',headers:{'content-type':'text/csv'},body:t});const j=await r.json();if(j&&j.ok){resSpan.textContent='Uploaded '+j.saved+' lines:'+j.lines;loadList()}else{resSpan.textContent='Upload failed'}}document.getElementById('lookupBtn').addEventListener('click',lookup);document.getElementById('uploadBtn').addEventListener('click',uploadCsv);document.getElementById('clsRefresh').addEventListener('click',loadClassroom);document.addEventListener('click',(e)=>{const t=e.target; if(t && t.classList && t.classList.contains('clsSave')){saveClassroom(t.getAttribute('data-id')||'')}});loadClassroom();loadList();</script></body></html>`;
+		const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Owner Dashboard | RealWorldCerts</title><meta name="robots" content="noindex,nofollow"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}.glass{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}.wrap{max-width:1100px;margin:0 auto;padding:24px}a{color:#f59e0b;text-decoration:none}.badge{display:inline-block;padding:4px 8px;border-radius:9999px;font-size:12px}.b-unconf{background:#1f2937}.b-prov{background:#10b981}.b-set{background:#f59e0b}input,button,select{padding:8px 12px;border-radius:8px;border:1px solid #333;background:#111;color:#fff;outline:none}</style></head><body><main class="wrap"><header class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><h1 style="margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent">Owner Dashboard</h1><nav style="margin-top:8px;font-size:14px"><a href="/index.html">Home</a> • <a href="/sitemap.xml">Sitemap</a> • <a href="/rss.xml">RSS</a></nav></header><section class="glass" style="border-radius:16px;padding:16px; margin-bottom:16px;"><h3 style="margin:0 0 10px 0">Classroom Requests Queue</h3><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;"><button id="clsRefresh">Refresh</button><span id="clsMeta" style="font-size:12px;color:#bdbdbd"></span></div><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #333">At</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Cert</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Goal</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">State</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Action</th></tr></thead><tbody id="clsRows"></tbody></table></section><section class="glass" style="border-radius:16px;padding:16px; margin-bottom:16px;"><label>Lookup ref: <input id="refInput" placeholder="rwc_xxx"/></label> <label>Days ± <input id="daysInput" type="number" min="0" max="30" value="7" style="width:80px"/></label> <label>Amount tol <input id="tolInput" type="number" min="0" step="0.01" value="0.01" style="width:100px"/></label> <button id="lookupBtn">Check</button> <span id="result"></span></section><section class="glass" style="border-radius:16px;padding:16px; margin-bottom:16px;"><div>Upload payout CSV</div><input id="csvFile" type="file" accept=".csv" /> <button id="uploadBtn">Upload</button> <span id="uploadRes"></span></section><section class="glass" style="border-radius:16px;padding:16px;"><p>Recent PayPal proofs and computed revenue states.</p><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Ref</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">IPN</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Webhook</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Payout</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">State</th><th style="text-align:left;padding:8px;border-bottom:1px solid #333">Viewer</th></tr></thead><tbody id="rows"></tbody></table></section></main><script nonce="${nonce}">let ownerToken=localStorage.getItem('owner_token')||'';async function fetchJSON(u,init){const i=init||{};i.headers=i.headers||{};if(ownerToken){i.headers['X-Owner-Token']=ownerToken}let r=await fetch(u,i);if(r.status===401){const t=prompt('Owner token');if(t){ownerToken=String(t||'').trim();localStorage.setItem('owner_token',ownerToken);i.headers['X-Owner-Token']=ownerToken;r=await fetch(u,i)}}return r.json()}function badge(s){if(s==='SETTLED_OWNER'){return '<span class="badge b-set">SETTLED_OWNER</span>'}if(s==='VERIFIED_PROVIDER'){return '<span class="badge b-prov">VERIFIED_PROVIDER</span>'}return '<span class="badge b-unconf">UNCONFIRMED</span>'}function viewer(ref){return '<a href="/owner-proof.html?ref='+encodeURIComponent(ref)+'" target="_blank">Open</a>'}function fmtAt(ms){try{return new Date(ms).toISOString()}catch{return ''}}async function loadClassroom(){const data=await fetchJSON('/api/classroom/queue');const rows=document.getElementById('clsRows');const meta=document.getElementById('clsMeta');rows.innerHTML='';if(!data||!data.ok){meta.textContent='Queue unavailable';return}meta.textContent='Loaded '+(data.items||[]).length+' items';for(const it of (data.items||[]).slice(0,50)){const tr=document.createElement('tr');const state=(it.status&&it.status.state)||'';tr.innerHTML='<td style="padding:8px;border-bottom:1px solid #222">'+fmtAt(it.at)+'</td>'+'<td style="padding:8px;border-bottom:1px solid #222">'+String(it.cert||'')+'</td>'+'<td style="padding:8px;border-bottom:1px solid #222">'+String(it.goal||'')+'</td>'+'<td style="padding:8px;border-bottom:1px solid #222"><select data-id="'+String(it.id||'')+'" class="clsState"><option value="">(none)</option><option value="new">new</option><option value="triaged">triaged</option><option value="fulfilled">fulfilled</option><option value="blocked">blocked</option></select></td>'+'<td style="padding:8px;border-bottom:1px solid #222"><button data-id="'+String(it.id||'')+'" class="clsSave">Save</button></td>';rows.appendChild(tr);const sel=tr.querySelector('select');if(sel){sel.value=state}}}async function saveClassroom(id){const sel=document.querySelector('select[data-id="'+id+'"]');const state=sel?sel.value:'';await fetchJSON('/api/classroom/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,state})});await loadClassroom()}async function loadList(){const proofs=await fetchJSON('/api/proofs/paypal-ipn');const customs=[...new Set((proofs.items||[]).map(x=>String(x.custom||'')).filter(Boolean))];const rows=document.getElementById('rows');rows.innerHTML='';for(const ref of customs.slice(0,100)){const s=await fetchJSON('/api/revenue/state?ref='+encodeURIComponent(ref));const tr=document.createElement('tr');tr.innerHTML='<td style="padding:8px;border-bottom:1px solid #222">'+ref+'</td><td style="padding:8px;border-bottom:1px solid #222">'+(s.details?.ipn_count||0)+'</td><td style="padding:8px;border-bottom:1px solid #222">'+(s.details?.webhook_count||0)+'</td><td style="padding:8px;border-bottom:1px solid #222">'+(s.details?.payout_mention?"Yes":"No")+'</td><td style="padding:8px;border-bottom:1px solid #222">'+badge(s.state)+'</td><td style="padding:8px;border-bottom:1px solid #222">'+viewer(ref)+'</td>';rows.appendChild(tr)}}async function lookup(){const ref=document.getElementById('refInput').value.trim();const days=document.getElementById('daysInput').value.trim();const tol=document.getElementById('tolInput').value.trim();if(!ref){return}const qs='&days='+(days||'7')+'&amount_tol='+(tol||'0.01');const s=await fetchJSON('/api/revenue/state?ref='+encodeURIComponent(ref)+qs);const slot=document.getElementById('result');slot.innerHTML=badge(s.state)+' IPN:'+(s.details?.ipn_count||0)+' WH:'+(s.details?.webhook_count||0)+' Payout:'+(s.details?.payout_mention?"Yes":"No")}async function uploadCsv(){const el=document.getElementById('csvFile');const resSpan=document.getElementById('uploadRes');if(!el.files||!el.files[0]){resSpan.textContent='No file';return}const f=el.files[0];const t=await f.text();const r=await fetch('/api/proofs/payouts/upload',{method:'POST',headers:{'content-type':'text/csv'},body:t});const j=await r.json();if(j&&j.ok){resSpan.textContent='Uploaded '+j.saved+' lines:'+j.lines;loadList()}else{resSpan.textContent='Upload failed'}}document.getElementById('lookupBtn').addEventListener('click',lookup);document.getElementById('uploadBtn').addEventListener('click',uploadCsv);document.getElementById('clsRefresh').addEventListener('click',loadClassroom);document.addEventListener('click',(e)=>{const t=e.target; if(t && t.classList && t.classList.contains('clsSave')){saveClassroom(t.getAttribute('data-id')||'')}});loadClassroom();loadList();</script></body></html>`;
 		res.type("text/html").send(html);
 	});
 	app.get("/owner-proof.html", (_req, res) => {

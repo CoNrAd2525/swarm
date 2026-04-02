@@ -93,7 +93,14 @@ function appendLedgerUpdate(evt) {
 				const provided = String(
 					hdrs["plaid-signature"] || hdrs["x-plaid-signature"] || "",
 				).trim();
-				if (provided) signatureValid = provided === calc;
+				if (provided) {
+					const a = Buffer.from(calc, "utf8");
+					const b = Buffer.from(provided, "utf8");
+					signatureValid =
+						a.length === b.length && crypto.timingSafeEqual(a, b);
+				} else {
+					signatureValid = false;
+				}
 			} catch {
 				signatureValid = false;
 			}
@@ -117,6 +124,36 @@ function appendLedgerUpdate(evt) {
 		safeWriteJson(file, arr);
 	} catch {
 		/* noop */
+	}
+}
+
+function verifyWebhook(raw, headers) {
+	const secret =
+		String(process.env.PLAID_WEBHOOK_HMAC_SECRET || "").trim() ||
+		String(process.env.PLAID_WEBHOOK_SIGNATURE_SECRET || "").trim();
+	if (!secret) return { ok: true };
+	let provided = "";
+	try {
+		provided = String(
+			headers["plaid-signature"] || headers["x-plaid-signature"] || "",
+		).trim();
+	} catch {
+		provided = "";
+	}
+	if (!provided) return { ok: false, error: "missing_signature" };
+	try {
+		const calc = crypto
+			.createHmac("sha256", secret)
+			.update(raw, "utf8")
+			.digest("hex");
+		const a = Buffer.from(calc, "utf8");
+		const b = Buffer.from(provided, "utf8");
+		if (a.length !== b.length) return { ok: false, error: "bad_signature" };
+		return crypto.timingSafeEqual(a, b)
+			? { ok: true }
+			: { ok: false, error: "bad_signature" };
+	} catch {
+		return { ok: false, error: "bad_signature" };
 	}
 }
 
@@ -144,6 +181,11 @@ function buildServer(port, pathPrefix) {
 		const hdrs = {};
 		for (const k of Object.keys(req.headers || {})) {
 			hdrs[k.toLowerCase()] = req.headers[k];
+		}
+		const verified = verifyWebhook(raw, hdrs);
+		if (!verified.ok) {
+			json(res, 401, { ok: false, error: verified.error || "unauthorized" });
+			return;
 		}
 		const evt = {
 			received_at: new Date().toISOString(),

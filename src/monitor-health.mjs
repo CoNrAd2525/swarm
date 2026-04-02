@@ -3,6 +3,7 @@ import path from "node:path";
 import { maybeSendAlert } from "./alerts.mjs";
 import { buildBase44ServiceClient } from "./base44-client.mjs";
 import { getPayPalAccessToken } from "./paypal-api.mjs";
+import { getPlaidStoreMeta, loadPlaidItems } from "./plaid/PlaidStore.mjs";
 import { parseArgs } from "./utils/cli.mjs";
 
 function sleep(ms) {
@@ -131,6 +132,18 @@ function buildReadinessSummary() {
 	const paypalMode = String(process.env.PAYPAL_MODE ?? "live").toLowerCase();
 	const paypalApiBaseUrl = String(process.env.PAYPAL_API_BASE_URL ?? "");
 
+	const plaidMode = String(process.env.PLAID_ENV ?? "sandbox").toLowerCase();
+	const plaidConfigured =
+		hasRealEnv("PLAID_CLIENT_ID") && hasRealEnv("PLAID_SECRET");
+	const plaidWebhookConfigured =
+		hasRealEnv("PLAID_WEBHOOK_HMAC_SECRET") ||
+		hasRealEnv("PLAID_WEBHOOK_SIGNATURE_SECRET");
+	const plaidStore = getPlaidStoreMeta({});
+	const plaidItemsLoaded = loadPlaidItems({});
+	const plaidItemsCount = plaidItemsLoaded.ok
+		? plaidItemsLoaded.items.length
+		: 0;
+
 	const flags = {
 		BASE44_ENABLE_PAYPAL_WEBHOOK_WRITE: getEnvBool(
 			"BASE44_ENABLE_PAYPAL_WEBHOOK_WRITE",
@@ -188,6 +201,9 @@ function buildReadinessSummary() {
 	if (!paypalConfigured) missing.push("PAYPAL_CLIENT_ID/PAYPAL_CLIENT_SECRET");
 	if (!webhookConfigured) missing.push("PAYPAL_WEBHOOK_ID");
 	if (!base44Configured) missing.push("BASE44_APP_ID/BASE44_SERVICE_TOKEN");
+	if (!plaidConfigured) missing.push("PLAID_CLIENT_ID/PLAID_SECRET");
+	if (plaidMode === "production" && !plaidWebhookConfigured)
+		missing.push("PLAID_WEBHOOK_HMAC_SECRET");
 	if (!flags.BASE44_ENABLE_REVENUE_FROM_PAYPAL)
 		missing.push("BASE44_ENABLE_REVENUE_FROM_PAYPAL");
 	if (live && paypalSandbox)
@@ -208,6 +224,13 @@ function buildReadinessSummary() {
 		nextSteps.push(
 			"Set BASE44_APP_ID and BASE44_SERVICE_TOKEN (BASE44_APP_ID accepts a Base44 app URL)",
 		);
+	if (!plaidConfigured) nextSteps.push("Set PLAID_CLIENT_ID and PLAID_SECRET");
+	if (!plaidStore.key_present)
+		nextSteps.push(
+			"Set PLAIDBOX_KEY (base64 32-byte key) to store Plaid items",
+		);
+	if (plaidMode === "production" && !plaidWebhookConfigured)
+		nextSteps.push("Set PLAID_WEBHOOK_HMAC_SECRET for production webhooks");
 	if (!flags.BASE44_ENABLE_REVENUE_FROM_PAYPAL)
 		nextSteps.push('PowerShell: $env:BASE44_ENABLE_REVENUE_FROM_PAYPAL="true"');
 	if (warnings.length)
@@ -230,6 +253,12 @@ function buildReadinessSummary() {
 		base44Error: base44Build.ok ? null : base44Build.error,
 		paypalConfigured,
 		webhookConfigured,
+		plaidConfigured,
+		plaidMode,
+		plaidWebhookConfigured,
+		plaidStore,
+		plaidItemsCount,
+		plaidStoreLocked: plaidItemsLoaded.ok ? null : plaidItemsLoaded.reason,
 		paypalMode,
 		paypalApiBaseUrl: paypalApiBaseUrl ? "(set)" : "(default)",
 		flags,
