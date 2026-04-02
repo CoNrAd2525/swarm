@@ -22,6 +22,7 @@
     "wise:webhook:subscribe": "node ./scripts/wise-subscribe-webhooks.mjs --client-key $env:WISE_CLIENT_KEY --url $env:WISE_WEBHOOK_URL",
     "plaid:webhook:start": "node ./src/plaid-webhook-server.mjs --port 5057 --path /plaid/webhook",
     "mission:plaid:ach": "node ./scripts/plaid-ach-mission.mjs",
+    "plaid:keygen": "node ./scripts/generate-plaidbox-key.mjs",
     "crypto:withdraw:owner": "node ./scripts/execute-crypto-withdraw.mjs",
     "monitor:health": "node ./src/monitor-health.mjs",
     "monitor:once": "node ./src/monitor-health.mjs --once",

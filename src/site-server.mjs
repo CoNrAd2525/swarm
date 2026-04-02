@@ -879,11 +879,13 @@ function start({ port = 8080 } = {}) {
 			}
 			const meta = getPlaidStoreMeta({});
 			const loaded = loadPlaidItems({});
+			const allowedProducts = resolvePlaidAllowedProducts();
 			res.json({
 				ok: true,
 				store: meta,
 				items: loaded.ok ? loaded.items.length : 0,
 				locked: loaded.ok ? false : loaded.reason,
+				allowed_products: allowedProducts,
 			});
 		} catch (e) {
 			res.status(500).json({ ok: false, error: String(e?.message ?? e) });
@@ -966,7 +968,12 @@ function start({ port = 8080 } = {}) {
 					webhook,
 					redirect_uri,
 				});
-				res.json({ ok: true, ...out });
+				res.json({
+					ok: true,
+					allowed_products: f.allowed,
+					products_used: f.chosen,
+					...out,
+				});
 			} catch (e) {
 				res.status(500).json({ ok: false, error: String(e?.message ?? e) });
 			}
@@ -1181,6 +1188,167 @@ function start({ port = 8080 } = {}) {
 		}
 		const nonce = res.locals?.cspNonce || "";
 		const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Plaid Admin | RealWorldCerts</title><meta name="robots" content="noindex,nofollow"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}.wrap{max-width:1100px;margin:0 auto;padding:24px}.glass{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:16px}a{color:#f59e0b;text-decoration:none}input,button,select,textarea{padding:8px 12px;border-radius:8px;border:1px solid #333;background:#111;color:#fff;outline:none}textarea{width:100%;min-height:96px}pre{white-space:pre-wrap;word-break:break-word;background:#000;border:1px solid #222;padding:8px;border-radius:8px;max-height:320px;overflow:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid #222}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}</style></head><body><main class="wrap"><header class="glass"><h1 style="margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent">Plaid Admin</h1><nav style="margin-top:8px;font-size:14px"><a href="/owner-dashboard.html">Owner Dashboard</a> • <a href="/index.html">Home</a></nav></header><section class="glass" style="margin-top:16px"><h3 style="margin:0 0 10px 0">Store</h3><div class="row"><button id="storeBtn">Refresh</button><span id="storeMeta" style="font-size:12px;color:#bdbdbd"></span></div><pre id="storeOut"></pre></section><section class="glass" style="margin-top:16px"><h3 style="margin:0 0 10px 0">Create Link Token</h3><div class="row"><label>Products <input id="products" placeholder="auth,transfer" value="auth" style="width:240px"></label><label>Countries <input id="countries" placeholder="US" value="US" style="width:160px"></label><label>User <input id="userId" value="owner" style="width:160px"></label><button id="linkBtn">Create</button></div><pre id="linkOut"></pre></section><section class="glass" style="margin-top:16px"><h3 style="margin:0 0 10px 0">Exchange Public Token</h3><div class="row"><label>public_token <input id="publicToken" style="width:520px" placeholder="public-sandbox-..."></label><button id="exchangeBtn">Exchange</button><span id="exchangeRes" style="font-size:12px;color:#bdbdbd"></span></div><pre id="exchangeOut"></pre></section><section class="glass" style="margin-top:16px"><h3 style="margin:0 0 10px 0">Items</h3><div class="row"><button id="itemsBtn">Load Items</button></div><table><thead><tr><th>item_id</th><th>updated</th><th>has token</th></tr></thead><tbody id="itemsRows"></tbody></table></section><section class="glass" style="margin-top:16px"><h3 style="margin:0 0 10px 0">Accounts</h3><div class="row"><label>item_id <input id="acctItem" style="width:420px"></label><button id="acctBtn">Get Accounts</button></div><pre id="acctOut"></pre></section></main><script nonce="${nonce}">let ownerToken=localStorage.getItem('owner_token')||'';async function fetchJSON(u,init){const i=init||{};i.headers=i.headers||{};if(ownerToken){i.headers['X-Owner-Token']=ownerToken}let r=await fetch(u,i);if(r.status===401){const t=prompt('Owner token');if(t){ownerToken=String(t||'').trim();localStorage.setItem('owner_token',ownerToken);i.headers['X-Owner-Token']=ownerToken;r=await fetch(u,i)}}const j=await r.json();if(!j||j.ok!==false){return j}return j}function byId(x){return document.getElementById(x)}function setText(id,v){byId(id).textContent=typeof v==='string'?v:JSON.stringify(v,null,2)}async function refreshStore(){const j=await fetchJSON('/api/plaid/store');setText('storeOut',j);byId('storeMeta').textContent=j&&j.ok?('items:'+String(j.items||0)+' key:'+String(j.store?.key_present||false)):'error'}async function createLinkToken(){const products=String(byId('products').value||'').trim();const countries=String(byId('countries').value||'').trim();const client_user_id=String(byId('userId').value||'owner').trim();const body={products:products,country_codes:countries,client_user_id};const j=await fetchJSON('/api/plaid/link_token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});setText('linkOut',j)}async function exchangeToken(){const t=String(byId('publicToken').value||'').trim();if(!t){return}const j=await fetchJSON('/api/plaid/exchange_public_token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:t})});setText('exchangeOut',j);byId('exchangeRes').textContent=j&&j.ok?('saved item '+String(j.item_id||'')):'failed';await loadItems()}async function loadItems(){const j=await fetchJSON('/api/plaid/items');const rows=byId('itemsRows');rows.innerHTML='';if(!j||!j.ok){return}for(const it of (j.items||[])){const tr=document.createElement('tr');tr.innerHTML='<td>'+String(it.item_id||'')+'</td><td>'+String(it.updated_at||'')+'</td><td>'+(it.has_access_token?'yes':'no')+'</td>';rows.appendChild(tr)}}async function getAccounts(){const item_id=String(byId('acctItem').value||'').trim();if(!item_id){return}const j=await fetchJSON('/api/plaid/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id})});setText('acctOut',j)}byId('storeBtn').addEventListener('click',refreshStore);byId('linkBtn').addEventListener('click',createLinkToken);byId('exchangeBtn').addEventListener('click',exchangeToken);byId('itemsBtn').addEventListener('click',loadItems);byId('acctBtn').addEventListener('click',getAccounts);refreshStore();</script></body></html>`;
+		res.type("text/html").send(html);
+	});
+	app.get("/owner-plaid2.html", (_req, res) => {
+		if (!checkOwnerAuth(_req)) {
+			res.status(401).type("text/plain").send("unauthorized");
+			return;
+		}
+		const nonce = res.locals?.cspNonce || "";
+		const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Plaid Admin | RealWorldCerts</title>
+<meta name="robots" content="noindex,nofollow" />
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}
+.wrap{max-width:1100px;margin:0 auto;padding:24px}
+.glass{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:16px}
+a{color:#f59e0b;text-decoration:none}
+input,button{padding:8px 12px;border-radius:8px;border:1px solid #333;background:#111;color:#fff;outline:none}
+pre{white-space:pre-wrap;word-break:break-word;background:#000;border:1px solid #222;padding:8px;border-radius:8px;max-height:280px;overflow:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px;border-bottom:1px solid #222}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header class="glass">
+<h1 style="margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent">Plaid Admin</h1>
+<nav style="margin-top:8px;font-size:14px"><a href="/owner-dashboard.html">Owner Dashboard</a> • <a href="/index.html">Home</a></nav>
+</header>
+
+<section class="glass" style="margin-top:16px">
+<h3 style="margin:0 0 10px 0">Store</h3>
+<div class="row"><button id="storeBtn">Refresh</button><span id="storeMeta" style="font-size:12px;color:#bdbdbd"></span></div>
+<pre id="storeOut"></pre>
+</section>
+
+<section class="glass" style="margin-top:16px">
+<h3 style="margin:0 0 10px 0">Create Link Token (Auth only)</h3>
+<div class="row">
+<label>Products <input id="products" value="auth" placeholder="auth" style="width:240px" /></label>
+<label>Countries <input id="countries" value="US" placeholder="US" style="width:160px" /></label>
+<label>User <input id="userId" value="owner" style="width:160px" /></label>
+<button id="linkBtn">Create</button>
+</div>
+<pre id="linkOut"></pre>
+</section>
+
+<section class="glass" style="margin-top:16px">
+<h3 style="margin:0 0 10px 0">Exchange Public Token</h3>
+<div class="row">
+<label>public_token <input id="publicToken" style="width:520px" placeholder="public-sandbox-..." /></label>
+<button id="exchangeBtn">Exchange</button>
+<span id="exchangeRes" style="font-size:12px;color:#bdbdbd"></span>
+</div>
+<pre id="exchangeOut"></pre>
+</section>
+
+<section class="glass" style="margin-top:16px">
+<h3 style="margin:0 0 10px 0">Items</h3>
+<div class="row">
+<button id="itemsBtn">Load Items</button>
+<label>Remove item_id <input id="rmItem" style="width:420px" /></label>
+<button id="rmBtn">Remove</button>
+</div>
+<table>
+<thead><tr><th>item_id</th><th>updated</th><th>has token</th></tr></thead>
+<tbody id="itemsRows"></tbody>
+</table>
+</section>
+
+<section class="glass" style="margin-top:16px">
+<h3 style="margin:0 0 10px 0">Accounts</h3>
+<div class="row">
+<label>item_id <input id="acctItem" style="width:420px" /></label>
+<button id="acctBtn">Get Accounts</button>
+</div>
+<pre id="acctOut"></pre>
+</section>
+</main>
+
+<script nonce="${nonce}">
+let ownerToken = localStorage.getItem("owner_token") || "";
+async function fetchJSON(u, init) {
+  const i = init || {};
+  i.headers = i.headers || {};
+  if (ownerToken) i.headers["X-Owner-Token"] = ownerToken;
+  let r = await fetch(u, i);
+  if (r.status === 401) {
+    const t = prompt("Owner token");
+    if (t) {
+      ownerToken = String(t || "").trim();
+      localStorage.setItem("owner_token", ownerToken);
+      i.headers["X-Owner-Token"] = ownerToken;
+      r = await fetch(u, i);
+    }
+  }
+  return r.json();
+}
+function byId(x) { return document.getElementById(x); }
+function setText(id, v) { byId(id).textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2); }
+async function refreshStore() {
+  const j = await fetchJSON("/api/plaid/store");
+  setText("storeOut", j);
+  byId("storeMeta").textContent = j && j.ok ? ("items:" + String(j.items || 0) + " allowed:" + String((j.allowed_products || []).join(","))) : "error";
+}
+async function createLinkToken() {
+  const products = String(byId("products").value || "").trim();
+  const countries = String(byId("countries").value || "").trim();
+  const client_user_id = String(byId("userId").value || "owner").trim();
+  const body = { products, country_codes: countries, client_user_id };
+  const j = await fetchJSON("/api/plaid/link_token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  setText("linkOut", j);
+}
+async function exchangeToken() {
+  const t = String(byId("publicToken").value || "").trim();
+  if (!t) return;
+  const j = await fetchJSON("/api/plaid/exchange_public_token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ public_token: t }) });
+  setText("exchangeOut", j);
+  byId("exchangeRes").textContent = j && j.ok ? ("saved item " + String(j.item_id || "")) : "failed";
+  await loadItems();
+  await refreshStore();
+}
+async function loadItems() {
+  const j = await fetchJSON("/api/plaid/items");
+  const rows = byId("itemsRows");
+  rows.innerHTML = "";
+  if (!j || !j.ok) return;
+  for (const it of (j.items || [])) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + String(it.item_id || "") + "</td><td>" + String(it.updated_at || "") + "</td><td>" + (it.has_access_token ? "yes" : "no") + "</td>";
+    rows.appendChild(tr);
+  }
+}
+async function removeItem() {
+  const item_id = String(byId("rmItem").value || "").trim();
+  if (!item_id) return;
+  await fetchJSON("/api/plaid/item/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ item_id }) });
+  byId("rmItem").value = "";
+  await loadItems();
+  await refreshStore();
+}
+async function getAccounts() {
+  const item_id = String(byId("acctItem").value || "").trim();
+  if (!item_id) return;
+  const j = await fetchJSON("/api/plaid/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ item_id }) });
+  setText("acctOut", j);
+}
+byId("storeBtn").addEventListener("click", refreshStore);
+byId("linkBtn").addEventListener("click", createLinkToken);
+byId("exchangeBtn").addEventListener("click", exchangeToken);
+byId("itemsBtn").addEventListener("click", loadItems);
+byId("rmBtn").addEventListener("click", removeItem);
+byId("acctBtn").addEventListener("click", getAccounts);
+refreshStore();
+</script>
+</body>
+</html>`;
 		res.type("text/html").send(html);
 	});
 	app.get("/owner-proof.html", (_req, res) => {
