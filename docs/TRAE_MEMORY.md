@@ -1,11 +1,13 @@
 # Trae Memory Documentation
 
 ## Overview
+
 Trae Memory is the persistent knowledge base and context management system for the Trae IDE AI assistant. It maintains conversation history, code context, project state, and learned patterns across development sessions.
 
 ## Architecture
 
 ### Core Components
+
 ```javascript
 class TraeMemory {
     constructor() {
@@ -23,6 +25,7 @@ class TraeMemory {
 ### Memory Segments
 
 #### 1. Conversation History
+
 - **Purpose**: Maintain context across conversation sessions
 - **Data**: User requests, assistant responses, tool usage patterns
 - **Access**: Real-time context for current conversation
@@ -55,6 +58,7 @@ class TraeMemory {
 ```
 
 #### 2. Project Context
+
 - **Purpose**: Understand project structure, dependencies, and conventions
 - **Data**: File structure, package dependencies, coding patterns
 - **Access**: Real-time project analysis
@@ -86,6 +90,7 @@ class TraeMemory {
 ```
 
 #### 3. Code Knowledge
+
 - **Purpose**: Store code patterns, solutions, and best practices
 - **Data**: Successful code snippets, common patterns, error solutions
 - **Access**: Code generation and problem-solving
@@ -112,6 +117,7 @@ class TraeMemory {
 ```
 
 #### 4. Error Patterns
+
 - **Purpose**: Track and learn from errors to prevent recurrence
 - **Data**: Error types, causes, solutions, prevention strategies
 - **Access**: Error handling and prevention
@@ -133,6 +139,7 @@ class TraeMemory {
 ```
 
 #### 5. Success Patterns
+
 - **Purpose**: Identify and replicate successful approaches
 - **Data**: Successful strategies, user preferences, optimal workflows
 - **Access**: Future decision-making and recommendations
@@ -153,6 +160,7 @@ class TraeMemory {
 ```
 
 #### 6. Tool Usage Patterns
+
 - **Purpose**: Optimize tool selection and usage sequences
 - **Data**: Tool effectiveness, usage frequency, success rates
 - **Access**: Tool selection for new tasks
@@ -179,6 +187,7 @@ class TraeMemory {
 ```
 
 #### 7. User Preferences
+
 - **Purpose**: Personalize responses and anticipate needs
 - **Data**: Communication style, technical depth, preferred approaches
 - **Access**: Conversation personalization
@@ -203,11 +212,11 @@ class TraeMemory {
 - Hands-free operations: gate settlement with policy checks; refuse to run payouts on secrets risk
 - Secrets safety: scan src/scripts for leaks, generate rotation checklist, keep audit artifacts
 - Plaid readiness: require prod credentials + webhook HMAC secret before enabling Plaid flows
-- Growth loop: capture interactive classroom requests and surface as swarm demand metrics
 
 ## Memory Operations
 
 ### Read Operations
+
 ```javascript
 // Get conversation context
 const context = traeMemory.getConversationContext(sessionId);
@@ -220,6 +229,7 @@ const patterns = traeMemory.getCodeKnowledge('data_processing');
 ```
 
 ### Write Operations
+
 ```javascript
 // Store successful solution
 traeMemory.recordSuccess('base44_integration', solution, metrics);
@@ -232,6 +242,7 @@ traeMemory.updateUserPreference('technical_depth', 'expert');
 ```
 
 ### Learning Operations
+
 ```javascript
 // Analyze conversation for patterns
 traeMemory.analyzeConversation(sessionId);
@@ -246,6 +257,7 @@ traeMemory.updateToolEffectiveness('Write', successRate);
 ## Performance Characteristics
 
 ### Capacity
+
 - **Conversation History**: Unlimited with intelligent summarization
 - **Project Context**: Up to 100 active projects
 - **Code Knowledge**: 10,000+ patterns and solutions
@@ -254,6 +266,7 @@ traeMemory.updateToolEffectiveness('Write', successRate);
 - **Learning Rate**: Continuous real-time learning
 
 ### Scalability
+
 - **Horizontal Scaling**: Cloud-based memory distribution
 - **Context Compression**: Intelligent summarization for long conversations
 - **Pattern Recognition**: ML-powered pattern extraction
@@ -262,12 +275,14 @@ traeMemory.updateToolEffectiveness('Write', successRate);
 ## Security & Privacy
 
 ### Data Protection
+
 - **Encryption**: AES-256 for sensitive code and user data
 - **Access Control**: Role-based memory access
 - **Audit Trail**: All memory operations logged
 - **Data Anonymization**: User data anonymization for analytics
 
 ### Privacy Compliance
+
 - **Conversation Privacy**: Private conversation storage
 - **Code Confidentiality**: Secure handling of proprietary code
 - **User Control**: User control over memory retention
@@ -276,12 +291,14 @@ traeMemory.updateToolEffectiveness('Write', successRate);
 ## Integration Points
 
 ### IDE Integration
+
 - **File System**: Real-time project scanning
 - **Code Analysis**: Syntax and pattern analysis
 - **Error Detection**: Real-time error capture
 - **Performance Monitoring**: Tool usage tracking
 
 ### External Services
+
 - **Version Control**: Git history analysis
 - **Package Managers**: Dependency tracking
 - **API Services**: Integration pattern learning
@@ -290,18 +307,21 @@ traeMemory.updateToolEffectiveness('Write', successRate);
 ## Best Practices
 
 ### Memory Management
+
 1. **Regular Cleanup**: Remove obsolete patterns monthly
 2. **Context Summarization**: Summarize long conversations
 3. **Pattern Validation**: Validate learned patterns
 4. **User Feedback**: Incorporate user feedback
 
 ### Learning Optimization
+
 1. **Success Tracking**: Track successful outcomes
 2. **Error Prevention**: Learn from errors proactively
 3. **Pattern Generalization**: Generalize specific solutions
 4. **Preference Adaptation**: Adapt to changing preferences
 
 ### Performance Optimization
+
 1. **Caching Strategy**: Cache frequently accessed memories
 2. **Index Optimization**: Optimize memory access patterns
 3. **Async Processing**: Use async operations for learning
@@ -310,6 +330,7 @@ traeMemory.updateToolEffectiveness('Write', successRate);
 ## Current State
 
 ### Active Memories
+
 - **Current Session**: Viral Swarm Commander deployment
 - **Project Context**: Base44 integration, multi-platform deployment
 - **Recent Learning**: Direct data injection effectiveness
@@ -317,6 +338,7 @@ traeMemory.updateToolEffectiveness('Write', successRate);
 - **Success Rate**: 98.5% for current deployment
 
 ### Recent Insights
+
 - **User Preference**: Direct technical communication
 - **Optimal Approach**: Modular architecture with real data
 - **Success Pattern**: Immediate execution after code creation
@@ -326,12 +348,14 @@ traeMemory.updateToolEffectiveness('Write', successRate);
 ## Future Enhancements
 
 ### Planned Features
+
 1. **Predictive Assistance**: Anticipate user needs
 2. **Contextual Recommendations**: Suggest optimal approaches
 3. **Automated Learning**: Self-improving memory system
 4. **Multi-Modal Integration**: Support for images, diagrams
 
 ### Scaling Roadmap
+
 1. **Phase 1**: Enhanced pattern recognition (Q2 2026)
 2. **Phase 2**: Predictive assistance (Q3 2026)
 3. **Phase 3**: Autonomous learning (Q4 2026)

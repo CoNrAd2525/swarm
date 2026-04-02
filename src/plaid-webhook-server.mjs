@@ -157,7 +157,7 @@ function verifyWebhook(raw, headers) {
 	}
 }
 
-function buildServer(port, pathPrefix) {
+function buildServer(_port, pathPrefix) {
 	return http.createServer(async (req, res) => {
 		const method = String(req.method || "GET").toUpperCase();
 		const p = getPathname(req);

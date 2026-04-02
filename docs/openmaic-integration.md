@@ -4,7 +4,7 @@
 
 OpenMAIC (Open Multi-Agent Interactive Classroom) is an open-source platform that converts a topic or document into an interactive classroom experience with multi-agent teaching, slides, quizzes, simulations, and project-based learning.
 
-Source: https://github.com/THU-MAIC/OpenMAIC
+Source: <https://github.com/THU-MAIC/OpenMAIC>
 
 ## License / compliance
 
