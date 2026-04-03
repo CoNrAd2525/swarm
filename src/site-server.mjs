@@ -71,6 +71,119 @@ function parseCommaList(s) {
 		.filter(Boolean);
 }
 
+function escapeHtml(s) {
+	return String(s ?? "")
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
+function slugToTitle(slug) {
+	const base = String(slug || "")
+		.replace(/\.html$/i, "")
+		.replace(/for-www-realworldcerts-com$/i, "")
+		.replace(/-www-realworldcerts-com$/i, "")
+		.replace(/www-realworldcerts-com$/i, "")
+		.replace(/-+/g, " ")
+		.trim();
+	return base
+		.split(" ")
+		.filter(Boolean)
+		.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+		.join(" ");
+}
+
+function buildAwsSaaPracticeArticle({ title }) {
+	const t = title || "AWS Certified Solutions Architect Practice Questions";
+	const questions = [
+		{
+			q: "You need to serve a static marketing site globally with the lowest latency and minimal ops. Which architecture is best?",
+			a: "Host on S3 and serve through CloudFront, with Route 53 for DNS. Use origin access control and cache-control headers.",
+		},
+		{
+			q: "An app needs to process spikes of SQS messages. You want automatic scaling and minimal management. Which compute option fits best?",
+			a: "Lambda with an SQS event source mapping. Configure batch size and concurrency limits.",
+		},
+		{
+			q: "You need a highly available relational database with automatic failover and read scaling. What should you choose?",
+			a: "Aurora (or RDS Multi-AZ for failover) plus read replicas (Aurora replicas) for read scaling.",
+		},
+		{
+			q: "A workload requires shared file storage across multiple EC2 instances in multiple AZs. What service should you use?",
+			a: "EFS (NFS) with mount targets in multiple AZs.",
+		},
+		{
+			q: "You want least-privilege access for an EC2 instance to read from S3 without using long-lived keys. What’s the right approach?",
+			a: "Attach an IAM role to the instance (instance profile) and use S3 bucket policies if needed.",
+		},
+		{
+			q: "You must ensure data is encrypted at rest for objects in S3 and want centralized control over keys. What do you enable?",
+			a: "SSE-KMS and a customer managed KMS key. Optionally enforce via bucket policy.",
+		},
+		{
+			q: "A web app must survive an AZ outage and keep serving traffic. How do you design the load balancing layer?",
+			a: "Use an ALB across multiple AZs with targets in each AZ. Use auto scaling groups spanning AZs.",
+		},
+		{
+			q: "You need private connectivity from a VPC to S3 without traversing the public internet. What do you configure?",
+			a: "An S3 Gateway VPC Endpoint and appropriate route table entries.",
+		},
+		{
+			q: "An API requires authentication for mobile and web clients with minimal custom auth code. Which AWS service fits?",
+			a: "Amazon Cognito User Pools (optionally with API Gateway authorizers).",
+		},
+		{
+			q: "You need to decouple microservices and guarantee at-least-once delivery. Which pair is most appropriate?",
+			a: "SQS for queueing and SNS for pub/sub fanout, depending on the delivery model.",
+		},
+	];
+
+	const qHtml = questions
+		.map(
+			(x, i) =>
+				`<div class="glass" style="border-radius:14px;padding:14px;margin-bottom:12px;"><div style="font-weight:700">Q${i + 1}. ${escapeHtml(
+					x.q,
+				)}</div><div style="margin-top:8px;color:#e5e7eb"><b>Answer:</b> ${escapeHtml(
+					x.a,
+				)}</div></div>`,
+		)
+		.join("");
+
+	const resources = [
+		{
+			name: "AWS Well-Architected Framework",
+			url: "https://aws.amazon.com/architecture/well-architected/",
+		},
+		{
+			name: "SAA-C03 Exam Guide",
+			url: "https://aws.amazon.com/certification/certified-solutions-architect-associate/",
+		},
+		{ name: "AWS Documentation", url: "https://docs.aws.amazon.com/" },
+	];
+
+	const rHtml = resources
+		.map(
+			(r) =>
+				`<li><a href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.name)}</a></li>`,
+		)
+		.join("");
+
+	return {
+		title: t,
+		body: `<section class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><p>Use these practice questions to build exam intuition: pick the simplest architecture that meets requirements, prefer managed services, and verify cost/operations tradeoffs.</p><h2 style="margin:14px 0 8px 0">7-Day Study Plan</h2><ol><li>Core services: IAM, VPC, EC2, S3, CloudFront</li><li>Databases: RDS/Aurora/DynamoDB, backups, DR basics</li><li>Compute patterns: Lambda, ECS/EKS, autoscaling</li><li>Networking: endpoints, VPN/Direct Connect, routing</li><li>Security: KMS, policies, org controls, logging</li><li>Resilience: Multi-AZ vs Multi-Region, RTO/RPO, failover</li><li>Full practice set + weak-area review</li></ol></section><section><h2 style="margin:0 0 10px 0">Practice Questions</h2>${qHtml}</section><section class="glass" style="border-radius:16px;padding:16px;margin-top:16px;"><h2 style="margin:0 0 10px 0">FAQs</h2><p><b>How should I review wrong answers?</b> Write why each wrong option fails requirements (latency, durability, availability, security, cost).</p><p><b>How many questions daily?</b> Start with 15–25/day, then increase as you stabilize accuracy.</p><h2 style="margin:14px 0 8px 0">Resources</h2><ul>${rHtml}</ul></section>`,
+	};
+}
+
+function buildGenericCourseArticle({ title }) {
+	const t = title || "Course Practice Questions";
+	return {
+		title: t,
+		body: `<section class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><p>This page provides a practical study workflow plus a reusable practice-question method you can apply to any certification course.</p><h2 style="margin:14px 0 8px 0">7-Day Study Plan</h2><ol><li>Read the exam blueprint/objectives and list weak domains</li><li>Learn core concepts and build a glossary</li><li>Do topic drills (10–20 questions) and write error notes</li><li>Do scenario questions and practice elimination strategies</li><li>Take a timed mini-mock and review mistakes</li><li>Take a full mock and fix weakest objective</li><li>Final review: cheat sheet + light practice set</li></ol></section><section class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><h2 style="margin:0 0 10px 0">How to Practice Questions (Step-by-step)</h2><ol><li>Identify the requirement keywords (availability, cost, latency, security)</li><li>Eliminate options that violate constraints</li><li>Pick the simplest managed solution that fits</li><li>Write a 1–2 sentence justification</li><li>Track mistakes by objective and revisit weak areas daily</li></ol></section><section class="glass" style="border-radius:16px;padding:16px;"><h2 style="margin:0 0 10px 0">FAQs</h2><p><b>What if I keep repeating the same mistakes?</b> Convert each mistake into a flashcard and re-test 24 hours later.</p><p><b>How many questions are enough?</b> Aim for consistent 80–90% on mixed sets before scheduling the exam.</p></section>`,
+	};
+}
+
 function start({ port = 8080 } = {}) {
 	const app = express();
 
@@ -1368,6 +1481,7 @@ refreshStore();
 				"/courses.html",
 				"/news.html",
 				"/checkout.html",
+				"/articles/",
 				"/interactive-classroom",
 			];
 			for (const p of dynamicPages) {
@@ -1429,6 +1543,35 @@ refreshStore();
 				.type("text/plain")
 				.send(String(e?.message ?? e));
 		}
+	});
+	app.get("/articles", (_req, res) => {
+		res.redirect(302, "/articles/");
+	});
+	app.get("/articles/", (_req, res) => {
+		const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Articles | RealWorldCerts</title><meta name="robots" content="index,follow"><link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml"><link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}.wrap{max-width:960px;margin:0 auto;padding:24px}.glass{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}a{color:#f59e0b;text-decoration:none}</style></head><body><main class="wrap"><header class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><h1 style="margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent">Articles</h1><nav style="margin-top:8px;font-size:14px"><a href="/index.html">Home</a> • <a href="/courses.html">Courses</a> • <a href="/sitemap.xml">Sitemap</a></nav></header><section class="glass" style="border-radius:16px;padding:16px;"><p>Practice questions and study guides for certification courses.</p><ul><li><a href="/articles/aws-certified-solutions-architect-practice-questions-for-www-realworldcerts-com.html">AWS Certified Solutions Architect practice questions</a></li><li><a href="/articles/itil-4-foundation-key-concepts-for-www-realworldcerts-com.html">ITIL 4 Foundation key concepts</a></li><li><a href="/articles/pmp-certification-fast-track-for-www-realworldcerts-com.html">PMP certification fast track</a></li><li><a href="/articles/best-exam-dumps-alternatives-for-www-realworldcerts-com.html">Best exam dumps alternatives</a></li></ul></section></main></body></html>`;
+		res.type("text/html").send(html);
+	});
+	app.get(/^\/articles\/(.+)$/i, (_req, res) => {
+		const slugRaw = String(_req.params?.[0] || "").trim();
+		const slug = slugRaw.replace(/^\/+/, "").slice(0, 220);
+		const title = slugToTitle(slug);
+		const lower = title.toLowerCase();
+		const article =
+			lower.includes("aws") && lower.includes("solutions architect")
+				? buildAwsSaaPracticeArticle({ title })
+				: buildGenericCourseArticle({ title });
+		const base = String(
+			process.env.SITE_PUBLIC_URL || "https://www.realworldcerts.com",
+		).replace(/\/+$/, "");
+		const canonical = `${base}/articles/${encodeURI(slug.replace(/^\//, ""))}`;
+		const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escapeHtml(
+			article.title,
+		)} | RealWorldCerts</title><link rel="canonical" href="${escapeHtml(
+			canonical,
+		)}"><meta name="robots" content="index,follow"><link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml"><link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}a{color:#f59e0b;text-decoration:none}.wrap{max-width:920px;margin:0 auto;padding:24px}.glass{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}h1,h2{letter-spacing:-0.02em}ol,ul{line-height:1.6}</style></head><body><main class="wrap"><header class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><h1 style="margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent">${escapeHtml(
+			article.title,
+		)}</h1><nav style="margin-top:8px;font-size:14px"><a href="/articles/">Articles</a> • <a href="/courses.html">Courses</a> • <a href="/interactive-classroom">Interactive Classroom</a></nav></header>${article.body}</main></body></html>`;
+		res.type("text/html").send(html);
 	});
 	app.get("/news.html", (_req, res) => {
 		const html =
