@@ -1578,6 +1578,57 @@ refreshStore();
 			'<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>News | RealWorldCerts</title><link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml"><link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml"><meta name="robots" content="index,follow"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}.glass{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}.wrap{max-width:960px;margin:0 auto;padding:24px}a{color:#f59e0b;text-decoration:none}</style></head><body><main class="wrap"><header class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><h1 style="margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent">News</h1><nav style="margin-top:8px;font-size:14px"><a href="/index.html">Home</a> • <a href="/sitemap.xml">Sitemap</a> • <a href="/rss.xml">RSS</a></nav></header><section class="glass" style="border-radius:16px;padding:16px;"><p>Latest updates and announcements. Subscribe via <a href="/rss.xml">RSS</a>.</p></section></main></body></html>';
 		res.type("text/html").send(html);
 	});
+
+	api.post(
+		"/wise/deposit_note",
+		express.json({ limit: "30kb" }),
+		(req, res) => {
+			try {
+				if (!checkOwnerAuth(req)) {
+					res.status(401).json({ ok: false, error: "unauthorized" });
+					return;
+				}
+				if (!checkAllowlist(req)) {
+					res.status(403).json({ ok: false, error: "forbidden" });
+					return;
+				}
+				if (!checkRateLimit(req)) {
+					res.status(429).json({ ok: false, error: "rate_limited" });
+					return;
+				}
+				const file_name = safeStr(req.body?.file_name || "", 200);
+				const note_id = safeStr(req.body?.note_id || "", 80);
+				const transfer_id = safeStr(req.body?.transfer_id || "", 80);
+				const amount = Number(req.body?.amount ?? NaN);
+				const currency = safeStr(req.body?.currency || "", 10).toUpperCase();
+				const reference = safeStr(req.body?.reference || "", 200);
+				const occurred_at = safeStr(req.body?.occurred_at || "", 60);
+
+				const record = {
+					kind: "wise_deposit_note",
+					at: new Date().toISOString(),
+					file_name: file_name || null,
+					note_id: note_id || null,
+					transfer_id: transfer_id || null,
+					amount: Number.isFinite(amount) ? amount : null,
+					currency: currency || null,
+					reference: reference || null,
+					occurred_at: occurred_at || null,
+				};
+
+				const dir = path.resolve("logs", "wise_deposits");
+				fs.mkdirSync(dir, { recursive: true });
+				const out = path.join(
+					dir,
+					`deposit_${Date.now()}_${crypto.randomBytes(3).toString("hex")}.json`,
+				);
+				fs.writeFileSync(out, JSON.stringify(record, null, 2), "utf8");
+				res.json({ ok: true, saved: path.basename(out) });
+			} catch (e) {
+				res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+			}
+		},
+	);
 	app.get("/checkout.html", (_req, res) => {
 		const nonce = res.locals?.cspNonce || "";
 		const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Checkout | RealWorldCerts</title><meta name="robots" content="index,follow"><link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml"><link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml"><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0b;color:#fff;margin:0}.glass{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}.wrap{max-width:680px;margin:0 auto;padding:24px}a{color:#f59e0b;text-decoration:none}button{background-image:linear-gradient(90deg,#f59e0b,#f43f5e);border:none;color:#111;padding:12px 16px;border-radius:12px;font-weight:700}</style></head><body><main class="wrap"><header class="glass" style="border-radius:16px;padding:16px;margin-bottom:16px;"><h1 style="margin:0;background-image:linear-gradient(90deg,#f59e0b,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent">Checkout</h1><nav style="margin-top:8px;font-size:14px"><a href="/index.html">Home</a> • <a href="/sitemap.xml">Sitemap</a> • <a href="/rss.xml">RSS</a></nav></header><section class="glass" style="border-radius:16px;padding:16px;"><p>Secure payment via PayPal is supported. Click below to generate a PayPal payment link.</p><button onclick="startPayPal()">Pay with PayPal</button></section></main><script nonce="${nonce}">async function startPayPal(){try{const res=await fetch('/api/paypal-link?amount=10&item=Course');const json=await res.json();if(json&&json.ok&&json.url){location.href=json.url;}else{alert('Unable to create PayPal link');}}catch(e){alert('Error starting PayPal checkout');}}</script></body></html>`;
