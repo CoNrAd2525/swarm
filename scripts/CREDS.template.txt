@@ -1,0 +1,53 @@
+$env:SWARM_LIVE="true"
+$env:FINANCIAL_MODE="DRY"
+
+# --- Base44 (required for SWARM + ETL) ---
+$env:BASE44_APP_ID=""
+$env:BASE44_SERVICE_TOKEN=""
+$env:BASE44_API_URL=""
+$env:BASE44_SERVER_URL=""
+
+# --- PayPal (required for revenue ingestion + payouts workflows) ---
+$env:PAYPAL_MODE="live"
+$env:PAYPAL_CLIENT_ID=""
+$env:PAYPAL_CLIENT_SECRET=""
+$env:PAYPAL_WEBHOOK_ID=""
+$env:PAYPAL_OWNER_EMAIL=""
+$env:PAYPAL_PPP2_APPROVED="false"
+$env:PAYPAL_PPP2_ENABLE_SEND="false"
+
+# --- Site (owner access + watchdog) ---
+$env:OWNER_DASH_TOKEN=""
+$env:SITE_PUBLIC_URL="https://www.realworldcerts.com"
+$env:PUBLIC_WEBHOOK_BASE_URL="https://www.realworldcerts.com"
+
+# --- Supabase (required for ETL) ---
+$env:SUPABASE_URL=""
+$env:SUPABASE_ANON_KEY=""
+$env:SUPABASE_SERVICE_ROLE_KEY=""
+$env:BASE44_REVENUE_ENTITY="RevenueEvent"
+$env:BASE44_PAYOUT_ENTITY="PayoutBatch"
+
+# --- Plaid (optional; keep minimal cost) ---
+$env:PLAID_ENV="sandbox"
+$env:PLAID_ALLOWED_PRODUCTS="auth"
+$env:PLAID_CLIENT_ID=""
+$env:PLAID_SECRET=""
+$env:PLAID_WEBHOOK_HMAC_SECRET=""
+$env:PLAIDBOX_KEY=""
+
+# --- Vercel (static deploy + proxy deploy) ---
+$env:VERCEL_TOKEN=""
+$env:VERCEL_TEAM_ID=""
+$env:VERCEL_ORG_ID=""
+$env:VERCEL_STATIC_PROJECT_NAME="realworldcerts-site"
+$env:VERCEL_PROXY_PROJECT_NAME="rwc-proxy"
+
+# --- SMTP (optional, for email agents) ---
+$env:SMTP_HOST=""
+$env:SMTP_PORT=""
+$env:SMTP_USER=""
+$env:SMTP_PASS=""
+$env:SMTP_FROM=""
+$env:SMTP_TEST_TO=""
+

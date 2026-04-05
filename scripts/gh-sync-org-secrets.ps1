@@ -10,7 +10,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -LiteralPath $root | Out-Null
 
 $gh = Get-Command gh -ErrorAction SilentlyContinue
-if (-not $gh) { throw "Missing GitHub CLI 'gh'. Install and run 'gh auth login'." }
+if (-not $gh) { throw "Missing GitHub CLI 'gh'. Install GitHub CLI and run 'gh auth login'." }
 
 function LoadCreds([string]$path) {
   if (-not (Test-Path -LiteralPath $path)) { return @() }
