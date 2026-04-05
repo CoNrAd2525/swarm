@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/articles", "dest": "/articles/index.html" },
+    { "src": "/articles/(.*)", "dest": "/articles/index.html" }
+  ]
+}
+

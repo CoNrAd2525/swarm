@@ -32,7 +32,9 @@ Thumbs.db
 settlements/
 exports/
 out/
-rank/
+rank/**
+!rank/output/
+!rank/output/**
 dist_rwc/
 logs/
 swarm-new/

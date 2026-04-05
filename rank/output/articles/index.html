@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Articles | RealWorldCerts</title>
+    <meta
+      name="description"
+      content="Practice questions, study plans, FAQs, and resources for certification courses."
+    />
+    <meta name="robots" content="index,follow" />
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <header class="site">
+      <div class="container row">
+        <div class="brand">
+          <div>
+            <h1 class="title"><a href="/">RealWorldCerts</a></h1>
+            <div class="subtitle">Articles</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="/courses.html">Courses</a>
+          <a href="/articles/">Articles</a>
+          <a href="/payments.html">Payments</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <div id="content"></div>
+    </main>
+
+    <script>
+      function escapeHtml(s) {
+        return String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+      function slugFromPathname(pathname) {
+        const p = String(pathname || "").trim();
+        const m = /^\/articles\/(.+)$/.exec(p);
+        if (!m) return "";
+        return String(m[1] || "")
+          .replace(/^\/+/, "")
+          .replace(/\.html$/i, "")
+          .trim();
+      }
+      function humanTitle(slug) {
+        return String(slug || "")
+          .replace(/for-www-realworldcerts-com$/i, "")
+          .replace(/-www-realworldcerts-com$/i, "")
+          .replace(/www-realworldcerts-com$/i, "")
+          .replace(/-+/g, " ")
+          .trim()
+          .split(" ")
+          .filter(Boolean)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
+      }
+      async function loadIndex() {
+        const res = await fetch("/site-data/articles.json", { cache: "no-store" });
+        if (!res.ok) throw new Error("articles_index_fetch_failed");
+        const json = await res.json();
+        return Array.isArray(json?.articles) ? json.articles : [];
+      }
+      function renderList(articles) {
+        const cards = articles
+          .map((a) => {
+            const href = "/articles/" + encodeURIComponent(a.slug) + ".html";
+            return (
+              '<div class="card">' +
+              "<h3>" +
+              escapeHtml(a.title || humanTitle(a.slug)) +
+              "</h3>" +
+              (a.lead ? "<p>" + escapeHtml(a.lead) + "</p>" : "") +
+              '<p><a class="btn" href="' +
+              href +
+              '">Read</a></p>' +
+              "</div>"
+            );
+          })
+          .join("");
+        return (
+          '<div class="card"><h2>Articles</h2><p>Study plans, practice questions, FAQs, and resources.</p></div>' +
+          '<div class="grid">' +
+          cards +
+          "</div>"
+        );
+      }
+      function renderArticle(a, slug) {
+        const title = a?.title || humanTitle(slug) || "Article";
+        document.title = title + " | RealWorldCerts";
+        const body = a?.body_html
+          ? String(a.body_html)
+          : '<div class="card"><h2>Coming soon</h2><p>This article is being prepared. Please check back.</p></div>';
+        return '<div class="card"><h2>' + escapeHtml(title) + "</h2></div>" + body;
+      }
+
+      (async function main() {
+        const slot = document.getElementById("content");
+        try {
+          const slug = slugFromPathname(location.pathname);
+          const articles = await loadIndex();
+          if (!slug || slug === "index") {
+            slot.innerHTML = renderList(articles);
+            return;
+          }
+          const hit = articles.find((x) => String(x?.slug || "") === slug) || null;
+          slot.innerHTML = renderArticle(hit, slug);
+        } catch (e) {
+          slot.innerHTML =
+            '<div class="card"><h2>Unavailable</h2><p>Unable to load article content.</p></div>';
+        }
+      })();
+    </script>
+  </body>
+</html>
+
