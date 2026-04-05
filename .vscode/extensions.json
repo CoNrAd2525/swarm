@@ -1,8 +1,9 @@
 {
-<<<<<<< Updated upstream
-	"recommendations": []
+  "recommendations": [
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "ms-vscode.powershell",
+    "redhat.vscode-yaml",
+    "eamodio.gitlens"
+  ]
 }
-=======
-    "recommendations": []
-}
->>>>>>> Stashed changes
