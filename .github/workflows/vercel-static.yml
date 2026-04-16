@@ -50,7 +50,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_STATIC_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
         run: |
-          NAME="${VERCEL_STATIC_PROJECT_NAME:-realworldcerts-site}"
+          NAME="${VERCEL_STATIC_PROJECT_NAME:-realworldcerts}"
           if [ -d "rank/output" ]; then
             cd rank/output
             if [ -n "$VERCEL_TEAM_ID" ]; then
@@ -71,7 +71,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_STATIC_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
         run: |
-          NAME="${VERCEL_STATIC_PROJECT_NAME:-realworldcerts-site}"
+          NAME="${VERCEL_STATIC_PROJECT_NAME:-realworldcerts}"
           cd site/realworldcerts
           if [ -n "$VERCEL_TEAM_ID" ]; then
             npx vercel pull --environment=production --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" || true
