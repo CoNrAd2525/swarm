@@ -18,8 +18,31 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+      - name: Verify artifact exists
+        run: |
+          test -f rank/output/index.html
+          test -f rank/output/courses.html
+          test -f rank/output/articles/index.html
       - name: Install Vercel CLI
         run: npm i -g vercel
+      - name: Check Vercel project link (best effort)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
+          VERCEL_EXPECT_GITHUB_REPO: CoNrAd2525/swarm
+        run: node scripts/vercel-check-project-link.mjs || true
+      - name: Ensure Vercel project uses canonical root (best effort)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
+          VERCEL_GIT_REPO: CoNrAd2525/swarm
+          VERCEL_ROOT_DIRECTORY: rank
+          VERCEL_GIT_BRANCH: release
+        run: node scripts/vercel-update-project-repo.mjs || true
       - name: Deploy rank/output to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
