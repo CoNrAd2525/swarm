@@ -71,6 +71,7 @@
     "site:health:local": "powershell -NoProfile -Command \"$env:SITE_PUBLIC_URL='http://localhost:8080'; node ./scripts/site-health-check.mjs\"",
     "site:smoke": "node ./scripts/site-smoke-test.mjs",
     "site:smoke:local": "node ./scripts/run-site-smoke.mjs",
+    "bank:reconcile:auto": "node ./scripts/auto-confirm-bank-settlements.mjs",
     "site:feed:gen": "node ./scripts/generate-feed.mjs",
     "ci:guardrails": "node ./scripts/ci-guardrails.mjs",
     "repo:merge": "node ./scripts/merge-repos.mjs",

@@ -78,4 +78,32 @@ export class PlaidClient {
 	async accountsGet(access_token) {
 		return await this.post("/accounts/get", { access_token });
 	}
+
+	async transactionsGet(
+		access_token,
+		{
+			start_date,
+			end_date,
+			options = { count: 500, offset: 0 },
+		} = {},
+	) {
+		return await this.post("/transactions/get", {
+			access_token,
+			start_date,
+			end_date,
+			options,
+		});
+	}
+
+	async transactionsSync(
+		access_token,
+		{ cursor = "", count = 500, options = {} } = {},
+	) {
+		return await this.post("/transactions/sync", {
+			access_token,
+			cursor,
+			count,
+			options,
+		});
+	}
 }

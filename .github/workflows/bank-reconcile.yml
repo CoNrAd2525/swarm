@@ -1,0 +1,52 @@
+name: Bank Reconciliation (Hands-Free)
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "15 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    env:
+      BANK_RECONCILE_ENABLE: "true"
+      SITE_PUBLIC_URL: ${{ secrets.SITE_PUBLIC_URL }}
+      BASE44_SERVICE_TOKEN: ${{ secrets.BASE44_SERVICE_TOKEN }}
+      BASE44_APP_ID: ${{ secrets.BASE44_APP_ID }}
+      BASE44_API_URL: ${{ secrets.BASE44_API_URL }}
+      BASE44_SERVER_URL: ${{ secrets.BASE44_SERVER_URL }}
+      BASE44_REVENUE_ENTITY: ${{ secrets.BASE44_REVENUE_ENTITY }}
+      BASE44_PAYOUT_ENTITY: ${{ secrets.BASE44_PAYOUT_ENTITY }}
+      PLAID_ENV: ${{ secrets.PLAID_ENV }}
+      PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+      PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
+      PLAIDBOX_KEY: ${{ secrets.PLAIDBOX_KEY }}
+      OWNER_NOTIFY_EMAIL: ${{ secrets.SECONDARY_CONTACT_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - name: Plaid readiness (best effort)
+        run: npm run plaid:preflight || true
+      - name: Auto-confirm pending external settlements
+        run: npm run bank:reconcile:auto || true
+      - name: Queue owner notifications (best effort)
+        run: node ./scripts/email/queue-from-communications.mjs || true
+      - name: Commit generated reports/communications
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(finance): bank reconciliation updates"
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "No reconciliation artifacts to commit."
+          fi
