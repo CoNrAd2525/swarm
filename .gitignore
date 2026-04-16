@@ -35,6 +35,7 @@ out/
 rank/**
 !rank/output/
 !rank/output/**
+!rank/README.md
 dist_rwc/
 logs/
 swarm-new/
