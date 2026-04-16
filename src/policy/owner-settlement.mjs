@@ -102,7 +102,7 @@ export function getPaymentConfiguration() {
 		wise: {
 			enabled:
 				String(process.env.WISE_ENABLE || "false").toLowerCase() === "true",
-			email: process.env.OWNER_WISE_EMAIL,
+				email: process.env.OWNER_WISE_EMAIL || process.env.WISE_EMAIL,
 		},
 		googlepay: {
 			enabled:
@@ -185,7 +185,7 @@ export function missingCredentials(route, cfg) {
 		if (!email || !email.includes("@")) return true;
 		if (String(process.env.WISE_ENVIRONMENT || "").toLowerCase() !== "live")
 			return true;
-		if (!process.env.WISE_API_KEY || !process.env.WISE_PROFILE_ID) return true;
+		if (!process.env.WISE_API_KEY) return true;
 		return false;
 	}
 	if (r === "googlepay") {

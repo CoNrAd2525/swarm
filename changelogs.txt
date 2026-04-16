@@ -57,7 +57,6 @@
   - fake_txhash_detected=true for invalid TX formats (non-64 hex)
   - real=false when simulation detected
 - Produces exports/reports/simulation_audit_report_<ts>.json summarizing updates.
-<<<<<<< Updated upstream
 2026-01-12T00:00:00Z [finance][paypal] Payout hardening and Base44 push
 - Hardened scripts/payout-paypal-once.mjs with live-mode preflight, sandbox guard, and credential verification; structured JSON outputs added.
 - Added fallback routes on AUTHORIZATION_ERROR: invoice/link generation and manual instruction JSON creation.
@@ -66,9 +65,9 @@
 2026-01-13T00:00:00Z [crypto][binance] Hardened client, cryptobox route, CLI, memory doc
 - Added robust Binance client with periodic time sync, ms timestamps, canonical signing, and retry on -1021/-1022.
 - Added binance_cryptobox route and automatic fallback when API returns recoverable errors.
-68→- Added CLI scripts/prepare-cryptobox-instruction.mjs to prepare and print cryptobox instructions; new npm script crypto:prepare:cryptobox.
-69→- Unified ESLint config, added lint:fix, removed duplicate config files.
-70→- Wrote docs/swarm-memory.md describing Base44 memory access/update flows and autonomy rules.
+- Added CLI scripts/prepare-cryptobox-instruction.mjs to prepare and print cryptobox instructions; new npm script crypto:prepare:cryptobox.
+- Unified ESLint config, added lint:fix, removed duplicate config files.
+- Wrote docs/swarm-memory.md describing Base44 memory access/update flows and autonomy rules.
 2026-01-14T00:00:00Z [finance][payoneer][ops] Follow-up automation and XLS/XLSX support
 - Updated scripts/generate-payoneer-followups.mjs to read Payoneer .xls/.xlsx by extracting embedded CSV and to process directories with --dir.
 - Emitted 3 follow-up payloads from submitted.manually to exports/communications with PoSP evidence lines.
@@ -83,5 +82,7 @@
 - Backup: snapshot of env/ledger/site under backups/snapshot_<ts> with manifest.json
 - UI: improved landing page styling with clear checkout routes and catalogue links
 - Swarm: added mission to promote Medium RWC article for amplification
-=======
->>>>>>> Stashed changes
+
+2026-04-16T00:00:00Z [finance][wise][bank-wire] Owner payout routes enabled
+- Wise: implemented live Wise API execution (quote → transfer → fund) and owner email support.
+- Bank wire: generates manual wire instruction JSON per payout, supports multi-beneficiary configuration via env JSON, and keeps allowlist enforcement.
