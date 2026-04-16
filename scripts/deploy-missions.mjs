@@ -2,24 +2,48 @@ import { fileURLToPath } from "node:url";
 import { buildMissionPlan } from "../src/swarm/mission-planner.mjs";
 import { MissionOrchestrator } from "../src/swarm/mission-orchestrator.mjs";
 
+function str(name) {
+  const v = process.env[name];
+  return v == null ? "" : String(v).trim();
+}
+
+function deployStatuses() {
+  const raw = str("SWARM_DEPLOY_STATUSES") || "pending";
+  const list = raw
+    .split(/[,\s]+/g)
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set(list.length ? list : ["pending"]);
+}
+
+function normalizeStatus(v) {
+  const s = String(v == null ? "" : v).trim().toLowerCase();
+  return s || null;
+}
+
 async function main() {
   try {
     const plan = buildMissionPlan({});
+    const allowed = deployStatuses();
     const ready = Array.isArray(plan?.missions)
-      ? plan.missions.filter((m) => m?.ready === true)
+      ? plan.missions.filter(
+          (m) =>
+            m?.ready === true &&
+            allowed.has(normalizeStatus(m?.status) || "pending"),
+        )
       : [];
 
     const nowIso = new Date().toISOString();
-    const ts = Date.now();
 
     const proposals = ready.map((m, idx) => ({
-      id: `${m.id}-${ts}-${idx}`,
+      id: `mission:${m.id}`,
       type: "VELOCITY_OPPORTUNITY",
       source_mission_id: m.id,
       title: m.title,
       channel: m.channel,
       priority: m.priority,
       created_at: nowIso,
+      idx,
     }));
 
     if (proposals.length === 0) {

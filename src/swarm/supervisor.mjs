@@ -429,11 +429,22 @@ async function runCycle({ memory, replenisher, filePath }) {
 		phase0MissionId = null;
 	}
 	let missionPlanPath = null;
+	let missionDeploy = { ok: true, output: null };
 	try {
 		const plan = buildMissionPlan({});
 		missionPlanPath = writeMissionPlan(plan);
 	} catch {
 		missionPlanPath = null;
+	}
+	try {
+		const dm = spawnSync(process.execPath, ["scripts/deploy-missions.mjs"], {
+			cwd: process.cwd(),
+			encoding: "utf8",
+			env: { ...process.env, SWARM_DEPLOY_STATUSES: "pending" },
+		});
+		missionDeploy.output = (dm.stdout || "").trim();
+	} catch {
+		missionDeploy = { ok: false, output: null };
 	}
 	const rep = replenisher.replenish();
 	saveAgents(filePath, memory.get("agents"));
@@ -553,6 +564,7 @@ async function runCycle({ memory, replenisher, filePath }) {
 		egress_file: egressFile,
 		egress,
 		mission_plan_file: missionPlanPath,
+		mission_deploy: missionDeploy,
 		success_metrics_file: metricsFile,
 		at: new Date().toISOString(),
 	};

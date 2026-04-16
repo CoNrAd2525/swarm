@@ -72,6 +72,7 @@
     "site:smoke": "node ./scripts/site-smoke-test.mjs",
     "site:smoke:local": "node ./scripts/run-site-smoke.mjs",
     "bank:reconcile:auto": "node ./scripts/auto-confirm-bank-settlements.mjs",
+    "missions:deploy:pending": "cross-env SWARM_DEPLOY_STATUSES=pending node ./scripts/deploy-missions.mjs",
     "site:feed:gen": "node ./scripts/generate-feed.mjs",
     "ci:guardrails": "node ./scripts/ci-guardrails.mjs",
     "repo:merge": "node ./scripts/merge-repos.mjs",

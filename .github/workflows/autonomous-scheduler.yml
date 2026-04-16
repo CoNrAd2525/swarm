@@ -23,6 +23,8 @@ jobs:
         run: npm run swarm:add:agents
       - name: Headhunter discovery
         run: npm run swarm:headhunter:once
+      - name: Deploy pending missions
+        run: node ./scripts/deploy-missions.mjs
       - name: Autonomous once
         run: npm run autonomous:once
       - name: Health readiness ping
