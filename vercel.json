@@ -1,7 +1,9 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/api/base44/(.*)", "destination": "/api/base44-proxy?path=$1" },
-    { "source": "/api/supabase/(.*)", "destination": "/api/supabase-proxy?path=$1" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "^/$", "dest": "/rank/output/index.html" },
+    { "src": "^/(.*)$", "dest": "/rank/output/$1" }
   ]
 }
+
