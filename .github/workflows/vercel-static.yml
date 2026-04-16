@@ -30,19 +30,21 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
-          VERCEL_EXPECT_GITHUB_REPO: CoNrAd2525/swarm
-        run: node scripts/vercel-check-project-link.mjs || true
+        run: |
+          export VERCEL_PROJECT_NAME="realworldcerts"
+          export VERCEL_EXPECT_GITHUB_REPO="CoNrAd2525/swarm"
+          node scripts/vercel-check-project-link.mjs || true
       - name: Ensure Vercel project uses canonical root (best effort)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
-          VERCEL_GIT_REPO: CoNrAd2525/swarm
-          VERCEL_ROOT_DIRECTORY: rank
-          VERCEL_GIT_BRANCH: release
-        run: node scripts/vercel-update-project-repo.mjs || true
+        run: |
+          export VERCEL_PROJECT_NAME="realworldcerts"
+          export VERCEL_GIT_REPO="CoNrAd2525/swarm"
+          export VERCEL_ROOT_DIRECTORY="rank"
+          export VERCEL_GIT_BRANCH="release"
+          node scripts/vercel-update-project-repo.mjs || true
       - name: Deploy rank/output to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -50,7 +52,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_STATIC_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
         run: |
-          NAME="${VERCEL_STATIC_PROJECT_NAME:-realworldcerts}"
+          NAME="realworldcerts"
           if [ -d "rank/output" ]; then
             cd rank/output
             if [ -n "$VERCEL_TEAM_ID" ]; then
@@ -71,7 +73,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_STATIC_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
         run: |
-          NAME="${VERCEL_STATIC_PROJECT_NAME:-realworldcerts}"
+          NAME="realworldcerts-site"
           cd site/realworldcerts
           if [ -n "$VERCEL_TEAM_ID" ]; then
             npx vercel pull --environment=production --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" || true
