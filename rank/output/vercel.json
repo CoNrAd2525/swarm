@@ -2,7 +2,10 @@
   "version": 2,
   "routes": [
     { "handle": "filesystem" },
+    { "src": "/courses", "dest": "/courses.html" },
+    { "src": "/courses/", "dest": "/courses.html" },
     { "src": "/articles", "dest": "/articles/index.html" },
+    { "src": "/articles/", "dest": "/articles/index.html" },
     { "src": "/articles/(.*)", "dest": "/articles/index.html" }
   ]
 }
