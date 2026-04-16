@@ -8,10 +8,31 @@ function num(v) {
 	const n = Number(v);
 	return Number.isFinite(n) ? n : 0;
 }
+function clampInt(v, { min = 0, max = 1e9, fallback = 0 } = {}) {
+	const n = Number(v);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.min(max, Math.max(min, Math.floor(n)));
+}
 function iso(v) {
 	if (!v) return null;
 	const d = new Date(v);
 	return isNaN(d.getTime()) ? null : d.toISOString();
+}
+function sleep(ms) {
+	return new Promise((r) => setTimeout(r, ms));
+}
+async function withRetry(fn, { tries = 3, baseDelayMs = 400 } = {}) {
+	let last = null;
+	for (let i = 0; i < Math.max(1, tries); i++) {
+		try {
+			return await fn();
+		} catch (e) {
+			last = e;
+			const delay = baseDelayMs * Math.pow(2, i);
+			await sleep(delay);
+		}
+	}
+	throw last || new Error("retry_failed");
 }
 function supabaseHeaders() {
 	const key = str("SUPABASE_SERVICE_ROLE_KEY") || str("SUPABASE_ANON_KEY");
@@ -35,6 +56,12 @@ async function supabaseUpsert(table, rows) {
 		throw new Error(`supabase_error:${res.status}:${txt}`);
 	}
 	return txt;
+}
+function chunk(arr, size) {
+	const s = Math.max(1, size);
+	const out = [];
+	for (let i = 0; i < arr.length; i += s) out.push(arr.slice(i, i + s));
+	return out;
 }
 function base44Env() {
 	const apiUrl = str("BASE44_API_URL");
@@ -74,9 +101,14 @@ async function base44Request(pathname, { method = "GET", body } = {}) {
 		...(body ? { body: JSON.stringify(body) } : {}),
 	};
 
+	const timeoutMs = clampInt(str("BASE44_TIMEOUT_MS") || "10000", {
+		min: 2000,
+		max: 60000,
+		fallback: 10000,
+	});
 	const p = fetch(url, opts);
 	const t = new Promise((_, rej) =>
-		setTimeout(() => rej(new Error("base44_timeout")), 4000),
+		setTimeout(() => rej(new Error("base44_timeout")), timeoutMs),
 	);
 	const res = await Promise.race([p, t]);
 	const text = await res.text().catch(() => "");
@@ -108,17 +140,57 @@ function pickCurrency(obj) {
 function pickStatus(obj) {
 	return String(obj?.status || obj?.state || "pending");
 }
-async function fetchBase44Records(entity, limit = 500) {
-	const params = new URLSearchParams();
-	params.set("limit", String(limit));
-	const r = await base44Request(
-		`/entities/${encodeURIComponent(entity)}/records?${params.toString()}`,
-	);
-
+function extractRecords(r) {
 	if (Array.isArray(r?.items)) return r.items;
 	if (Array.isArray(r?.records)) return r.records;
 	if (Array.isArray(r?.data)) return r.data;
 	return [];
+}
+
+async function fetchBase44Records(entity, { limit = 500, offset = 0 } = {}) {
+	const params = new URLSearchParams();
+	params.set("limit", String(limit));
+	params.set("offset", String(offset));
+	const r = await base44Request(
+		`/entities/${encodeURIComponent(entity)}/records?${params.toString()}`,
+	);
+	return extractRecords(r);
+}
+
+async function fetchAllBase44Records(entity, { pageSize, maxTotal } = {}) {
+	const limit = clampInt(pageSize ?? str("ETL_PAGE_SIZE") ?? "500", {
+		min: 50,
+		max: 2000,
+		fallback: 500,
+	});
+	const cap = clampInt(maxTotal ?? str("ETL_LIMIT_TOTAL") ?? str("ETL_LIMIT") ?? "2000", {
+		min: 1,
+		max: 20000,
+		fallback: 2000,
+	});
+	const out = [];
+	const seen = new Set();
+	let offset = 0;
+	while (out.length < cap) {
+		const page = await withRetry(
+			() => fetchBase44Records(entity, { limit, offset }),
+			{ tries: 3, baseDelayMs: 500 },
+		);
+		if (!page.length) break;
+
+		for (const rec of page) {
+			const id = String(rec?.id ?? rec?._id ?? rec?.code ?? rec?.external_id ?? "").trim();
+			const key = id || `row:${out.length + 1}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
+			out.push(rec);
+			if (out.length >= cap) break;
+		}
+
+		if (page.length < limit) break;
+		offset += page.length;
+	}
+	return out;
 }
 function mapRevenue(rec) {
 	return {
@@ -155,18 +227,22 @@ async function etlBase44ToSupabase() {
 		!live || String(process.env.DRY_RUN ?? "").toLowerCase() === "true";
 	const supa = str("SUPABASE_URL");
 	const hasSupa = !!supa;
-	const limit = Math.max(1, Math.min(5000, num(process.env.ETL_LIMIT ?? 500)));
 	const revenueEntity = str("BASE44_REVENUE_ENTITY") || "RevenueEvent";
 	const payoutEntity = str("BASE44_PAYOUT_ENTITY") || "Payout";
+	const upsertChunk = clampInt(str("SUPABASE_UPSERT_CHUNK") || "500", {
+		min: 50,
+		max: 2000,
+		fallback: 500,
+	});
 	let revenue = [];
 	let payouts = [];
 	try {
-		revenue = await fetchBase44Records(revenueEntity, limit);
+		revenue = await fetchAllBase44Records(revenueEntity, {});
 	} catch {
 		revenue = [];
 	}
 	try {
-		payouts = await fetchBase44Records(payoutEntity, limit);
+		payouts = await fetchAllBase44Records(payoutEntity, {});
 	} catch {
 		payouts = [];
 	}
@@ -188,8 +264,22 @@ async function etlBase44ToSupabase() {
 		);
 		return;
 	}
-	if (revRows.length) await supabaseUpsert("revenue_events", revRows);
-	if (payRows.length) await supabaseUpsert("payouts", payRows);
+	for (const part of chunk(revRows, upsertChunk)) {
+		if (part.length) {
+			await withRetry(() => supabaseUpsert("revenue_events", part), {
+				tries: 3,
+				baseDelayMs: 500,
+			});
+		}
+	}
+	for (const part of chunk(payRows, upsertChunk)) {
+		if (part.length) {
+			await withRetry(() => supabaseUpsert("payouts", part), {
+				tries: 3,
+				baseDelayMs: 500,
+			});
+		}
+	}
 	process.stdout.write(
 		JSON.stringify({ ok: true, dry: false, counts: out }, null, 2) + "\n",
 	);

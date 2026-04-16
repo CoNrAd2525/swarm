@@ -47,6 +47,18 @@ export class RecoveryCommand {
 			);
 			await this.mirrors.syncAll(classroomRequests);
 		} catch {}
+		try {
+			const exportStore = path.resolve(
+				"data",
+				"base44_export",
+				"offline-store-backup.json",
+			);
+			await this.mirrors.syncAll(exportStore);
+		} catch {}
+		try {
+			const ledger = path.resolve("data", "swarm", "mission-ledger.json");
+			await this.mirrors.syncAll(ledger);
+		} catch {}
 
 		// 3. Mirror Health Check
 		await this.mirrors.healthCheck();

@@ -1,0 +1,49 @@
+name: Backup + Mirror (Cloud)
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "5 */6 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      BASE44_API_URL: ${{ secrets.BASE44_API_URL }}
+      BASE44_SERVER_URL: ${{ secrets.BASE44_SERVER_URL }}
+      BASE44_APP_ID: ${{ secrets.BASE44_APP_ID }}
+      BASE44_SERVICE_TOKEN: ${{ secrets.BASE44_SERVICE_TOKEN }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      MIRROR_SUPABASE_BUCKET: ${{ secrets.MIRROR_SUPABASE_BUCKET }}
+      ENVBOX_KEY: ${{ secrets.ENVBOX_KEY }}
+      PLAIDBOX_KEY: ${{ secrets.PLAIDBOX_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Export Base44 entities
+        run: node ./scripts/export-full-base44.mjs || true
+      - name: Local snapshot
+        run: node ./scripts/backup-project-state.mjs || true
+      - name: Recovery + mirror sync (best effort)
+        run: node ./scripts/recovery-daemon.mjs --once || true
+      - name: Upload backups (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-mirror-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: |
+            data/base44_export/**
+            doomsday-vault/**
+            backups/**
+            logs/mirror-status.json

@@ -2,13 +2,13 @@ name: ETL Base44 to Supabase
 
 on:
   schedule:
-    - cron: "17 2 * * *"
+    - cron: "22 * * * *"
   workflow_dispatch:
     inputs:
       live:
         description: "Write to Supabase (true/false)"
         required: false
-        default: "false"
+        default: "true"
       limit:
         description: "Max records per entity"
         required: false
@@ -37,6 +37,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           BASE44_REVENUE_ENTITY: ${{ secrets.BASE44_REVENUE_ENTITY }}
           BASE44_PAYOUT_ENTITY: ${{ secrets.BASE44_PAYOUT_ENTITY }}
-          ETL_LIVE: ${{ github.event.inputs.live }}
-          ETL_LIMIT: ${{ github.event.inputs.limit }}
+          ETL_LIVE: ${{ github.event.inputs.live || 'true' }}
+          ETL_PAGE_SIZE: ${{ github.event.inputs.limit || '500' }}
+          ETL_LIMIT_TOTAL: "5000"
+          BASE44_TIMEOUT_MS: "15000"
+          SUPABASE_UPSERT_CHUNK: "500"
         run: node scripts/etl/base44-to-supabase.mjs
