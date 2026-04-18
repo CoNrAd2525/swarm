@@ -32,3 +32,4 @@ Optional:
 - Do not reuse tokens that have been exposed. Revoke and rotate immediately if a token ever leaks.
 - Do not track `.env`, runtime state, or any personal data in the canonical repo if you want the mirror to remain safe.
 - If using auto-create, token must have permission to create repositories for the target owner/org.
+- Recommended: add an `Autonomy Health` workflow to alert if schedulers/mirroring are stale or failing.

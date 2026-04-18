@@ -32,7 +32,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           BR="${MIRROR_BRANCH:-${GITHUB_REF_NAME}}"
-          bad="$(git ls-files | egrep -i '(^\.env$|^CREDS\.txt$|^\.keys/|\.pem$|\.key$|phone data|suppression_hashes)' || true)"
+          bad="$(git ls-files | egrep -i '(^\.env$|^CREDS\.txt$|^\.keys/|\.pem$|\.key$|\.p12$|\.pfx$|\.kdbx$|id_rsa$|id_ed25519$|\.sqlite$|\.db$|phone data|suppression_hashes)' || true)"
           if [ -n "$bad" ]; then
             echo "Refusing to mirror: sensitive files are tracked:"
             echo "$bad"

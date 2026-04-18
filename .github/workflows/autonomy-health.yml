@@ -1,0 +1,103 @@
+name: Autonomy Health
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "35 * * * *"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: autonomy-health
+      cancel-in-progress: false
+    env:
+      HEALTH_BRANCH: ${{ vars.HEALTH_BRANCH }}
+      HEALTH_MAX_AGE_HOURS: ${{ vars.HEALTH_MAX_AGE_HOURS }}
+      MIRROR_REPO: ${{ secrets.MIRROR_REPO }}
+      MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+      MIRROR_BRANCH: ${{ secrets.MIRROR_BRANCH }}
+    steps:
+      - name: Check workflow freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          BR="${HEALTH_BRANCH:-release}"
+          MAX_AGE="${HEALTH_MAX_AGE_HOURS:-3}"
+          now_epoch="$(date -u +%s)"
+
+          check_workflow() {
+            wf="$1"
+            url="https://api.github.com/repos/${REPO}/actions/workflows/${wf}/runs?branch=${BR}&per_page=1"
+            json="$(curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "$url")"
+            created="$(echo "$json" | jq -r '.workflow_runs[0].created_at // empty')"
+            status="$(echo "$json" | jq -r '.workflow_runs[0].status // empty')"
+            conclusion="$(echo "$json" | jq -r '.workflow_runs[0].conclusion // empty')"
+            html="$(echo "$json" | jq -r '.workflow_runs[0].html_url // empty')"
+
+            if [ -z "$created" ]; then
+              echo "FAIL: no runs found for ${wf} on branch ${BR}"
+              exit 2
+            fi
+
+            created_epoch="$(date -u -d "$created" +%s)"
+            age_hours="$(( (now_epoch - created_epoch) / 3600 ))"
+
+            echo "${wf}: created_at=${created} age_hours=${age_hours} status=${status} conclusion=${conclusion}"
+            echo "${wf}: url=${html}"
+
+            if [ "$age_hours" -gt "$MAX_AGE" ]; then
+              echo "FAIL: ${wf} is too old (${age_hours}h > ${MAX_AGE}h)"
+              exit 3
+            fi
+            if [ "$status" != "completed" ]; then
+              echo "FAIL: ${wf} latest run not completed"
+              exit 4
+            fi
+            if [ "$conclusion" != "success" ]; then
+              echo "FAIL: ${wf} latest run not successful (conclusion=${conclusion})"
+              exit 5
+            fi
+          }
+
+          check_workflow "autonomous-scheduler.yml"
+          check_workflow "mirror-nd3.yml"
+          check_workflow "safeguarding-scheduler.yml"
+
+      - name: Verify mirror HEAD matches canonical (optional)
+        if: ${{ env.MIRROR_REPO != '' && env.MIRROR_PUSH_TOKEN != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          BR="${HEALTH_BRANCH:-release}"
+          MIRROR_BR="${MIRROR_BRANCH:-${BR}}"
+
+          canon_json="$(curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/git/ref/heads/${BR}")"
+          canon_sha="$(echo "$canon_json" | jq -r '.object.sha // empty')"
+          if [ -z "$canon_sha" ]; then
+            echo "FAIL: could not read canonical ref heads/${BR}"
+            exit 10
+          fi
+
+          mirror_json="$(curl -sS -H "Authorization: Bearer ${MIRROR_PUSH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${MIRROR_REPO}/git/ref/heads/${MIRROR_BR}")"
+          mirror_sha="$(echo "$mirror_json" | jq -r '.object.sha // empty')"
+          if [ -z "$mirror_sha" ]; then
+            echo "FAIL: could not read mirror ref heads/${MIRROR_BR} for ${MIRROR_REPO}"
+            exit 11
+          fi
+
+          echo "canonical=${canon_sha}"
+          echo "mirror=${mirror_sha}"
+          if [ "$canon_sha" != "$mirror_sha" ]; then
+            echo "FAIL: mirror SHA mismatch"
+            exit 12
+          fi
