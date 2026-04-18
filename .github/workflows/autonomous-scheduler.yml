@@ -33,6 +33,8 @@ jobs:
         run: npm run catalogue:ultimate
       - name: Build catalogue (advanced)
         run: npm run catalogue:pdfkit
+      - name: Trust and legitimacy sweep
+        run: node ./scripts/trust-market-agent.mjs
       - name: Sync catalogue PDF into static artifact
         run: node ./scripts/sync-catalogue-to-static.mjs
       - name: Fallback placeholder if missing
