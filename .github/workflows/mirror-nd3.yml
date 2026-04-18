@@ -21,6 +21,8 @@ jobs:
           MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
           MIRROR_REPO: ${{ secrets.MIRROR_REPO }}
           MIRROR_BRANCH: ${{ secrets.MIRROR_BRANCH }}
+          MIRROR_AUTO_CREATE: ${{ vars.MIRROR_AUTO_CREATE }}
+          MIRROR_VISIBILITY: ${{ vars.MIRROR_VISIBILITY }}
         run: |
           if [ -z "$MIRROR_PUSH_TOKEN" ] || [ -z "$MIRROR_REPO" ]; then
             echo "Missing MIRROR_PUSH_TOKEN or MIRROR_REPO secret"
@@ -35,6 +37,39 @@ jobs:
             echo "Refusing to mirror: sensitive files are tracked:"
             echo "$bad"
             exit 2
+          fi
+
+          owner="${MIRROR_REPO%%/*}"
+          repo="${MIRROR_REPO##*/}"
+          check_code="$(curl -sS -o /tmp/mirror_repo_check.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${MIRROR_PUSH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${MIRROR_REPO}")"
+          if [ "$check_code" = "404" ] && [ "${MIRROR_AUTO_CREATE:-false}" = "true" ]; then
+            me="$(curl -sS -H "Authorization: Bearer ${MIRROR_PUSH_TOKEN}" -H "Accept: application/vnd.github+json" https://api.github.com/user | jq -r .login)"
+            vis="${MIRROR_VISIBILITY:-private}"
+            if [ "$vis" = "public" ]; then
+              private_flag=false
+            else
+              private_flag=true
+            fi
+            payload="$(jq -nc --arg n "$repo" --argjson p "$private_flag" '{name:$n, private:$p}')"
+            if [ "$me" = "$owner" ]; then
+              create_url="https://api.github.com/user/repos"
+            else
+              create_url="https://api.github.com/orgs/${owner}/repos"
+            fi
+            create_code="$(curl -sS -o /tmp/mirror_repo_create.json -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${MIRROR_PUSH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "$create_url" \
+              -d "$payload")"
+            if [ "$create_code" != "201" ] && [ "$create_code" != "422" ]; then
+              echo "Mirror repo auto-create failed (HTTP ${create_code})"
+              cat /tmp/mirror_repo_create.json || true
+              exit 6
+            fi
           fi
 
           git remote remove mirror 2>/dev/null || true

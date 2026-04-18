@@ -24,8 +24,11 @@ It refuses to mirror if sensitive files are tracked (guardrail check via `git ls
 
 Optional:
 - `MIRROR_BRANCH`: target branch (default: `main`)
+- `MIRROR_AUTO_CREATE`: `true|false` (default false). If true, workflow attempts to create mirror repo when missing.
+- `MIRROR_VISIBILITY`: `private|public` (default private) used only when auto-create is enabled.
 
 ### Notes
 
 - Do not reuse tokens that have been exposed. Revoke and rotate immediately if a token ever leaks.
 - Do not track `.env`, runtime state, or any personal data in the canonical repo if you want the mirror to remain safe.
+- If using auto-create, token must have permission to create repositories for the target owner/org.
