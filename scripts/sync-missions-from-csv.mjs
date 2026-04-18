@@ -43,8 +43,8 @@ function toObj(headers, cols) {
 	return o;
 }
 
-function getCampaignEntityName() {
-	return process.env.BASE44_CAMPAIGN_ENTITY ?? "Campaign";
+function getMissionEntityName() {
+	return process.env.BASE44_MISSION_ENTITY ?? "Mission";
 }
 
 function parseMaybeJson(s) {
@@ -64,15 +64,15 @@ function parseNumberOrNull(s) {
 	return Number.isFinite(n) ? n : null;
 }
 
-function normalizeAgents(raw) {
+function normalizeIdList(raw) {
 	const parsed = parseMaybeJson(raw);
-	if (Array.isArray(parsed)) return parsed.filter((x) => !!x).map((x) => String(x).trim());
+	if (Array.isArray(parsed)) return parsed.filter(Boolean).map((x) => String(x).trim());
 	const str = String(raw ?? "").trim();
 	if (!str) return [];
 	let candidate = str;
 	if (candidate.startsWith("[") && !candidate.endsWith("]")) candidate = candidate + "]";
 	const tryJson = parseMaybeJson(candidate);
-	if (Array.isArray(tryJson)) return tryJson.filter((x) => !!x).map((x) => String(x).trim());
+	if (Array.isArray(tryJson)) return tryJson.filter(Boolean).map((x) => String(x).trim());
 	const cleaned = candidate.replace(/[[\]"]/g, "");
 	return cleaned
 		.split(/[,;|]/)
@@ -80,23 +80,11 @@ function normalizeAgents(raw) {
 		.filter((x) => x.length > 0);
 }
 
-function normalizeTargetMetrics(raw) {
+function parseJsonOrRawString(raw) {
 	const parsed = parseMaybeJson(raw);
-	if (parsed && typeof parsed === "object") return parsed;
-	const str = String(raw ?? "").trim();
-	if (!str) return null;
-	const cleaned = str.replace(/^\{/, "").replace(/\}$/, "");
-	const parts = cleaned.split(/[,;|]/);
-	const out = {};
-	for (const part of parts) {
-		const segs = part.split(/:/);
-		if (!segs[0]) continue;
-		const k = String(segs[0]).trim();
-		let v = segs.length > 1 ? String(segs.slice(1).join(":")).trim() : null;
-		if (v && /^-?\d+(\.\d+)?$/.test(v)) v = Number(v);
-		out[k] = v;
-	}
-	return Object.keys(out).length ? out : null;
+	if (parsed !== null) return parsed;
+	const t = String(raw ?? "").trim();
+	return t ? t : null;
 }
 
 function shouldWriteOffline() {
@@ -107,9 +95,7 @@ function shouldWriteOffline() {
 async function main() {
 	const args = process.argv.slice(2);
 	const ix = args.indexOf("--in");
-	const inputPath =
-		(ix !== -1 && args[ix + 1]) ||
-		path.join(process.cwd(), "rank", "Campaign_export (5).csv");
+	const inputPath = (ix !== -1 && args[ix + 1]) || path.join(process.cwd(), "archive", "Mission_export.csv");
 	if (!fs.existsSync(inputPath)) {
 		console.error(`Input CSV not found: ${inputPath}`);
 		process.exit(2);
@@ -118,7 +104,7 @@ async function main() {
 	const online = buildBase44ServiceClient({ mode: "online" });
 	const offline = shouldWriteOffline() ? buildBase44Client({ mode: "offline" }) : null;
 
-	const entityName = getCampaignEntityName();
+	const entityName = getMissionEntityName();
 	const onlineEntity = online.asServiceRole.entities[entityName];
 	const offlineEntity = offline ? offline.asServiceRole.entities[entityName] : null;
 
@@ -127,18 +113,19 @@ async function main() {
 	for (const cols of rows) {
 		const r = toObj(headers, cols);
 		const id = r.id?.trim() || null;
-		const agents = normalizeAgents(r.agents);
-		const target_metrics = normalizeTargetMetrics(r.target_metrics);
 		const patch = {
-			name: r.name,
-			description: r.description,
-			target_url: r.target_url,
-			agents,
-			status: r.status || "active",
-			start_date: r.start_date || null,
-			end_date: r.end_date || null,
-			target_metrics,
-			budget: parseNumberOrNull(r.budget),
+			title: r.title,
+			type: r.type,
+			priority: r.priority,
+			status: r.status,
+			assigned_agent_ids: normalizeIdList(r.assigned_agent_ids),
+			mission_parameters: parseJsonOrRawString(r.mission_parameters),
+			progress_data: parseJsonOrRawString(r.progress_data),
+			estimated_duration_hours: parseNumberOrNull(r.estimated_duration_hours),
+			actual_duration_hours: parseNumberOrNull(r.actual_duration_hours),
+			deadline: r.deadline || null,
+			completion_notes: r.completion_notes || null,
+			revenue_generated: parseNumberOrNull(r.revenue_generated),
 		};
 		try {
 			if (id) {
@@ -146,41 +133,24 @@ async function main() {
 				updated++;
 				continue;
 			}
-			let didUpdate = false;
+			let createdRec = null;
 			try {
-				const existing = await onlineEntity.filter(
-					{ name: r.name, target_url: r.target_url },
-					"-created_date",
-					1,
-					0,
-					["id"],
-				);
-				if (Array.isArray(existing) && existing[0]?.id) {
-					await onlineEntity.update(existing[0].id, patch);
-					updated++;
-					didUpdate = true;
-				}
+				createdRec = await onlineEntity.create(patch);
 			} catch {}
-			if (!didUpdate) {
-				let createdRec = null;
-				try {
-					createdRec = await onlineEntity.create(patch);
-				} catch {}
-				if (offlineEntity) {
-					const offlineId =
-						(createdRec && createdRec.id) ? createdRec.id : `offline_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
-					await offlineEntity.create({ ...patch, id: offlineId });
-				}
-				created++;
+			if (offlineEntity) {
+				const offlineId =
+					(createdRec && createdRec.id) ? createdRec.id : `offline_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+				await offlineEntity.create({ ...patch, id: offlineId });
 			}
+			created++;
 		} catch (err) {
-			console.warn("Sync failed for campaign", {
-				name: r.name,
+			console.warn("Sync failed for mission", {
+				title: r.title,
 				error: String(err?.message ?? err),
 			});
 		}
 	}
-	console.log(`Campaign sync completed. Created: ${created}, Updated: ${updated}`);
+	console.log(`Mission sync completed. Created: ${created}, Updated: ${updated}`);
 }
 
 main();

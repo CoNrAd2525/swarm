@@ -19,6 +19,14 @@ import { checkNewBatches } from "./payoneer-watch.mjs";
 import { writeRoutesStatus } from "./routes-status.mjs";
 import { SwarmMemory } from "./shared-memory.mjs";
 
+function statePath(...parts) {
+	return path.resolve(process.env.SWARM_STATE_DIR || "data", ...parts);
+}
+
+function archiveDir() {
+	return path.resolve(process.env.SWARM_ARCHIVE_DIR || "archive");
+}
+
 function parseCsvList(raw) {
 	return String(raw || "")
 		.split(",")
@@ -56,6 +64,17 @@ function ensureDir(p) {
 	if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
 
+function writeBridgeHeartbeat(payload) {
+	const rawDir = process.env.SWARM_BRIDGE_DIR;
+	if (!rawDir) return null;
+	const dir = path.resolve(rawDir);
+	ensureDir(dir);
+	const name = process.env.SWARM_BRIDGE_NAME || "swarm_heartbeat.json";
+	const file = path.join(dir, name);
+	fs.writeFileSync(file, JSON.stringify(payload, null, 2));
+	return file;
+}
+
 function safeJsonRead(file) {
 	try {
 		if (!fs.existsSync(file)) return null;
@@ -68,7 +87,7 @@ function safeJsonRead(file) {
 
 function computeDailyRevenueCurrent() {
 	try {
-		const file = path.resolve("data/financial/settlement_ledger.json");
+		const file = statePath("financial", "settlement_ledger.json");
 		const json = safeJsonRead(file);
 		if (!json || !Array.isArray(json.transactions)) return 0;
 		const start = new Date();
@@ -91,7 +110,7 @@ function computeDailyRevenueCurrent() {
 }
 
 function writeSuccessMetrics({ target, current }) {
-	const dir = path.resolve("data/swarm");
+	const dir = statePath("swarm");
 	ensureDir(dir);
 	const file = path.join(dir, "success_metrics.json");
 	const payload = {
@@ -107,7 +126,7 @@ function writeSuccessMetrics({ target, current }) {
 
 function readBase44ExportMissions() {
 	try {
-		const file = path.resolve("data/base44_export/Mission.json");
+		const file = statePath("base44_export", "Mission.json");
 		if (!fs.existsSync(file)) return [];
 		const txt = fs.readFileSync(file, "utf8");
 		const json = JSON.parse(txt);
@@ -118,7 +137,7 @@ function readBase44ExportMissions() {
 }
 
 function syncBase44Missions() {
-	const missionDir = path.resolve("data/swarm/missions");
+	const missionDir = statePath("swarm", "missions");
 	ensureDir(missionDir);
 	const base44 = readBase44ExportMissions();
 	if (!base44.length) return [];
@@ -179,7 +198,7 @@ function readCsv(filePath) {
 
 function listArchiveMissionCsvs() {
 	try {
-		const dir = path.resolve("archive");
+		const dir = archiveDir();
 		if (!fs.existsSync(dir)) return [];
 		const files = fs
 			.readdirSync(dir)
@@ -208,7 +227,7 @@ function normalizeCsvMission(row) {
 }
 
 function syncArchiveCsvMissions() {
-	const missionDir = path.resolve("data/swarm/missions");
+	const missionDir = statePath("swarm", "missions");
 	ensureDir(missionDir);
 	const files = listArchiveMissionCsvs();
 	if (!files.length) return [];
@@ -256,7 +275,7 @@ function syncArchiveCsvMissions() {
 }
 
 function ensureUpgradeMission() {
-	const missionDir = path.resolve("data/swarm/missions");
+	const missionDir = statePath("swarm", "missions");
 	ensureDir(missionDir);
 	const id = "b44_upgrade_premium";
 	const targetFile = path.join(missionDir, `${id}.json`);
@@ -287,7 +306,7 @@ function ensureUpgradeMission() {
 }
 
 function ensurePhase0BootstrapMission() {
-	const missionDir = path.resolve("data/swarm/missions");
+	const missionDir = statePath("swarm", "missions");
 	ensureDir(missionDir);
 	const id = "INF-001";
 	const targetFile = path.join(missionDir, `${id}.json`);
@@ -333,7 +352,7 @@ function ensurePhase0BootstrapMission() {
 }
 
 function loadAgents() {
-	const dir = path.resolve("data/swarm");
+	const dir = statePath("swarm");
 	const file = path.join(dir, "agents.json");
 	ensureDir(dir);
 	if (!fs.existsSync(file)) return { agents: [], path: file };
@@ -375,22 +394,78 @@ async function runCycle({ memory, replenisher, filePath }) {
 	const synced = syncBase44Missions();
 	const syncedCsv = syncArchiveCsvMissions();
 	let campaigns = { ok: true, output: null };
+	let safeguardingCampaigns = null;
+	let safeguardingMissions = null;
 	try {
+		const inputPath =
+			process.env.SWARM_CAMPAIGNS_CSV ||
+			path.join(process.cwd(), "rank", "Campaign_export (5).csv");
+		const entityName =
+			process.env.SWARM_CAMPAIGN_ENTITY ||
+			process.env.BASE44_CAMPAIGN_ENTITY ||
+			"Campaign";
 		const cs = spawnSync(
 			process.execPath,
 			[
 				"scripts/sync-campaigns-from-csv.mjs",
 				"--in",
-				path.join(process.cwd(), "rank", "Campaign_export (5).csv"),
+				inputPath,
 			],
 			{
 				cwd: process.cwd(),
 				encoding: "utf8",
+				env: { ...process.env, BASE44_CAMPAIGN_ENTITY: entityName },
 			},
 		);
 		campaigns.output = (cs.stdout || "").trim();
 	} catch {
 		campaigns = { ok: false };
+	}
+	try {
+		const inputPath = process.env.SWARM_SAFEGUARDING_CAMPAIGNS_CSV;
+		if (inputPath) {
+			const entityName =
+				process.env.SWARM_SAFEGUARDING_CAMPAIGN_ENTITY ||
+				"SafeguardingCampaign";
+			const cs = spawnSync(
+				process.execPath,
+				["scripts/sync-campaigns-from-csv.mjs", "--in", inputPath],
+				{
+					cwd: process.cwd(),
+					encoding: "utf8",
+					env: { ...process.env, BASE44_CAMPAIGN_ENTITY: entityName },
+				},
+			);
+			safeguardingCampaigns = {
+				ok: cs.status === 0,
+				output: (cs.stdout || "").trim(),
+			};
+		}
+	} catch {
+		safeguardingCampaigns = { ok: false, output: null };
+	}
+	try {
+		const inputPath = process.env.SWARM_SAFEGUARDING_MISSIONS_CSV;
+		if (inputPath) {
+			const entityName =
+				process.env.SWARM_SAFEGUARDING_MISSION_ENTITY ||
+				"SafeguardingMission";
+			const ms = spawnSync(
+				process.execPath,
+				["scripts/sync-missions-from-csv.mjs", "--in", inputPath],
+				{
+					cwd: process.cwd(),
+					encoding: "utf8",
+					env: { ...process.env, BASE44_MISSION_ENTITY: entityName },
+				},
+			);
+			safeguardingMissions = {
+				ok: ms.status === 0,
+				output: (ms.stdout || "").trim(),
+			};
+		}
+	} catch {
+		safeguardingMissions = { ok: false, output: null };
 	}
 	let payoutPromotion = { ok: true, output: null };
 	try {
@@ -455,7 +530,7 @@ async function runCycle({ memory, replenisher, filePath }) {
 		windowDays: Number(process.env.POSP_WINDOW_DAYS ?? "30") || 30,
 	});
 	const proofPath = writePospProof(posp);
-	const missionDir = path.resolve("data/swarm/missions");
+	const missionDir = statePath("swarm", "missions");
 	try {
 		const idxPath = path.join(missionDir, "index.json");
 		if (fs.existsSync(idxPath)) {
@@ -475,6 +550,19 @@ async function runCycle({ memory, replenisher, filePath }) {
 	} catch {}
 	const current = computeDailyRevenueCurrent();
 	const metricsFile = writeSuccessMetrics({ target: 1500, current });
+	const bridgeFile = writeBridgeHeartbeat({
+		at: new Date().toISOString(),
+		instance_id: holder,
+		profile: process.env.SWARM_PROFILE || null,
+		state_dir: process.env.SWARM_STATE_DIR || "data",
+		archive_dir: process.env.SWARM_ARCHIVE_DIR || "archive",
+		imported_base44_missions: Array.isArray(synced) ? synced.length : 0,
+		imported_csv_missions: Array.isArray(syncedCsv) ? syncedCsv.length : 0,
+		safeguarding_campaigns_ok:
+			(safeguardingCampaigns && safeguardingCampaigns.ok) ?? null,
+		safeguarding_missions_ok:
+			(safeguardingMissions && safeguardingMissions.ok) ?? null,
+	});
 	const newsSources = [
 		"https://www.techuk.org/resource/new-ico-tech-futures-report-on-agentic-ai-opportunities-and-considerations.html",
 		"https://securityboulevard.com/2026/01/bodysnatcher-cve-2025-12420-a-broken-authentication-and-agentic-hijacking-vulnerability-in-servicenow/",
@@ -552,6 +640,8 @@ async function runCycle({ memory, replenisher, filePath }) {
 		replenish: rep,
 		revenue: rev,
 		campaigns_sync: campaigns,
+		safeguarding_campaigns_sync: safeguardingCampaigns,
+		safeguarding_missions_sync: safeguardingMissions,
 		payout_promotion: payoutPromotion,
 		base44_upgrade: upgrade,
 		base44_upgrade_mission_id: upgradeMissionId,
@@ -566,6 +656,7 @@ async function runCycle({ memory, replenisher, filePath }) {
 		mission_plan_file: missionPlanPath,
 		mission_deploy: missionDeploy,
 		success_metrics_file: metricsFile,
+		bridge_file: bridgeFile,
 		at: new Date().toISOString(),
 	};
 	console.log(JSON.stringify(out));

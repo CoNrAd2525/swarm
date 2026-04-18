@@ -1,0 +1,47 @@
+name: Safeguarding Scheduler
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 * * * *"
+permissions:
+  contents: read
+jobs:
+  safeguarding-sync:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: safeguarding-scheduler
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - name: Sync safeguarding campaigns (if CSV exists)
+        env:
+          SWARM_LIVE: "true"
+          BASE44_OFFLINE: "false"
+          BASE44_WRITE_OFFLINE: "false"
+          BASE44_CAMPAIGN_ENTITY: ${{ vars.SWARM_SAFEGUARDING_CAMPAIGN_ENTITY || 'SafeguardingCampaign' }}
+          SAFEGUARDING_CAMPAIGNS_CSV: ${{ vars.SWARM_SAFEGUARDING_CAMPAIGNS_CSV || 'rank/Safeguarding_Campaign_export.csv' }}
+        run: |
+          if [ -f "$SAFEGUARDING_CAMPAIGNS_CSV" ]; then
+            node ./scripts/sync-campaigns-from-csv.mjs --in "$SAFEGUARDING_CAMPAIGNS_CSV"
+          else
+            echo "No safeguarding campaigns CSV found at $SAFEGUARDING_CAMPAIGNS_CSV"
+          fi
+      - name: Sync safeguarding missions (if CSV exists)
+        env:
+          SWARM_LIVE: "true"
+          BASE44_OFFLINE: "false"
+          BASE44_WRITE_OFFLINE: "false"
+          BASE44_MISSION_ENTITY: ${{ vars.SWARM_SAFEGUARDING_MISSION_ENTITY || 'SafeguardingMission' }}
+          SAFEGUARDING_MISSIONS_CSV: ${{ vars.SWARM_SAFEGUARDING_MISSIONS_CSV || 'rank/Safeguarding_Mission_export.csv' }}
+        run: |
+          if [ -f "$SAFEGUARDING_MISSIONS_CSV" ]; then
+            node ./scripts/sync-missions-from-csv.mjs --in "$SAFEGUARDING_MISSIONS_CSV"
+          else
+            echo "No safeguarding missions CSV found at $SAFEGUARDING_MISSIONS_CSV"
+          fi

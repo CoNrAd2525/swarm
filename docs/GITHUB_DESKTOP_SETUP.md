@@ -7,7 +7,7 @@ Use GitHub Desktop to commit/push safely, and use GitHub repository secrets (not
 ## GitHub Desktop workflow (recommended)
 
 1. Open GitHub Desktop.
-2. Add local repository: `repo-git2`.
+2. Add local repository: `swarm-repo` (or `repo-git2` if that is your canonical remote).
 3. Ensure the current branch is `master` for development and `release` for deployment triggers.
 4. Review changes, commit with a clear message, and push.
 5. If you need to deploy, fast-forward `release` to the same commit as `master` and push `release`.

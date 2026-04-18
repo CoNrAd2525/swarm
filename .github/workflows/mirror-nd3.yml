@@ -1,0 +1,69 @@
+name: Mirror to Nouveau-dossier-3-
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "20 * * * *"
+permissions:
+  contents: read
+jobs:
+  mirror:
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == 'main' || github.ref_name == 'master' || github.ref_name == 'release'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: mirror-nd3
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Push full repo mirror
+        env:
+          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+          MIRROR_REPO: ${{ secrets.MIRROR_REPO }}
+          MIRROR_BRANCH: ${{ secrets.MIRROR_BRANCH }}
+        run: |
+          if [ -z "$MIRROR_PUSH_TOKEN" ] || [ -z "$MIRROR_REPO" ]; then
+            echo "Missing MIRROR_PUSH_TOKEN or MIRROR_REPO secret"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BR="${MIRROR_BRANCH:-${GITHUB_REF_NAME}}"
+          bad="$(git ls-files | egrep -i '(^\.env$|^CREDS\.txt$|^\.keys/|\.pem$|\.key$|phone data|suppression_hashes)' || true)"
+          if [ -n "$bad" ]; then
+            echo "Refusing to mirror: sensitive files are tracked:"
+            echo "$bad"
+            exit 2
+          fi
+
+          git remote remove mirror 2>/dev/null || true
+          git remote add mirror "https://x-access-token:${MIRROR_PUSH_TOKEN}@github.com/${MIRROR_REPO}.git"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          ok=0
+          for attempt in 1 2 3; do
+            echo "Mirror push attempt ${attempt}/3"
+            if git push --force mirror "HEAD:${BR}"; then
+              ok=1
+              break
+            fi
+            sleep $((attempt * 5))
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "Mirror push failed after retries"
+            exit 3
+          fi
+
+          remote_sha="$(git ls-remote mirror "refs/heads/${BR}" | awk '{print $1}' | head -n 1)"
+          if [ -z "$remote_sha" ]; then
+            echo "Mirror verification failed: could not read remote ref"
+            exit 4
+          fi
+          if [ "$remote_sha" != "$HEAD_SHA" ]; then
+            echo "Mirror verification failed: remote SHA mismatch"
+            echo "expected=$HEAD_SHA"
+            echo "actual=$remote_sha"
+            exit 5
+          fi
+
+          git push --force --tags mirror || true

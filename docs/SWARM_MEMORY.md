@@ -19,6 +19,17 @@ Config:
 - `SWARM_MISSION_IMPORT_STATUSES` (default: `deployed,pending`)
 - `SWARM_MISSION_IMPORT_CATEGORIES` (default includes `infrastructure,market_research,store_setup,financial_setup,marketing,operations,content_creation`)
 
+### Compartmentalized Ops Profiles (Safeguarding)
+
+- Supervisor state and archive imports can be isolated per-profile:
+  - `SWARM_STATE_DIR` (default: `data`)
+  - `SWARM_ARCHIVE_DIR` (default: `archive`)
+- Dedicated safeguarding entity sync is supported (optional):
+  - `SWARM_SAFEGUARDING_CAMPAIGNS_CSV` + `SWARM_SAFEGUARDING_CAMPAIGN_ENTITY` (default: `SafeguardingCampaign`)
+  - `SWARM_SAFEGUARDING_MISSIONS_CSV` + `SWARM_SAFEGUARDING_MISSION_ENTITY` (default: `SafeguardingMission`)
+- Semi-linked monitoring without cross-domain data mixing:
+  - `SWARM_BRIDGE_DIR` writes a minimal heartbeat JSON (counts + ok flags only)
+
 ## Architecture
 
 ### Core Components

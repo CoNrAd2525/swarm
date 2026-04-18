@@ -19,10 +19,15 @@ backups/snapshot_*/
 backups/mirror/
 data/locks/
 data/swarm/
+data_safeguarding/
+archive_safeguarding/
+data/bridge/
 data/base44_export/offline-store-backup.json
 data/financial/settlement_ledger.json
 data/classroom/
 data/plaid/
+suppression_hashes*.txt
+*Phone Data*.txt
 test_*.js
 test_*.mjs
 node_modules/

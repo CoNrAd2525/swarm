@@ -247,11 +247,46 @@ async function ensureSchemaBootstrap() {
 					{ name: "payout_item_id", type: "text", required: false },
 				],
 	};
+	const safeguardingCampaign = {
+		name: "SafeguardingCampaign",
+		description: "Compartmentalized safeguarding campaigns",
+		fields: [
+			{ name: "name", type: "text", required: true },
+			{ name: "description", type: "text", required: false },
+			{ name: "target_url", type: "text", required: false },
+			{ name: "agents", type: "json", required: false },
+			{ name: "status", type: "text", required: false },
+			{ name: "start_date", type: "text", required: false },
+			{ name: "end_date", type: "text", required: false },
+			{ name: "target_metrics", type: "json", required: false },
+			{ name: "budget", type: "number", required: false },
+		],
+	};
+	const safeguardingMission = {
+		name: "SafeguardingMission",
+		description: "Compartmentalized safeguarding missions",
+		fields: [
+			{ name: "title", type: "text", required: true },
+			{ name: "type", type: "text", required: false },
+			{ name: "priority", type: "text", required: false },
+			{ name: "status", type: "text", required: false },
+			{ name: "assigned_agent_ids", type: "json", required: false },
+			{ name: "mission_parameters", type: "json", required: false },
+			{ name: "progress_data", type: "json", required: false },
+			{ name: "estimated_duration_hours", type: "number", required: false },
+			{ name: "actual_duration_hours", type: "number", required: false },
+			{ name: "deadline", type: "text", required: false },
+			{ name: "completion_notes", type: "text", required: false },
+			{ name: "revenue_generated", type: "number", required: false },
+		],
+	};
 	const ok1 = await ensureSchema("RevenueEvent", revenue);
 	const ok2 = await ensureSchema("PayoutBatch", batch);
 	const ok3 = await ensureSchema("PayoutItem", item);
 	const ok4 = await ensureSchema("TransactionLog", tx);
-	return ok1 && ok2 && ok3 && ok4;
+	const ok5 = await ensureSchema("SafeguardingCampaign", safeguardingCampaign);
+	const ok6 = await ensureSchema("SafeguardingMission", safeguardingMission);
+	return ok1 && ok2 && ok3 && ok4 && ok5 && ok6;
 }
 function startWebhookServer() {
 	if (!envTrue(process.env.BASE44_ENABLE_PAYOUT_LEDGER_WRITE)) return null;

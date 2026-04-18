@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-04-17]
+- feat(swarm): Added SWARM_STATE_DIR and SWARM_ARCHIVE_DIR to isolate supervisor state and imports for compartmentalized ops profiles
+- feat(swarm): Added optional safeguarding campaign sync (separate Base44 entity + CSV path) for dedicated child-safeguarding initiatives
+- feat(swarm): Added optional safeguarding mission sync (separate Base44 entity + CSV path) via new scripts/sync-missions-from-csv.mjs
+- feat(ops): Added minimal bridge heartbeat file output for semi-linked monitoring without cross-domain data mixing
+- feat(base44): Auto-bootstrapped SafeguardingCampaign and SafeguardingMission entities during schema bootstrap
+- chore(base44): Added BASE44_WRITE_OFFLINE flag to disable offline mirror writes during CSV sync
+
 ## [2026-03-31]
 - feat(security): Added automated secrets scan + rotation checklist and policy status outputs
 - feat(payments): Enforced hands-free settlement gating based on security posture and Plaid readiness

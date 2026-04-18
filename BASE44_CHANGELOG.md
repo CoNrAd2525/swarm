@@ -1,5 +1,13 @@
 # Base44 App Update Changelogs
 
+## Version 2026.04.17 - Compartmentalized Safeguarding Ops
+
+### 🔒 Separation & Control
+- Added supervisor state isolation via `SWARM_STATE_DIR` and `SWARM_ARCHIVE_DIR` to keep safeguarding ops separate from revenue/shop activities
+- Added dedicated Base44 entity sync for safeguarding campaigns and missions (CSV-driven, entity names configurable)
+- Added a minimal heartbeat bridge for semi-linked monitoring (metrics-only)
+- Added `BASE44_WRITE_OFFLINE` to disable offline mirror writes during CSV sync when operating live-only
+
 ## Version 2026.02.25 - Base44 Coordination & Owner Directive Validation
 
 ### 🚀 Deployment
