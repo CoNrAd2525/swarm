@@ -23,6 +23,8 @@ jobs:
         run: npm run swarm:add:agents
       - name: Headhunter discovery
         run: npm run swarm:headhunter:once
+      - name: Seed revenue missions
+        run: node ./scripts/seed-revenue-missions.mjs
       - name: Deploy pending missions
         run: node ./scripts/deploy-missions.mjs
       - name: Autonomous once
@@ -60,6 +62,8 @@ jobs:
         run: npm run catalogue:pdfkit
       - name: Trust and legitimacy sweep
         run: node ./scripts/trust-market-agent.mjs
+      - name: Generate multilingual course pages
+        run: node ./scripts/generate-multilang-courses.mjs
       - name: Sync catalogue PDF into static artifact
         run: node ./scripts/sync-catalogue-to-static.mjs
       - name: Fallback placeholder if missing
