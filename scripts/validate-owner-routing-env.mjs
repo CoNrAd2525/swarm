@@ -56,6 +56,27 @@ function main() {
 		}
 	}
 
+	// Wise
+	if (cfg.settlement_priority.includes("wise")) {
+		const w = cfg.creds.wise;
+		out.checks.push(ok("WISE_ENABLE", w.enabled));
+		out.checks.push(
+			ok(
+				"WISE_ENVIRONMENT",
+				String(process.env.WISE_ENVIRONMENT || "").toLowerCase() === "live",
+			),
+		);
+		out.checks.push(ok("WISE_API_KEY", has(process.env.WISE_API_KEY)));
+		out.checks.push(ok("OWNER_WISE_EMAIL", has(w.email)));
+	}
+
+	// Google Pay
+	if (cfg.settlement_priority.includes("googlepay")) {
+		const g = cfg.creds.googlepay;
+		out.checks.push(ok("GOOGLEPAY_ENABLE", g.enabled));
+		out.checks.push(ok("OWNER_GOOGLEPAY_EMAIL", has(g.email)));
+	}
+
 	// Payoneer API
 	if (cfg.settlement_priority.includes("payoneer")) {
 		const p = cfg.creds.payoneer;

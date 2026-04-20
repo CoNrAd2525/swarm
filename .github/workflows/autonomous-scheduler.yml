@@ -29,6 +29,19 @@ jobs:
         run: npm run autonomous:once
       - name: Health readiness ping
         run: npm run live:readiness:ping
+      - name: Owner routing env validation
+        run: node ./scripts/validate-owner-routing-env.mjs
+      - name: Bank reconciliation (Plaid) - auto confirm
+        run: node ./scripts/auto-confirm-bank-settlements.mjs
+      - name: Owner hands-free settlement cycle (optional)
+        env:
+          OWNER_SETTLEMENT_AUTORUN: ${{ vars.OWNER_SETTLEMENT_AUTORUN }}
+        run: |
+          if [ "${OWNER_SETTLEMENT_AUTORUN:-false}" = "true" ]; then
+            node ./scripts/auto-settle-owner-daemon.mjs --once
+          else
+            echo "OWNER_SETTLEMENT_AUTORUN disabled"
+          fi
       - name: Build catalogue (ultimate)
         run: npm run catalogue:ultimate
       - name: Build catalogue (advanced)
