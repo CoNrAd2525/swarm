@@ -32,13 +32,25 @@ jobs:
       - name: Owner routing env validation
         run: node ./scripts/validate-owner-routing-env.mjs
       - name: Bank reconciliation (Plaid) - auto confirm
-        run: node ./scripts/auto-confirm-bank-settlements.mjs
+        id: bank_reconcile
+        run: |
+          out="$(node ./scripts/auto-confirm-bank-settlements.mjs)"
+          echo "$out"
+          confirmed="$(echo "$out" | jq -r '.confirmed // 0' 2>/dev/null || echo 0)"
+          if [ -z "$confirmed" ] || [ "$confirmed" = "null" ]; then
+            confirmed=0
+          fi
+          echo "confirmed=$confirmed" >> "$GITHUB_OUTPUT"
       - name: Owner hands-free settlement cycle (optional)
         env:
           OWNER_SETTLEMENT_AUTORUN: ${{ vars.OWNER_SETTLEMENT_AUTORUN }}
         run: |
           if [ "${OWNER_SETTLEMENT_AUTORUN:-false}" = "true" ]; then
-            node ./scripts/auto-settle-owner-daemon.mjs --once
+            if [ "${{ steps.bank_reconcile.outputs.confirmed }}" -gt 0 ]; then
+              node ./scripts/auto-settle-owner-daemon.mjs --once
+            else
+              echo "No confirmed incomings detected; skipping owner settlement cycle"
+            fi
           else
             echo "OWNER_SETTLEMENT_AUTORUN disabled"
           fi
