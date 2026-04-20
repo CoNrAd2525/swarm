@@ -16,9 +16,18 @@ function nowIso() {
 	return new Date().toISOString();
 }
 
+function parseLocales() {
+	const raw = String(process.env.RWC_COURSE_LOCALES || process.env.COURSES_LOCALES || "")
+		.split(",")
+		.map((s) => s.trim().toLowerCase())
+		.filter(Boolean);
+	return raw.length ? raw : ["fr", "es", "ar", "de", "it"];
+}
+
 function main() {
 	const missionDir = path.resolve("data", "swarm", "missions");
 	ensureDir(missionDir);
+	const locales = parseLocales();
 
 	const baseGuardrails = {
 		no_spam: true,
@@ -33,14 +42,14 @@ function main() {
 	const missions = [
 		{
 			id: "REV-001",
-			title: "Localized funnels: publish FR/ES/AR course pages and track conversions",
+			title: "Localized funnels: publish multilingual course pages and track conversions",
 			channel: "marketing",
 			priority: "high",
 			status: "pending",
 			data: {
 				mission_parameters: JSON.stringify({
 					task: "localized_funnels",
-					locales: ["fr", "es", "ar"],
+					locales,
 					objectives: [
 						"publish_language_course_pages",
 						"add_language_links_on_courses_page",
@@ -60,7 +69,7 @@ function main() {
 			data: {
 				mission_parameters: JSON.stringify({
 					task: "multilang_content_factory",
-					locales: ["fr", "es", "ar"],
+					locales,
 					objectives: [
 						"publish_one_article_per_locale_per_week",
 						"focus_on_exam_strategy_and_real_world_skills",

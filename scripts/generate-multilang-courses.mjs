@@ -31,6 +31,14 @@ function getDomain() {
 	return a || b || "realworldcerts.com";
 }
 
+function parseLocales() {
+	const raw = String(process.env.RWC_COURSE_LOCALES || process.env.COURSES_LOCALES || "")
+		.split(",")
+		.map((s) => s.trim().toLowerCase())
+		.filter(Boolean);
+	return raw.length ? raw : ["fr", "es", "ar", "de", "it"];
+}
+
 const catalog = [
 	{
 		sku: "cybersecurity-foundations",
@@ -265,11 +273,43 @@ const i18n = {
 		what_learn: "ماذا ستتعلم",
 		outline: "المحتوى",
 	},
-};
-
-const translations = {
-	fr: {
-		"Cybersecurity Foundations — IAM & Threat Modeling": "أساسيات الأمن السيبراني — إدارة الهوية والصلاحيات ونمذجة التهديدات",
+	de: {
+		lang: "de",
+		dir: "ltr",
+		brand_sub: "Kurse & Ressourcen",
+		courses: "Kurse",
+		payments: "Zahlung",
+		support: "Support",
+		how_access: "So funktioniert der Zugriff",
+		access_p1:
+			"Nach der Zahlung erhältst du per E‑Mail die Zugriff-Links (Google Drive) und alle enthaltenen Materialien.",
+		access_p2:
+			"Brauchst du Hilfe oder Team‑Preise? Kontaktiere den Support.",
+		go_payments: "Zu den Zahlungen",
+		buy: "Kaufen",
+		details: "Details",
+		course_details: "Kursdetails",
+		what_learn: "Das lernst du",
+		outline: "Inhalt",
+	},
+	it: {
+		lang: "it",
+		dir: "ltr",
+		brand_sub: "Corsi e risorse",
+		courses: "Corsi",
+		payments: "Pagamenti",
+		support: "Supporto",
+		how_access: "Come funziona l’accesso",
+		access_p1:
+			"Dopo il pagamento ricevi via email i link di accesso (Google Drive) e i materiali inclusi.",
+		access_p2:
+			"Hai bisogno di aiuto o prezzi per team? Contatta il supporto.",
+		go_payments: "Vai ai pagamenti",
+		buy: "Acquista",
+		details: "Dettagli",
+		course_details: "Dettagli del corso",
+		what_learn: "Cosa imparerai",
+		outline: "Programma",
 	},
 };
 
@@ -343,6 +383,52 @@ function translateCourseTitle(locale, titleEn) {
 		};
 		return map[titleEn] || titleEn;
 	}
+	if (locale === "de") {
+		const map = {
+			"Cybersecurity Foundations — IAM & Threat Modeling":
+				"Cybersecurity Grundlagen — IAM & Bedrohungsmodellierung",
+			"Networking Essentials — DNS, HTTPS, CDN":
+				"Netzwerk‑Grundlagen — DNS, HTTPS, CDN",
+			"Business Analytics — Excel, SQL & Dashboards":
+				"Business Analytics — Excel, SQL & Dashboards",
+			"Legal Research with GenAI — Citations & Bluebook Basics":
+				"Juristische Recherche mit GenAI — Zitate & Bluebook Grundlagen",
+			"Project Management — Sprint Planning & Risk Logs":
+				"Projektmanagement — Sprintplanung & Risikologs",
+			"Mock Exam — Fundamentals (Timed)":
+				"Probeprüfung — Grundlagen (zeitlich)",
+			"Mock Exam — Professional (Advanced)":
+				"Probeprüfung — Professional (fortgeschritten)",
+			"Mock Marathon — Three Exams Series":
+				"Mock‑Marathon — Serie aus drei Prüfungen",
+			"Enterprise Team Pack — Multi‑track Access":
+				"Enterprise Team Pack — Multi‑Track Zugriff",
+		};
+		return map[titleEn] || titleEn;
+	}
+	if (locale === "it") {
+		const map = {
+			"Cybersecurity Foundations — IAM & Threat Modeling":
+				"Fondamenti di cybersecurity — IAM e threat modeling",
+			"Networking Essentials — DNS, HTTPS, CDN":
+				"Fondamenti di networking — DNS, HTTPS, CDN",
+			"Business Analytics — Excel, SQL & Dashboards":
+				"Business analytics — Excel, SQL e dashboard",
+			"Legal Research with GenAI — Citations & Bluebook Basics":
+				"Ricerca legale con GenAI — citazioni e basi Bluebook",
+			"Project Management — Sprint Planning & Risk Logs":
+				"Project management — sprint e registro rischi",
+			"Mock Exam — Fundamentals (Timed)":
+				"Simulazione — fondamentali (cronometrata)",
+			"Mock Exam — Professional (Advanced)":
+				"Simulazione — professional (avanzata)",
+			"Mock Marathon — Three Exams Series":
+				"Maratona mock — serie di tre prove",
+			"Enterprise Team Pack — Multi‑track Access":
+				"Pacchetto team enterprise — accesso multi‑percorso",
+		};
+		return map[titleEn] || titleEn;
+	}
 	return titleEn;
 }
 
@@ -413,6 +499,36 @@ function translateShort(locale, text) {
 				"ثلاث اختبارات متتالية مع صعوبة متدرجة.",
 			"Team bundle with business+tech tracks, templates, and support.":
 				"حزمة للفرق تشمل مسارات أعمال وتقنية وقوالب ودعم.",
+		};
+		return map[text] || text;
+	}
+	if (locale === "de") {
+		const map = {
+			"Access control, identity & policy, threat modeling, secure workflows.":
+				"Zugriffskontrolle, Identität & Policies, Bedrohungsmodellierung, sichere Workflows.",
+			"Hands‑on fundamentals for DNS, TLS/HTTPS, caching/CDNs and status codes.":
+				"Praxis‑Grundlagen zu DNS, TLS/HTTPS, Caching/CDNs und Statuscodes.",
+			"Data cleaning, pivot tables, SQL queries, and executive dashboards.":
+				"Datenbereinigung, Pivot‑Tabellen, SQL‑Abfragen und Management‑Dashboards.",
+			"Responsible AI assistance, citation hygiene, Bluebook overview.":
+				"Verantwortungsvoller KI‑Einsatz, Zitierhygiene, Bluebook‑Überblick.",
+			"Agile sprints, burndown charts, risk registers and stakeholder updates.":
+				"Agile Sprints, Burndown, Risikoregister und Stakeholder‑Updates.",
+		};
+		return map[text] || text;
+	}
+	if (locale === "it") {
+		const map = {
+			"Access control, identity & policy, threat modeling, secure workflows.":
+				"Controllo accessi, identità e policy, threat modeling, workflow sicuri.",
+			"Hands‑on fundamentals for DNS, TLS/HTTPS, caching/CDNs and status codes.":
+				"Fondamenti pratici di DNS, TLS/HTTPS, caching/CDN e codici di stato.",
+			"Data cleaning, pivot tables, SQL queries, and executive dashboards.":
+				"Pulizia dati, tabelle pivot, query SQL e dashboard executive.",
+			"Responsible AI assistance, citation hygiene, Bluebook overview.":
+				"Uso responsabile dell’IA, igiene delle citazioni, panoramica Bluebook.",
+			"Agile sprints, burndown charts, risk registers and stakeholder updates.":
+				"Sprint Agile, burndown, registro rischi e aggiornamenti stakeholder.",
 		};
 		return map[text] || text;
 	}
@@ -971,10 +1087,25 @@ function pageShell({ locale, title, canonicalUrl, body }) {
 
 function buildCoursesListPage({ locale, domain }) {
 	const t = i18n[locale];
+	const localeLabels = {
+		fr: "Français",
+		es: "Español",
+		ar: "العربية",
+		de: "Deutsch",
+		it: "Italiano",
+	};
+	const locales = parseLocales().filter((l) => l in i18n);
+	const links = [
+		`<a class="btn secondary" href="/courses.html">English</a>`,
+		...locales.map(
+			(l) =>
+				`<a class="btn secondary" href="/courses.${l}.html">${escapeHtml(localeLabels[l] || l)}</a>`,
+		),
+	].join(" ");
 	const langBar = [
 		"<div class=\"card\">",
 		"<h2>Languages</h2>",
-		"<p><a class=\"btn secondary\" href=\"/courses.html\">English</a> <a class=\"btn secondary\" href=\"/courses.fr.html\">Français</a> <a class=\"btn secondary\" href=\"/courses.es.html\">Español</a> <a class=\"btn secondary\" href=\"/courses.ar.html\">العربية</a></p>",
+		`<p>${links}</p>`,
 		"</div>",
 	].join("\n");
 	const access = [
@@ -1118,7 +1249,7 @@ function main() {
 	const coursesDir = path.join(rankOut, "courses");
 	ensureDir(coursesDir);
 
-	const locales = ["fr", "es", "ar"];
+	const locales = parseLocales().filter((l) => l in i18n);
 	const written = [];
 
 	for (const locale of locales) {
