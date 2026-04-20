@@ -84,9 +84,32 @@ function getOpenAiModel() {
 	return String(process.env.OPENAI_MODEL || "").trim() || "gpt-4o-mini";
 }
 
+function getOpenRouterKey() {
+	return (
+		String(process.env.OPENROUTER_API_KEY || "").trim() ||
+		String(process.env.OPENROUTER_KEY || "").trim()
+	);
+}
+
+function getOpenRouterModel() {
+	return String(process.env.OPENROUTER_MODEL || "").trim() || "openai/gpt-4o-mini";
+}
+
+function llmProvider() {
+	if (getOpenRouterKey()) return "openrouter";
+	if (getOpenAiKey()) return "openai";
+	return "none";
+}
+
+function llmModel() {
+	if (llmProvider() === "openrouter") return getOpenRouterModel();
+	if (llmProvider() === "openai") return getOpenAiModel();
+	return null;
+}
+
 function translationEnabled() {
-	const key = getOpenAiKey();
-	if (!key) return false;
+	const provider = llmProvider();
+	if (provider === "none") return false;
 	const v = String(process.env.RWC_ENABLE_LLM_TRANSLATION || "").trim().toLowerCase();
 	if (!v) return false;
 	return v === "true" || v === "1" || v === "yes";
@@ -155,12 +178,55 @@ async function translateViaOpenAi({ locale, text }) {
 	return String(out ?? "").trim();
 }
 
+async function translateViaOpenRouter({ locale, text }) {
+	const apiKey = getOpenRouterKey();
+	const model = getOpenRouterModel();
+	const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${apiKey}`,
+			"Content-Type": "application/json",
+			"HTTP-Referer": String(process.env.SITE_URL || process.env.SITE_DOMAIN || "https://realworldcerts.com"),
+			"X-Title": "realworldcerts-i18n",
+		},
+		body: JSON.stringify({
+			model,
+			temperature: 0.2,
+			messages: [
+				{
+					role: "system",
+					content:
+						"Translate the user text into the requested language. Preserve meaning, structure, and product names. Do not add claims, certifications, numbers, or extra content. Output only the translation.",
+				},
+				{
+					role: "user",
+					content: `LANG=${locale}\nTEXT=${text}`,
+				},
+			],
+		}),
+	});
+	if (!r.ok) {
+		const t = await r.text();
+		throw new Error(`openrouter_http_${r.status}:${t.slice(0, 200)}`);
+	}
+	const json = await r.json();
+	const out = json?.choices?.[0]?.message?.content;
+	return String(out ?? "").trim();
+}
+
+async function translateViaLlm({ locale, text }) {
+	const provider = llmProvider();
+	if (provider === "openrouter") return translateViaOpenRouter({ locale, text });
+	if (provider === "openai") return translateViaOpenAi({ locale, text });
+	return null;
+}
+
 async function translateText({ locale, text, cache, useLlm, budget }) {
 	const key = hashKey(locale, text);
 	if (cache[key]) return cache[key];
 	if (!useLlm) return null;
 	if (budget.used >= budget.max) return null;
-	const t = await translateViaOpenAi({ locale, text });
+	const t = await translateViaLlm({ locale, text });
 	if (!t) return null;
 	budget.used += 1;
 	const violations = translationPolicyViolations(t);
@@ -1576,7 +1642,8 @@ async function main() {
 				sitemap: sm,
 				translation: useLlm
 					? {
-							model: getOpenAiModel(),
+							provider: llmProvider(),
+							model: llmModel(),
 							calls_used: budgetInfo.used,
 							calls_max: budgetInfo.max,
 							violations: budgetInfo.violations.length,
