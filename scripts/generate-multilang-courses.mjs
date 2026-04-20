@@ -92,6 +92,35 @@ function translationEnabled() {
 	return v === "true" || v === "1" || v === "yes";
 }
 
+function translationMaxCalls() {
+	const raw = String(process.env.RWC_TRANSLATION_MAX_CALLS_PER_RUN || "").trim();
+	const n = raw ? Number(raw) : 120;
+	return Number.isFinite(n) && n >= 0 ? n : 120;
+}
+
+function translationPolicyViolations(text) {
+	const t = String(text || "").toLowerCase();
+	const patterns = [
+		/accredited|accreditation|official certification|officially certified|guaranteed job|guaranteed hire/i,
+		/accr[ée]dit[ée]|\bcertification officielle\b|\bemploi garanti\b|\bembauche garantie\b/i,
+		/acreditad[oa]|\bcertificaci[oó]n oficial\b|\btrabajo garantizado\b|\bcontrataci[oó]n garantizada\b/i,
+		/معتمد|اعتماد|شهادة رسمية|وظيفة مضمونة|توظيف مضمون/i,
+		/akkreditiert|amtliche zertifizierung|job garantiert|garantierte einstellung/i,
+		/accreditat[oa]|certificazione ufficiale|lavoro garantito|assunzione garantita/i,
+	];
+	return patterns.filter((re) => re.test(t)).map((re) => String(re));
+}
+
+function looksUntranslated(locale, source, translated) {
+	const l = normalizeLocale(locale);
+	if (l === "en") return false;
+	const s = String(source ?? "").trim();
+	const t = String(translated ?? "").trim();
+	if (!s || !t) return true;
+	if (t === s && s.length >= 12) return true;
+	return false;
+}
+
 async function translateViaOpenAi({ locale, text }) {
 	const apiKey = getOpenAiKey();
 	const model = getOpenAiModel();
@@ -126,12 +155,23 @@ async function translateViaOpenAi({ locale, text }) {
 	return String(out ?? "").trim();
 }
 
-async function translateText({ locale, text, cache, useLlm }) {
+async function translateText({ locale, text, cache, useLlm, budget }) {
 	const key = hashKey(locale, text);
 	if (cache[key]) return cache[key];
 	if (!useLlm) return null;
+	if (budget.used >= budget.max) return null;
 	const t = await translateViaOpenAi({ locale, text });
 	if (!t) return null;
+	budget.used += 1;
+	const violations = translationPolicyViolations(t);
+	if (violations.length) {
+		budget.violations.push({ locale, key, violations });
+		return null;
+	}
+	if (looksUntranslated(locale, text, t)) {
+		budget.violations.push({ locale, key, violations: ["untranslated_or_identical"] });
+		return null;
+	}
 	cache[key] = t;
 	return t;
 }
@@ -1361,6 +1401,7 @@ async function buildCourseDetail({ locale, domain, course, cache, useLlm, locale
 			text: course.title_en,
 			cache,
 			useLlm,
+			budget: cache.__budget,
 		})) ||
 		translateCourseTitle(locale, course.title_en);
 	const desc =
@@ -1369,19 +1410,20 @@ async function buildCourseDetail({ locale, domain, course, cache, useLlm, locale
 			text: course.desc_en,
 			cache,
 			useLlm,
+			budget: cache.__budget,
 		})) ||
 		translateShort(locale, course.desc_en);
 	const learnTranslated = [];
 	for (const x of course.detail_learn_en) {
 		learnTranslated.push(
-			(await translateText({ locale, text: x, cache, useLlm })) ||
+			(await translateText({ locale, text: x, cache, useLlm, budget: cache.__budget })) ||
 				translateBullets(locale, [x])[0],
 		);
 	}
 	const outlineTranslated = [];
 	for (const x of course.detail_outline_en) {
 		outlineTranslated.push(
-			(await translateText({ locale, text: x, cache, useLlm })) ||
+			(await translateText({ locale, text: x, cache, useLlm, budget: cache.__budget })) ||
 				translateBullets(locale, [x])[0],
 		);
 	}
@@ -1485,6 +1527,11 @@ async function main() {
 	const useLlm = translationEnabled();
 	const cPath = cachePath();
 	const cache = readJson(cPath) || {};
+	cache.__budget = {
+		max: translationMaxCalls(),
+		used: 0,
+		violations: [],
+	};
 
 	for (const locale of locales) {
 		const listHtml = buildCoursesListPage({ locale, domain });
@@ -1506,6 +1553,8 @@ async function main() {
 		}
 	}
 
+	const budgetInfo = cache.__budget;
+	delete cache.__budget;
 	if (useLlm) writeJson(cPath, cache);
 
 	const sitemapPath = path.join(rankOut, "sitemap.xml");
@@ -1519,7 +1568,24 @@ async function main() {
 	const sm = ensureSitemapUrls(sitemapPath, urls);
 
 	process.stdout.write(
-		`${JSON.stringify({ ok: true, written: written.length, files: written, sitemap: sm }, null, 2)}\n`,
+		`${JSON.stringify(
+			{
+				ok: true,
+				written: written.length,
+				files: written,
+				sitemap: sm,
+				translation: useLlm
+					? {
+							model: getOpenAiModel(),
+							calls_used: budgetInfo.used,
+							calls_max: budgetInfo.max,
+							violations: budgetInfo.violations.length,
+						}
+					: { enabled: false },
+			},
+			null,
+			2,
+		)}\n`,
 	);
 }
 
