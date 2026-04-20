@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 function ensureDir(p) {
 	if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
@@ -37,6 +38,102 @@ function parseLocales() {
 		.map((s) => s.trim().toLowerCase())
 		.filter(Boolean);
 	return raw.length ? raw : ["fr", "es", "ar", "de", "it"];
+}
+
+function normalizeLocale(locale) {
+	return String(locale || "")
+		.trim()
+		.toLowerCase();
+}
+
+function supportedLocales(locales) {
+	return (locales || []).map(normalizeLocale).filter((l) => l && l in i18n);
+}
+
+function cachePath() {
+	return path.resolve("rank", "output", "site-data", "i18n-cache.json");
+}
+
+function readJson(p) {
+	try {
+		return JSON.parse(fs.readFileSync(p, "utf8"));
+	} catch {
+		return null;
+	}
+}
+
+function writeJson(p, obj) {
+	ensureDir(path.dirname(p));
+	fs.writeFileSync(p, `${JSON.stringify(obj, null, 2)}\n`, "utf8");
+}
+
+function hashKey(locale, text) {
+	const h = crypto.createHash("sha256");
+	h.update(`${locale}\n${text}`);
+	return h.digest("hex").slice(0, 32);
+}
+
+function getOpenAiKey() {
+	return (
+		String(process.env.OPENAI_API_KEY || "").trim() ||
+		String(process.env.OPENAI_KEY || "").trim()
+	);
+}
+
+function getOpenAiModel() {
+	return String(process.env.OPENAI_MODEL || "").trim() || "gpt-4o-mini";
+}
+
+function translationEnabled() {
+	const key = getOpenAiKey();
+	if (!key) return false;
+	const v = String(process.env.RWC_ENABLE_LLM_TRANSLATION || "").trim().toLowerCase();
+	if (!v) return false;
+	return v === "true" || v === "1" || v === "yes";
+}
+
+async function translateViaOpenAi({ locale, text }) {
+	const apiKey = getOpenAiKey();
+	const model = getOpenAiModel();
+	const r = await fetch("https://api.openai.com/v1/chat/completions", {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${apiKey}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			model,
+			temperature: 0.2,
+			messages: [
+				{
+					role: "system",
+					content:
+						"Translate the user text into the requested language. Preserve meaning, structure, and product names. Do not add claims, certifications, numbers, or extra content. Output only the translation.",
+				},
+				{
+					role: "user",
+					content: `LANG=${locale}\nTEXT=${text}`,
+				},
+			],
+		}),
+	});
+	if (!r.ok) {
+		const t = await r.text();
+		throw new Error(`openai_http_${r.status}:${t.slice(0, 200)}`);
+	}
+	const json = await r.json();
+	const out = json?.choices?.[0]?.message?.content;
+	return String(out ?? "").trim();
+}
+
+async function translateText({ locale, text, cache, useLlm }) {
+	const key = hashKey(locale, text);
+	if (cache[key]) return cache[key];
+	if (!useLlm) return null;
+	const t = await translateViaOpenAi({ locale, text });
+	if (!t) return null;
+	cache[key] = t;
+	return t;
 }
 
 const catalog = [
@@ -218,6 +315,98 @@ const catalog = [
 			"Support workflow and escalation routes",
 		],
 		detail_outline_en: ["Tracks and bundles", "Onboarding plan", "Support and operations"],
+	},
+	{
+		sku: "cloud-fundamentals",
+		price: 49,
+		level: "techbeginner",
+		hours: "7h",
+		title_en: "Cloud Fundamentals — IAM, Networking, and Cost Control",
+		desc_en: "Core cloud concepts: identity, networking, security, and cost hygiene.",
+		learn_en: ["Understand cloud IAM", "Design secure networks", "Control cloud cost"],
+		detail_learn_en: [
+			"Core cloud services and shared responsibility basics",
+			"IAM: roles, permissions, and least privilege",
+			"Networking: VPC/VNet concepts, routing, and firewalls",
+			"Cost control: budgets, tagging, and alerts",
+		],
+		detail_outline_en: [
+			"Cloud mental models and service categories",
+			"IAM and least privilege",
+			"Networking fundamentals",
+			"Logging and monitoring basics",
+			"Cost controls and operational hygiene",
+			"Exercises + checklists",
+		],
+	},
+	{
+		sku: "python-automation",
+		price: 59,
+		level: "techintermediate",
+		hours: "9h",
+		title_en: "Python Automation — Data Pipelines & Scripts that Ship",
+		desc_en: "Practical automation: file workflows, APIs, data transforms, and scheduling.",
+		learn_en: ["Automate workflows", "Call APIs safely", "Ship reliable scripts"],
+		detail_learn_en: [
+			"Build robust scripts with logging and error handling",
+			"Work with files, CSV/JSON, and transforms",
+			"Call APIs with retries and rate-limit safety",
+			"Schedule jobs and monitor outcomes",
+		],
+		detail_outline_en: [
+			"Project setup and environment hygiene",
+			"File workflows and data transforms",
+			"HTTP APIs: auth, retries, and pagination",
+			"Scheduling and monitoring",
+			"Packaging and operational checklists",
+			"Exercises + templates",
+		],
+	},
+	{
+		sku: "excel-finance",
+		price: 39,
+		level: "non-techbeginner",
+		hours: "6h",
+		title_en: "Excel for Finance — Forecasts, Models & Decision Tables",
+		desc_en: "Practical Excel models: forecasting, sensitivity tables, and clean reporting.",
+		learn_en: ["Build forecasts", "Create models", "Report cleanly"],
+		detail_learn_en: [
+			"Build clean financial tables and model layouts",
+			"Forecasting basics and scenario planning",
+			"Sensitivity tables and decision support",
+			"Reporting: charts and executive summaries",
+		],
+		detail_outline_en: [
+			"Model structure and assumptions",
+			"Forecasting and scenarios",
+			"Sensitivity and what-if analysis",
+			"Reporting and chart hygiene",
+			"Templates and review checklists",
+			"Exercises",
+		],
+	},
+	{
+		sku: "customer-success-ops",
+		price: 35,
+		level: "non-techintermediate",
+		hours: "5h",
+		title_en: "Customer Success Ops — Support Playbooks & Retention Loops",
+		desc_en: "Support workflows, playbooks, escalation, and retention metrics.",
+		learn_en: ["Build playbooks", "Improve retention", "Run escalations"],
+		detail_learn_en: [
+			"Support playbooks and response standards",
+			"Escalation routes and incident communication",
+			"Retention loops: feedback, fixes, and follow-ups",
+			"Metrics: response time, churn signals, and QA",
+		],
+		detail_outline_en: [
+			"Support system basics",
+			"Playbooks and escalation",
+			"Retention loops and quality control",
+			"Metrics and reporting",
+			"Templates and checklists",
+			"Exercises",
+		],
 	},
 ];
 
@@ -1041,8 +1230,22 @@ function translateBullets(locale, bullets) {
 		if (locale === "fr") return mapFr[b] || mapLongFr[b] || b;
 		if (locale === "es") return mapEs[b] || mapLongEs[b] || b;
 		if (locale === "ar") return mapAr[b] || mapLongAr[b] || b;
+		if (locale === "de") return b;
+		if (locale === "it") return b;
 		return b;
 	});
+}
+
+function alternates({ domain, pathEn, locales }) {
+	const tags = [];
+	tags.push(`<link rel="alternate" hreflang="en" href="https://${domain}${pathEn}">`);
+	for (const l of locales) {
+		tags.push(
+			`<link rel="alternate" hreflang="${escapeHtml(l)}" href="https://${domain}${pathEn.replace(/\\.html$/, `.${l}.html`)}">`,
+		);
+	}
+	tags.push(`<link rel="alternate" hreflang="x-default" href="https://${domain}${pathEn}">`);
+	return tags.join("\n  ");
 }
 
 function pageShell({ locale, title, canonicalUrl, body }) {
@@ -1057,6 +1260,7 @@ function pageShell({ locale, title, canonicalUrl, body }) {
 		"  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
 		`  <title>${escapeHtml(title)}</title>`,
 		`  <link rel=\"canonical\" href=\"${escapeHtml(canonicalUrl)}\">`,
+		`  ${alternates({ domain: getDomain(), pathEn: "/courses.html", locales: supportedLocales(parseLocales()) })}`,
 		"  <link rel=\"stylesheet\" href=\"/assets/style.css\">",
 		extraRtl,
 		"</head>",
@@ -1149,12 +1353,38 @@ function buildCoursesListPage({ locale, domain }) {
 	});
 }
 
-function buildCourseDetail({ locale, domain, course }) {
+async function buildCourseDetail({ locale, domain, course, cache, useLlm, locales }) {
 	const t = i18n[locale];
-	const title = translateCourseTitle(locale, course.title_en);
-	const desc = translateShort(locale, course.desc_en);
-	const learn = translateBullets(locale, course.detail_learn_en);
-	const outline = translateBullets(locale, course.detail_outline_en);
+	const title =
+		(await translateText({
+			locale,
+			text: course.title_en,
+			cache,
+			useLlm,
+		})) ||
+		translateCourseTitle(locale, course.title_en);
+	const desc =
+		(await translateText({
+			locale,
+			text: course.desc_en,
+			cache,
+			useLlm,
+		})) ||
+		translateShort(locale, course.desc_en);
+	const learnTranslated = [];
+	for (const x of course.detail_learn_en) {
+		learnTranslated.push(
+			(await translateText({ locale, text: x, cache, useLlm })) ||
+				translateBullets(locale, [x])[0],
+		);
+	}
+	const outlineTranslated = [];
+	for (const x of course.detail_outline_en) {
+		outlineTranslated.push(
+			(await translateText({ locale, text: x, cache, useLlm })) ||
+				translateBullets(locale, [x])[0],
+		);
+	}
 	const dir = t.dir === "rtl" ? " dir=\"rtl\"" : "";
 	const extraRtl = t.dir === "rtl" ? "<style>body{direction:rtl}</style>" : "";
 	const canonicalPath = `/courses/${course.sku}.${locale}.html`;
@@ -1168,6 +1398,7 @@ function buildCourseDetail({ locale, domain, course }) {
 		`  <title>${escapeHtml(title)} | RealWorldCerts</title>`,
 		`  <meta name="description" content="${escapeHtml(desc)}">`,
 		`  <link rel="canonical" href="https://${domain}${canonicalPath}">`,
+		`  ${alternates({ domain, pathEn: `/courses/${course.sku}.html`, locales })}`,
 		"  <link rel=\"stylesheet\" href=\"/assets/style.css\">",
 		extraRtl,
 		"</head>",
@@ -1200,13 +1431,13 @@ function buildCourseDetail({ locale, domain, course }) {
 		"      <div class=\"card\">",
 		`        <h3>${escapeHtml(t.what_learn)}</h3>`,
 		"        <ul>",
-		...learn.map((x) => `          <li>${escapeHtml(x)}</li>`),
+		...learnTranslated.map((x) => `          <li>${escapeHtml(x)}</li>`),
 		"        </ul>",
 		"      </div>",
 		"      <div class=\"card\">",
 		`        <h3>${escapeHtml(t.outline)}</h3>`,
 		"        <ol>",
-		...outline.map((x) => `          <li>${escapeHtml(x)}</li>`),
+		...outlineTranslated.map((x) => `          <li>${escapeHtml(x)}</li>`),
 		"        </ol>",
 		"      </div>",
 		"    </div>",
@@ -1243,14 +1474,17 @@ function ensureSitemapUrls(sitemapPath, urls) {
 	return { ok: true, changed };
 }
 
-function main() {
+async function main() {
 	const domain = getDomain();
 	const rankOut = path.resolve("rank", "output");
 	const coursesDir = path.join(rankOut, "courses");
 	ensureDir(coursesDir);
 
-	const locales = parseLocales().filter((l) => l in i18n);
+	const locales = supportedLocales(parseLocales());
 	const written = [];
+	const useLlm = translationEnabled();
+	const cPath = cachePath();
+	const cache = readJson(cPath) || {};
 
 	for (const locale of locales) {
 		const listHtml = buildCoursesListPage({ locale, domain });
@@ -1258,12 +1492,21 @@ function main() {
 			written.push(`rank/output/courses.${locale}.html`);
 
 		for (const c of catalog) {
-			const detail = buildCourseDetail({ locale, domain, course: c });
+			const detail = await buildCourseDetail({
+				locale,
+				domain,
+				course: c,
+				cache,
+				useLlm,
+				locales,
+			});
 			const outPath = path.join(coursesDir, `${c.sku}.${locale}.html`);
 			if (writeTextIfChanged(outPath, detail))
 				written.push(`rank/output/courses/${c.sku}.${locale}.html`);
 		}
 	}
+
+	if (useLlm) writeJson(cPath, cache);
 
 	const sitemapPath = path.join(rankOut, "sitemap.xml");
 	const urls = [];
@@ -1280,4 +1523,7 @@ function main() {
 	);
 }
 
-main();
+main().catch((err) => {
+	process.stderr.write(`${String(err?.message ?? err)}\n`);
+	process.exit(1);
+});
