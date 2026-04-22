@@ -1,19 +1,16 @@
-name: Bank Reconciliation (Hands-Free)
-
+name: Finance Diagnose (Hands-Free)
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: "15 * * * *"
+    - cron: "10 * * * *"
   push:
     branches:
       - master
-
 permissions:
   contents: write
-
 jobs:
-  reconcile:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[bank-reconcile]')
+  diagnose:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[finance-diagnose]')
     runs-on: ubuntu-latest
     env:
       BANK_RECONCILE_ENABLE: "true"
@@ -39,24 +36,29 @@ jobs:
         with:
           node-version: "20"
       - run: npm ci
-      - name: Plaid readiness (best effort)
-        run: |
-          mkdir -p exports/reports
-          node ./scripts/plaid-preflight.mjs | tee exports/reports/plaid_preflight_last.json || true
-      - name: Auto-confirm pending external settlements
-        run: |
-          mkdir -p exports/reports
-          node ./scripts/auto-confirm-bank-settlements.mjs | tee exports/reports/bank_reconcile_last.json || true
-      - name: Queue owner notifications (best effort)
+      - name: Prepare output folder
+        run: mkdir -p exports/reports
+      - name: Owner routing env validation
+        run: node ./scripts/validate-owner-routing-env.mjs | tee exports/reports/owner_routing_env_last.json || true
+      - name: Plaid readiness
+        run: node ./scripts/plaid-preflight.mjs | tee exports/reports/plaid_preflight_last.json || true
+      - name: Bank reconciliation (Plaid) - auto confirm
+        run: node ./scripts/auto-confirm-bank-settlements.mjs | tee exports/reports/bank_reconcile_last.json || true
+      - name: Queue owner notifications
         run: node ./scripts/email/queue-from-communications.mjs || true
+      - name: Upload finance reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-diagnose-${{ github.run_id }}
+          path: exports/reports/*.json
       - name: Commit generated reports/communications
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m "chore(finance): bank reconciliation updates"
+            git commit -m "chore(finance): diagnostics update"
             git push origin HEAD:${{ github.ref_name }}
           else
-            echo "No reconciliation artifacts to commit."
+            echo "No diagnostics artifacts to commit."
           fi
