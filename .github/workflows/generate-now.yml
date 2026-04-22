@@ -1,0 +1,57 @@
+name: Generate Courses Now
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+permissions:
+  contents: write
+jobs:
+  generate:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[generate-now]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - name: Bank reconciliation (Plaid) - auto confirm
+        id: bank_reconcile
+        run: |
+          out="$(node ./scripts/auto-confirm-bank-settlements.mjs)"
+          echo "$out"
+          confirmed="$(echo "$out" | jq -r '.confirmed // 0' 2>/dev/null || echo 0)"
+          if [ -z "$confirmed" ] || [ "$confirmed" = "null" ]; then
+            confirmed=0
+          fi
+          echo "confirmed=$confirmed" >> "$GITHUB_OUTPUT"
+      - name: Owner hands-free settlement cycle (optional)
+        env:
+          OWNER_SETTLEMENT_AUTORUN: ${{ vars.OWNER_SETTLEMENT_AUTORUN }}
+        run: |
+          if [ "${OWNER_SETTLEMENT_AUTORUN:-false}" = "true" ]; then
+            if [ "${{ steps.bank_reconcile.outputs.confirmed }}" -gt 0 ]; then
+              node ./scripts/auto-settle-owner-daemon.mjs --once
+            else
+              echo "No confirmed incomings detected; skipping owner settlement cycle"
+            fi
+          else
+            echo "OWNER_SETTLEMENT_AUTORUN disabled"
+          fi
+      - name: Generate multilingual course pages
+        run: node ./scripts/generate-multilang-courses.mjs
+      - name: Commit and push changes to release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "generate-now: course pages and settlement state"
+            git push origin HEAD:release
+          else
+            echo "No changes to commit."
+          fi
