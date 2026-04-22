@@ -1436,7 +1436,7 @@ function buildCoursesListPage({ locale, domain }) {
 			return [
 				"<div class=\"card\">",
 				`<h3>${escapeHtml(title)}</h3>`,
-				`<p>${escapeHtml(c.level + c.hours)}</p>`,
+				`<p>${escapeHtml(`${c.level} • ~${c.hours}`)}</p>`,
 				`<p>${escapeHtml(desc)}</p>`,
 				"<ul>",
 				...bullets.map((b) => `  <li>${escapeHtml(b)}</li>`),
