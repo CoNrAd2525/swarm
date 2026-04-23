@@ -42,8 +42,13 @@ jobs:
           else
             echo "OWNER_SETTLEMENT_AUTORUN disabled"
           fi
-      - name: Generate multilingual course pages
-        run: node ./scripts/generate-multilang-courses.mjs
+      - name: Generate multilingual course pages (optional)
+        run: |
+          if [ -f "./scripts/generate-multilang-courses.mjs" ]; then
+            node ./scripts/generate-multilang-courses.mjs
+          else
+            echo "scripts/generate-multilang-courses.mjs not present; skipping generation"
+          fi
       - name: Commit and push changes to release
         run: |
           git config user.name "github-actions[bot]"
