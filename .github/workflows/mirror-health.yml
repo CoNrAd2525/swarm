@@ -1,0 +1,68 @@
+name: Mirror Health (Upstream Parity)
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "43 */6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO || 'CoNrAd2525/swarm' }}
+      UPSTREAM_BRANCHES: ${{ vars.UPSTREAM_BRANCHES || 'master release' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check upstream parity
+        run: |
+          set -e
+          mkdir -p exports/reports
+          {
+            echo "{"
+            echo "  \"repo\": \"${GITHUB_REPOSITORY}\","
+            echo "  \"upstream\": \"${UPSTREAM_REPO}\","
+            echo "  \"checked_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
+            echo "  \"branches\": ["
+          } > exports/reports/mirror_health_last.json
+
+          first=1
+          for b in $UPSTREAM_BRANCHES; do
+            upstream_sha="$(git ls-remote \"https://github.com/${UPSTREAM_REPO}.git\" \"refs/heads/$b\" | awk '{print $1}' | head -n 1)"
+            mirror_sha="$(git ls-remote \"https://github.com/${GITHUB_REPOSITORY}.git\" \"refs/heads/$b\" | awk '{print $1}' | head -n 1)"
+            if [ -z "$upstream_sha" ]; then
+              upstream_sha="null"
+            else
+              upstream_sha="\"$upstream_sha\""
+            fi
+            if [ -z "$mirror_sha" ]; then
+              mirror_sha="null"
+            else
+              mirror_sha="\"$mirror_sha\""
+            fi
+            ok="false"
+            if [ "$upstream_sha" = "$mirror_sha" ] && [ "$upstream_sha" != "null" ]; then
+              ok="true"
+            fi
+            if [ $first -eq 0 ]; then
+              echo "," >> exports/reports/mirror_health_last.json
+            fi
+            first=0
+            printf "    {\"branch\":\"%s\",\"upstream_sha\":%s,\"mirror_sha\":%s,\"ok\":%s}" "$b" "$upstream_sha" "$mirror_sha" "$ok" >> exports/reports/mirror_health_last.json
+          done
+
+          {
+            echo ""
+            echo "  ]"
+            echo "}"
+          } >> exports/reports/mirror_health_last.json
+      - name: Upload mirror health
+        uses: actions/upload-artifact@v4
+        with:
+          name: mirror-health-${{ github.run_id }}
+          path: exports/reports/mirror_health_last.json
+
