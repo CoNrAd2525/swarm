@@ -34,6 +34,9 @@ Configure repo variables in the mirror repo:
 - `UPSTREAM_BRANCHES` = `master release`
 - `UPSTREAM_TAGS` = `true`
 
+Health check (recommended):
+- enable [mirror-health.yml](file:///c:/Users/Dell/Downloads/Nouveau%20dossier%20(3)/swarm-repo/.github/workflows/mirror-health.yml) in the mirror repo to continuously verify SHAs match upstream and to provide an artifact report
+
 ## 4) Run finance + settlement hands-free in the mirror
 
 In the mirror repo, add secrets (do not store them in the flagged repo):
@@ -70,4 +73,3 @@ Store Supabase credentials only in the mirror repo:
 ## 6) If you need email escalation
 
 If GitHub account recovery is pending, keep the mirror repo as the active “control plane” until the flagged account is reinstated.
-
