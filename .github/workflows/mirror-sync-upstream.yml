@@ -1,0 +1,49 @@
+name: Mirror Sync (Upstream)
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "22 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mirror-sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO || 'CoNrAd2525/swarm' }}
+      UPSTREAM_BRANCHES: ${{ vars.UPSTREAM_BRANCHES || 'master release' }}
+      UPSTREAM_TAGS: ${{ vars.UPSTREAM_TAGS || 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Fetch upstream
+        run: |
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" || true
+          git fetch upstream --prune --tags
+      - name: Sync branches
+        run: |
+          set -e
+          for b in $UPSTREAM_BRANCHES; do
+            if git show-ref --verify --quiet "refs/remotes/upstream/$b"; then
+              git checkout -B "$b" "upstream/$b"
+              git push origin "$b" --force-with-lease
+            else
+              echo "Upstream branch not found: $b"
+            fi
+          done
+      - name: Sync tags
+        if: env.UPSTREAM_TAGS == 'true'
+        run: |
+          git push origin --tags --force
+

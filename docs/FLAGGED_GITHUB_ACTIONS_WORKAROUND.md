@@ -5,6 +5,7 @@ If the `CoNrAd2525/swarm` repository cannot run GitHub Actions because the accou
 This runner repository will:
 - check out `CoNrAd2525/swarm`
 - run the same finance scripts (Plaid preflight + bank reconcile)
+- optionally run the owner settlement cycle (only if confirmed incomings exist)
 - upload reports as artifacts (and optionally commit back to the runner repo)
 
 This does not require enabling Actions on the flagged account.
@@ -25,6 +26,7 @@ This does not require enabling Actions on the flagged account.
    - `PLAID_OWNER_ACCESS_TOKEN` (or `PLAID_ACCESS_TOKEN`)
    - `SITE_PUBLIC_URL` (optional)
    - `SECONDARY_CONTACT_EMAIL` (optional)
+   - `OWNER_SETTLEMENT_AUTORUN` (optional; set to `true` to enable owner settlement cycle)
 3. Add the workflow below to the runner repo at `.github/workflows/finance-diagnose-runner.yml`.
 
 ```yml
@@ -65,11 +67,16 @@ jobs:
           PLAID_OWNER_ACCESS_TOKEN: ${{ secrets.PLAID_OWNER_ACCESS_TOKEN }}
           PLAID_ACCESS_TOKEN: ${{ secrets.PLAID_ACCESS_TOKEN }}
           OWNER_NOTIFY_EMAIL: ${{ secrets.SECONDARY_CONTACT_EMAIL }}
+          OWNER_SETTLEMENT_AUTORUN: ${{ secrets.OWNER_SETTLEMENT_AUTORUN }}
         run: |
           mkdir -p exports/reports
           node ./scripts/validate-owner-routing-env.mjs | tee exports/reports/owner_routing_env_last.json || true
           node ./scripts/plaid-preflight.mjs | tee exports/reports/plaid_preflight_last.json || true
           node ./scripts/auto-confirm-bank-settlements.mjs | tee exports/reports/bank_reconcile_last.json || true
+          confirmed="$(node -e \"try{const fs=require('fs');const j=JSON.parse(fs.readFileSync('exports/reports/bank_reconcile_last.json','utf8'));process.stdout.write(String(j.confirmed??0));}catch(e){process.stdout.write('0');}\")"
+          if [ \"${OWNER_SETTLEMENT_AUTORUN:-false}\" = \"true\" ] && [ \"${confirmed:-0}\" -gt 0 ]; then
+            node ./scripts/auto-settle-owner-daemon.mjs --once || true
+          fi
       - name: Upload reports
         uses: actions/upload-artifact@v4
         with:
@@ -107,4 +114,3 @@ The artifact will always include:
 - `bank_reconcile_last.json` (why reconcile confirmed/confirmed=0/skipped)
 
 If `bank_reconcile_last.json` reports `no_pending_batches`, the issue is not “Plaid missing money”, it’s that there are no `PayoutBatch` records waiting for external confirmation to match.
-
