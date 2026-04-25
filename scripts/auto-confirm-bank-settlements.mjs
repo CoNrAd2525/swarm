@@ -153,6 +153,24 @@ function ownerNotifyEmail() {
 	);
 }
 
+function isLikelyBankRail(batch) {
+	const gw = String(batch?.gateway_ref || "").toLowerCase();
+	if (!gw) return true;
+	if (!gw.startsWith("file:")) return true;
+	if (gw.includes("bank-wire")) return true;
+	if (gw.includes("plaid")) return true;
+	return false;
+}
+
+function countBy(arr, keyFn) {
+	const out = {};
+	for (const x of arr || []) {
+		const k = String(keyFn?.(x) ?? "").trim() || "unknown";
+		out[k] = (out[k] || 0) + 1;
+	}
+	return out;
+}
+
 async function main() {
 	const enabled = boolEnv("BANK_RECONCILE_ENABLE");
 	if (!enabled) {
@@ -219,15 +237,42 @@ async function main() {
 	}
 
 	const confirmed = [];
+	const skipped_batches = [];
 	for (const b of pending) {
 		const batchId = b?.batch_id || b?.id || null;
-		if (!batchId) continue;
+		if (!batchId) {
+			skipped_batches.push({ batch_id: null, reason: "missing_batch_id" });
+			continue;
+		}
 		const createdAt = b?.created_date || b?.createdAt || b?.created_at || null;
-		if (!isOldEnough(createdAt)) continue;
+		if (!isOldEnough(createdAt)) {
+			skipped_batches.push({ batch_id: batchId, reason: "too_new", created_at: createdAt });
+			continue;
+		}
 
 		const amount = num(b?.total_amount ?? b?.amount ?? null);
 		const currency = normalizeCurrency(b?.currency);
-		if (!(amount > 0)) continue;
+		if (!(amount > 0)) {
+			skipped_batches.push({
+				batch_id: batchId,
+				reason: "missing_amount",
+				created_at: createdAt,
+				currency,
+			});
+			continue;
+		}
+
+		if (!isLikelyBankRail(b)) {
+			skipped_batches.push({
+				batch_id: batchId,
+				reason: "non_bank_rail",
+				created_at: createdAt,
+				amount,
+				currency,
+				gateway_ref: b?.gateway_ref ?? null,
+			});
+			continue;
+		}
 
 		const createdMs = createdAt ? Date.parse(createdAt) : Number.NaN;
 		const minTxMs = Number.isFinite(createdMs) ? createdMs - 24 * 60 * 60_000 : Number.NaN;
@@ -239,7 +284,17 @@ async function main() {
 			: tx;
 
 		const candidates = matchCandidates(filteredTx, { amount, currency });
-		if (candidates.length !== 1) continue;
+		if (candidates.length !== 1) {
+			skipped_batches.push({
+				batch_id: batchId,
+				reason: candidates.length === 0 ? "no_plaid_match" : "multiple_plaid_matches",
+				candidate_count: candidates.length,
+				created_at: createdAt,
+				amount,
+				currency,
+			});
+			continue;
+		}
 		const matched = candidates[0];
 
 		const proof = slimTx(matched);
@@ -253,7 +308,7 @@ async function main() {
 		});
 
 		const items = await itemEntity.filter(
-			{ batch_id: b.batch_id },
+			{ batch_id: batchId },
 			"-created_date",
 			2000,
 			0,
@@ -314,6 +369,16 @@ async function main() {
 		});
 	}
 
+	let recent_status_counts = null;
+	if (pending.length === 0) {
+		try {
+			const recent = await batchEntity.filter({}, "-created_date", 200, 0);
+			recent_status_counts = countBy(recent, (x) => x?.status);
+		} catch {
+			recent_status_counts = null;
+		}
+	}
+
 	process.stdout.write(
 		JSON.stringify(
 			{
@@ -321,6 +386,8 @@ async function main() {
 				pending_found: pending.length,
 				confirmed: confirmed.length,
 				confirmed_batches: confirmed,
+				skipped_batches,
+				recent_status_counts,
 			},
 			null,
 			2,

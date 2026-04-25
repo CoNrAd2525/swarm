@@ -25,7 +25,7 @@ Avoid embedding tokens in remote URLs. Use GitHub Desktop or SSH.
 ## 3) Keep it synced automatically (mirror sync workflow)
 
 The mirror repository should run:
-- [mirror-sync-upstream.yml](file:///c:/Users/Dell/Downloads/Nouveau%20dossier%20(3)/swarm-repo/.github/workflows/mirror-sync-upstream.yml)
+- [mirror-sync-upstream.yml](../.github/workflows/mirror-sync-upstream.yml)
 
 This workflow fetches `CoNrAd2525/swarm` and force-updates the mirror branches/tags to match.
 
@@ -35,7 +35,7 @@ Configure repo variables in the mirror repo:
 - `UPSTREAM_TAGS` = `true`
 
 Health check (recommended):
-- enable [mirror-health.yml](file:///c:/Users/Dell/Downloads/Nouveau%20dossier%20(3)/swarm-repo/.github/workflows/mirror-health.yml) in the mirror repo to continuously verify SHAs match upstream and to provide an artifact report
+- enable [mirror-health.yml](../.github/workflows/mirror-health.yml) in the mirror repo to continuously verify SHAs match upstream and to provide an artifact report
 
 ## 4) Run finance + settlement hands-free in the mirror
 
@@ -53,8 +53,8 @@ In the mirror repo, add secrets (do not store them in the flagged repo):
 - `SECONDARY_CONTACT_EMAIL` (optional)
 
 Then run:
-- [finance-diagnose.yml](file:///c:/Users/Dell/Downloads/Nouveau%20dossier%20(3)/swarm-repo/.github/workflows/finance-diagnose.yml) (manual + scheduled)
-- [bank-reconcile.yml](file:///c:/Users/Dell/Downloads/Nouveau%20dossier%20(3)/swarm-repo/.github/workflows/bank-reconcile.yml) (manual + scheduled)
+- [finance-diagnose.yml](../.github/workflows/finance-diagnose.yml) (manual + scheduled)
+- [bank-reconcile.yml](../.github/workflows/bank-reconcile.yml) (manual + scheduled)
 
 Owner settlement stays guarded:
 - it only runs when reconcile reports confirmed incomings > 0
@@ -62,7 +62,7 @@ Owner settlement stays guarded:
 ## 5) Secure cloud backups (optional)
 
 Run:
-- [backup-mirror.yml](file:///c:/Users/Dell/Downloads/Nouveau%20dossier%20(3)/swarm-repo/.github/workflows/backup-mirror.yml)
+- [backup-mirror.yml](../.github/workflows/backup-mirror.yml)
 
 Store Supabase credentials only in the mirror repo:
 - `SUPABASE_URL`
