@@ -47,6 +47,10 @@ jobs:
         run: |
           mkdir -p exports/reports
           node ./scripts/auto-confirm-bank-settlements.mjs | tee exports/reports/bank_reconcile_last.json || true
+      - name: Finance state snapshot (Base44)
+        run: |
+          mkdir -p exports/reports
+          node ./scripts/report-finance-state.mjs | tee exports/reports/finance_state_last.json || true
       - name: Queue owner notifications (best effort)
         run: node ./scripts/email/queue-from-communications.mjs || true
       - name: Commit generated reports/communications

@@ -44,6 +44,8 @@ jobs:
         run: node ./scripts/plaid-preflight.mjs | tee exports/reports/plaid_preflight_last.json || true
       - name: Bank reconciliation (Plaid) - auto confirm
         run: node ./scripts/auto-confirm-bank-settlements.mjs | tee exports/reports/bank_reconcile_last.json || true
+      - name: Finance state snapshot (Base44)
+        run: node ./scripts/report-finance-state.mjs | tee exports/reports/finance_state_last.json || true
       - name: Queue owner notifications
         run: node ./scripts/email/queue-from-communications.mjs || true
       - name: Upload finance reports
