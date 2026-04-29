@@ -1,0 +1,53 @@
+name: Payout Health (PayPal/Payoneer)
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "33 */6 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    env:
+      BASE44_API_URL: ${{ secrets.BASE44_API_URL }}
+      BASE44_SERVER_URL: ${{ secrets.BASE44_SERVER_URL }}
+      BASE44_APP_ID: ${{ secrets.BASE44_APP_ID }}
+      BASE44_SERVICE_TOKEN: ${{ secrets.BASE44_SERVICE_TOKEN }}
+      PAYOUT_HEALTH_MAX_HOURS: ${{ vars.PAYOUT_HEALTH_MAX_HOURS || '24' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Export Base44 entities (best effort)
+        run: node ./scripts/export-full-base44.mjs || true
+      - name: Payout pipeline health report
+        run: |
+          mkdir -p exports/reports
+          node ./scripts/report-payout-health.mjs data/base44_export/PayoutBatch.json | tee exports/reports/payout_health_last.txt || true
+      - name: Finance state snapshot (Base44)
+        run: node ./scripts/report-finance-state.mjs | tee exports/reports/finance_state_last.json || true
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: payout-health-${{ github.run_id }}
+          path: exports/reports/*
+      - name: Commit generated reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(payout): health report update"
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "No health artifacts to commit."
+          fi
+
