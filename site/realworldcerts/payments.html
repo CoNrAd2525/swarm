@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RealWorldCerts - Payments</title>
-  <meta name="description" content="Secure payment options for RealWorldCerts.">
+  <title>Payments — RealWorldCerts</title>
+  <meta name="description" content="Payment information for RealWorldCerts.">
   <link rel="canonical" href="https://realworldcerts.com/payments.html">
   <link rel="stylesheet" href="/assets/style.css">
   <meta name="robots" content="index,follow">
+  <meta http-equiv="refresh" content="0; url=/checkout.html">
 </head>
 <body>
   <header class="site">
@@ -31,52 +32,27 @@
       </div>
       <nav class="nav">
         <a href="/courses.html">Courses</a>
-        <a href="/payments.html">Payments</a>
+        <a href="/deals.html">Deals</a>
+        <a href="/tests.html">Timed Mocks</a>
+        <a href="/checkout.html">Checkout</a>
         <a href="/contact.html">Support</a>
       </nav>
     </div>
   </header>
   <main class="container">
     <div class="card">
-      <h2>Selected Item</h2>
-      <p class="muted">If you came from a course page, your selection appears here.</p>
-      <div class="row">
-        <span class="pill mono" id="sku"></span>
-        <span class="pill mono" id="amount"></span>
-      </div>
-      <p class="muted" style="margin-top:12px">After payment, delivery is sent to your email. If you need help, contact <a href="mailto:younesdgc@gmail.com">younesdgc@gmail.com</a>.</p>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <h2>PayPal</h2>
-        <p class="muted">Fast checkout.</p>
-        <div class="row">
-          <a class="btn" href="https://www.paypal.com/ncp/payment/726Z3FMU2DRUG" rel="noopener">Pay with PayPal</a>
-          <a class="btn" href="https://paypal.me/realworldcerts" rel="noopener">PayPal.me</a>
-        </div>
-      </div>
-      <div class="card">
-        <h2>Crypto (USDT)</h2>
-        <p class="muted">Send only USDT on the matching network.</p>
-        <h3>USDT BEP20 (BSC)</h3>
-        <div class="mono">0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7</div>
-        <h3 style="margin-top:16px">USDT ERC20 (ETH)</h3>
-        <div class="mono">0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7</div>
+      <h2>Payments</h2>
+      <p class="muted">Redirecting to checkout…</p>
+      <div class="divider"></div>
+      <p><a class="btn" href="/checkout.html">Go to Checkout</a></p>
+      <div class="divider"></div>
+      <div class="note">
+        <strong>Privacy-first:</strong> payment instructions should not expose personal owner identity. If a link reveals personal details, request an alternative via support.
       </div>
     </div>
   </main>
   <footer class="site">
     <div class="container"><p>© RealWorldCerts</p></div>
   </footer>
-  <script>
-    (function () {
-      const p = new URLSearchParams(location.search);
-      const sku = p.get('sku') || 'SKU: (not specified)';
-      const amount = p.get('amount') || 'Amount: (not specified)';
-      document.getElementById('sku').textContent = sku;
-      document.getElementById('amount').textContent = amount;
-    })();
-  </script>
 </body>
 </html>

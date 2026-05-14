@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Checkout — RealWorldCerts</title>
+  <meta name="description" content="Start a checkout request for RealWorldCerts.">
+  <link rel="canonical" href="https://realworldcerts.com/checkout.html">
+  <link rel="stylesheet" href="/assets/style.css">
+  <meta name="robots" content="index,follow">
+</head>
+<body>
+  <header class="site">
+    <div class="container row">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#60a5fa"/>
+            </linearGradient>
+          </defs>
+          <rect x="2" y="2" width="20" height="20" rx="6" fill="url(#g)"/>
+          <rect x="7" y="8" width="10" height="2" rx="1" fill="#ffffff" fill-opacity="0.95"/>
+          <rect x="7" y="12" width="8" height="2" rx="1" fill="#e5f0ff" fill-opacity="0.95"/>
+          <rect x="7" y="16" width="6" height="2" rx="1" fill="#dbeafe" fill-opacity="0.95"/>
+        </svg>
+        <div>
+          <h1 class="title"><a href="/">RealWorldCerts</a></h1>
+          <div class="subtitle">Checkout</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="/courses.html">Courses</a>
+        <a href="/deals.html">Deals</a>
+        <a href="/tests.html">Timed Mocks</a>
+        <a href="/checkout.html">Checkout</a>
+        <a href="/contact.html">Support</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <div class="card">
+      <h2>Start checkout</h2>
+      <p class="muted">Submit the details below. You’ll receive payment instructions and delivery steps from support.</p>
+      <div class="divider"></div>
+      <div class="note">
+        <strong>Privacy-first:</strong> payment instructions should not reveal personal owner identity. If a link exposes personal details, contact support for an alternative.
+      </div>
+      <div class="divider"></div>
+      <form id="f">
+        <div class="field">
+          <label for="item">Item</label>
+          <select id="item" name="item">
+            <option value="starter">Starter Pack ($35)</option>
+            <option value="pro">Pro Bundle ($99)</option>
+            <option value="all">All Exams Pack ($120)</option>
+            <option value="custom">Custom request</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="exam">Target exam (optional)</label>
+          <input id="exam" name="exam" placeholder="e.g., Security+, AZ-104, Google ML Engineer">
+        </div>
+        <div class="field">
+          <label for="email">Email (optional)</label>
+          <input id="email" name="email" placeholder="you@domain.com">
+          <small>Used for delivery and support.</small>
+        </div>
+        <div class="field">
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes" placeholder="Timeline, focus areas, order details"></textarea>
+        </div>
+        <div class="cta">
+          <button class="btn" type="submit">Generate request</button>
+          <a class="btn secondary" href="/contact.html">Contact support</a>
+        </div>
+      </form>
+      <div class="divider"></div>
+      <div id="out" class="muted"></div>
+    </div>
+  </main>
+  <footer class="site">
+    <div class="container"><p>© RealWorldCerts</p></div>
+  </footer>
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const pick = qs.get("deal") || qs.get("item");
+    if (pick && document.getElementById("item")) document.getElementById("item").value = pick;
+    const enc = (s) => encodeURIComponent(String(s || "").trim());
+    const id = () => {
+      const a = new Uint8Array(8);
+      crypto.getRandomValues(a);
+      return "RWC-" + Array.from(a).map(x => x.toString(16).padStart(2,"0")).join("").toUpperCase();
+    };
+    document.getElementById("f").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const reqId = id();
+      const item = document.getElementById("item").value;
+      const exam = document.getElementById("exam").value;
+      const email = document.getElementById("email").value;
+      const notes = document.getElementById("notes").value;
+      const subject = `RealWorldCerts checkout request ${reqId}`;
+      const body = [
+        `Request ID: ${reqId}`,
+        `Item: ${item}`,
+        exam ? `Target exam: ${exam}` : "",
+        email ? `Email: ${email}` : "",
+        notes ? `Notes: ${notes}` : "",
+        "",
+        "Please send payment instructions and delivery steps."
+      ].filter(Boolean).join("\\n");
+      const mailto = `mailto:support@realworldcerts.com?subject=${enc(subject)}&body=${enc(body)}`;
+      document.getElementById("out").innerHTML = `Request generated: <strong>${reqId}</strong><div class="divider"></div><a class="btn" href="${mailto}">Send request to support</a>`;
+    });
+  </script>
+</body>
+</html>
