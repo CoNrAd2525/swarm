@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Checkout | RealWorldCerts</title>
+  <meta name="description" content="Request a private checkout link for courses and bundles.">
+  <link rel="canonical" href="https://www.realworldcerts.com/checkout.html">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:0;background:#0f172a;color:#e2e8f0}
+    header{padding:32px 20px;background:#111827;border-bottom:1px solid #1f2937}
+    header h1{margin:0;font-size:24px}
+    header p{margin:6px 0 0;color:#94a3b8}
+    main{max-width:860px;margin:0 auto;padding:24px 20px}
+    .box{background:#0b1220;border:1px solid #1f2937;border-radius:10px;padding:16px}
+    label{display:block;margin:12px 0 6px}
+    input,textarea{width:100%;box-sizing:border-box;background:#0f172a;color:#e2e8f0;border:1px solid #1f2937;border-radius:8px;padding:10px}
+    textarea{min-height:120px;resize:vertical}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .row>div{flex:1;min-width:240px}
+    .btn{display:inline-block;margin-top:12px;background:#60a5fa;color:#0b1220;border:none;border-radius:10px;padding:12px 16px;font-weight:700;text-decoration:none;cursor:pointer}
+    .btn.secondary{background:transparent;color:#93c5fd;border:1px solid #1f2937}
+    .links a{color:#93c5fd;text-decoration:none;margin-right:12px}
+    .muted{color:#94a3b8;font-size:14px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Checkout Request</h1>
+    <p>Privacy-first: request a checkout link without exposing owner details</p>
+  </header>
+  <main>
+    <section class="links">
+      <a href="./index.html">Home</a>
+      <a href="./deals.html">Deals</a>
+      <a href="./tests.html">Timed Mocks</a>
+      <a href="./sitemap.xml">Sitemap</a>
+    </section>
+    <div class="box">
+      <div class="row">
+        <div>
+          <label for="sku">SKU / Course name</label>
+          <input id="sku" placeholder="e.g. AWS-SAA / CCNA / Bundle name">
+        </div>
+        <div>
+          <label for="email">Your email</label>
+          <input id="email" type="email" placeholder="you@example.com">
+        </div>
+      </div>
+      <label for="notes">Notes (optional)</label>
+      <textarea id="notes" placeholder="Promo code, preferred payment method, anything else…"></textarea>
+      <button class="btn" id="requestBtn" type="button">Request Checkout Link</button>
+      <a class="btn secondary" href="./deals.html">Browse Deals</a>
+      <p class="muted" id="status"></p>
+    </div>
+  </main>
+  <script>
+    function makeId() {
+      try {
+        const a = new Uint32Array(4);
+        crypto.getRandomValues(a);
+        return 'RWC-' + Array.from(a).map(n => n.toString(16)).join('').toUpperCase();
+      } catch {
+        return 'RWC-' + Math.random().toString(16).slice(2).toUpperCase();
+      }
+    }
+    function pref(name) {
+      const url = new URL(window.location.href);
+      return url.searchParams.get(name) || '';
+    }
+    const reqId = makeId();
+    const sku = document.getElementById('sku');
+    const email = document.getElementById('email');
+    const notes = document.getElementById('notes');
+    const status = document.getElementById('status');
+    sku.value = pref('sku') || '';
+    notes.value = pref('code') ? ('Promo: ' + pref('code')) : '';
+    document.getElementById('requestBtn').addEventListener('click', function () {
+      const to = 'support@realworldcerts.com';
+      const subject = encodeURIComponent('Checkout request ' + reqId);
+      const body = encodeURIComponent(
+        'Request ID: ' + reqId + '\n' +
+        'SKU / Course: ' + (sku.value || '(not provided)') + '\n' +
+        'Buyer email: ' + (email.value || '(not provided)') + '\n' +
+        'Notes: ' + (notes.value || '-') + '\n' +
+        'Page: ' + window.location.href + '\n'
+      );
+      status.textContent = 'Opening email draft…';
+      window.location.href = 'mailto:' + to + '?subject=' + subject + '&body=' + body;
+    });
+  </script>
+</body>
+</html>
