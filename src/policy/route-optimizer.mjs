@@ -3,7 +3,9 @@ import { OwnerSettlementEnforcer } from "./owner-settlement.mjs";
 
 export function getEffectiveRoutes(_amount, currency) {
 	const cfg = OwnerSettlementEnforcer.getPaymentConfiguration();
-	let routes = [...cfg.settlement_priority];
+	let routes = [...cfg.settlement_priority].map((r) =>
+		String(r || "").toLowerCase() === "bank" ? "bank_transfer" : r,
+	);
 	if (shouldAvoidPayPal()) routes = routes.filter((r) => r !== "paypal");
 	routes = routes.filter(
 		(r) => !OwnerSettlementEnforcer.missingCredentials(r, cfg),

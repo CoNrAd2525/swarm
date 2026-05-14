@@ -159,7 +159,7 @@ export function missingCredentials(route, cfg) {
 		if (!c.address) return true;
 		return false;
 	}
-	if (r === "bank_transfer") {
+	if (r === "bank_transfer" || r === "bank") {
 		const c = cfg?.creds?.bank || {};
 		if (!c.enabled) return true;
 		if (c.provider !== "LIVE") return true;
@@ -240,7 +240,7 @@ export function getOwnerAccountForType(type) {
 			normEmail(process.env.OWNER_PAYONEER_EMAIL) ||
 			normEmail(process.env.PAYONEER_EMAIL)
 		);
-	if (t === "bank_transfer") {
+	if (t === "bank_transfer" || t === "bank") {
 		return (
 			process.env.OWNER_IBAN ||
 			process.env.MOROCCAN_BANK_RIB ||
