@@ -13,7 +13,11 @@ import path from "node:path";
  */
 export class AutonomousUpgradeAgent {
 	constructor(options = {}) {
-		this.staticRoot = options.staticRoot || path.resolve("dist_rwc");
+		this.staticRoot =
+			options.staticRoot ||
+			process.env.RWC_STATIC_ROOT ||
+			process.env.SITE_STATIC_ROOT ||
+			path.resolve("site", "realworldcerts");
 		this.rankOutput = options.rankOutput || path.resolve("rank", "output");
 		this.upgradeLogPath = path.join(
 			process.cwd(),

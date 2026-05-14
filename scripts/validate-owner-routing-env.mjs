@@ -33,19 +33,22 @@ function main() {
 	if (cfg.settlement_priority.includes("bank_transfer")) {
 		const bank = cfg.creds.bank;
 		out.checks.push(ok("BANK_WIRE_ENABLE", bank.enabled));
-		out.checks.push(ok("BANK_WIRE_PROVIDER", bank.provider === "LIVE"));
+		const prov = String(bank.provider || "").toUpperCase();
+		out.checks.push(ok("BANK_WIRE_PROVIDER", prov === "LIVE" || prov === "WISE"));
 		out.checks.push(ok("OWNER_BENEFICIARY_NAME", has(bank.beneficiaryName)));
-		out.checks.push(
-			ok(
-				"OWNER_IBAN",
-				has(
-					process.env.OWNER_IBAN ||
-						process.env.MOROCCAN_BANK_RIB ||
-						process.env.BANK_IBAN,
-				),
-			),
+		const hasIban = has(
+			process.env.OWNER_IBAN || process.env.MOROCCAN_BANK_RIB || process.env.BANK_IBAN,
 		);
-		out.checks.push(ok("OWNER_SWIFT", has(bank.swift)));
+		const hasUsd = has(process.env.OWNER_ROUTING_NUMBER || process.env.OWNER_ROUTING) && has(process.env.OWNER_ACCOUNT_NUMBER);
+		const hasGbp = has(process.env.OWNER_SORT_CODE) && has(process.env.OWNER_ACCOUNT_NUMBER);
+		out.checks.push(ok("OWNER_BANK_DETAILS", hasIban || hasUsd || hasGbp));
+		if (prov !== "WISE") out.checks.push(ok("OWNER_SWIFT", has(bank.swift)));
+		if (prov === "WISE") {
+			out.checks.push(ok("WISE_ENABLE", b(process.env.WISE_ENABLE)));
+			out.checks.push(ok("WISE_ENVIRONMENT", String(process.env.WISE_ENVIRONMENT || "").toLowerCase() === "live"));
+			out.checks.push(ok("WISE_API_KEY", has(process.env.WISE_API_KEY)));
+			out.checks.push(ok("WISE_PROFILE_ID", has(process.env.WISE_PROFILE_ID)));
+		}
 		try {
 			const allow = JSON.parse(bank.allowlist || "[]");
 			out.checks.push(

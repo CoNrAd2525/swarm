@@ -20,12 +20,24 @@ export function getPaymentConfiguration() {
 		).toLowerCase() === "true";
 	const priorityEnv =
 		process.env.PAYMENT_ROUTING_PRIORITY ||
-		"bank_transfer,payoneer,crypto,paypal,wise,googlepay";
+		"mpc,safe,bank_transfer,crypto,payoneer,wise,paypal,googlepay";
 	const settlement_priority = priorityEnv
 		.split(/[,\s]+/g)
 		.map((r) => r.trim())
 		.filter(Boolean);
 	const creds = {
+		mpc: {
+			enabled:
+				String(process.env.MPC_ENABLE || "false").toLowerCase() === "true",
+			provider: process.env.MPC_PROVIDER || "FIREBLOCKS",
+			org: process.env.MPC_ORG_NAME || "",
+		},
+		safe: {
+			enabled:
+				String(process.env.SAFE_ENABLE || "false").toLowerCase() === "true",
+			chain: String(process.env.SAFE_CHAIN || "").toUpperCase(),
+			address: process.env.SAFE_ADDRESS || "",
+		},
 		paypal: {
 			clientId: process.env.PAYPAL_CLIENT_ID,
 			clientSecret: process.env.PAYPAL_CLIENT_SECRET,
@@ -102,7 +114,7 @@ export function getPaymentConfiguration() {
 		wise: {
 			enabled:
 				String(process.env.WISE_ENABLE || "false").toLowerCase() === "true",
-				email: process.env.OWNER_WISE_EMAIL || process.env.WISE_EMAIL,
+			email: process.env.OWNER_WISE_EMAIL,
 		},
 		googlepay: {
 			enabled:
@@ -121,87 +133,127 @@ export function getPaymentConfiguration() {
 	return { settlement_priority, creds, SAFE_MODE };
 }
 
-export function missingCredentials(route, cfg) {
+export function explainMissingCredentials(route, cfg) {
+	const reasons = [];
 	const live =
 		String(process.env.SWARM_LIVE || "false").toLowerCase() === "true";
-	if (!live) return true;
-	if (cfg?.SAFE_MODE === true) {
-		return true;
-	}
+	if (!live) reasons.push("SWARM_LIVE=false");
+	if (cfg?.SAFE_MODE === true) reasons.push("SAFE_MODE=true");
+	if (reasons.length) return reasons;
 	const r = String(route || "").toLowerCase();
 	if (r === "paypal") {
 		const c = cfg?.creds?.paypal || {};
-		if (c.disabled) return true;
-		if (!getOwnerAccountForType("paypal")) return true;
-		return false;
+		if (c.disabled) reasons.push("PAYPAL_DISABLED_OR_PPP2_NOT_READY");
+		if (!getOwnerAccountForType("paypal"))
+			reasons.push("OWNER_PAYPAL_EMAIL_MISSING");
+		return reasons;
 	}
-	if (r === "bank_transfer") {
+	if (r === "mpc") {
+		const c = cfg?.creds?.mpc || {};
+		if (!c.enabled) reasons.push("MPC_ENABLE=false");
+		if (!c.provider) reasons.push("MPC_PROVIDER_MISSING");
+		return reasons;
+	}
+	if (r === "safe") {
+		const c = cfg?.creds?.safe || {};
+		if (!c.enabled) reasons.push("SAFE_ENABLE=false");
+		if (!c.address) reasons.push("SAFE_ADDRESS_MISSING");
+		return reasons;
+	}
+	if (r === "bank_transfer" || r === "bank") {
 		const c = cfg?.creds?.bank || {};
-		if (!c.enabled) return true;
-		if (c.provider !== "LIVE") return true;
-		if (!c.beneficiaryName || !c.iban || !c.swift) return true;
+		if (!c.enabled) reasons.push("BANK_WIRE_ENABLE=false");
+		const prov = String(c.provider || "").toUpperCase();
+		if (!["LIVE", "WISE"].includes(prov))
+			reasons.push("BANK_WIRE_PROVIDER_UNSUPPORTED");
+		const hasIban = !!String(process.env.OWNER_IBAN || "").trim();
+		const hasUsd =
+			!!String(process.env.OWNER_ROUTING_NUMBER || process.env.OWNER_ROUTING || "")
+				.replace(/\D+/g, "")
+				.trim() && !!String(process.env.OWNER_ACCOUNT_NUMBER || "").replace(/\D+/g, "").trim();
+		const hasGbp =
+			!!String(process.env.OWNER_SORT_CODE || "").replace(/\D+/g, "").trim() &&
+			!!String(process.env.OWNER_ACCOUNT_NUMBER || "").replace(/\D+/g, "").trim();
+		if (!hasIban && !hasUsd && !hasGbp) reasons.push("OWNER_BANK_DETAILS_MISSING");
+		if (!c.beneficiaryName) reasons.push("OWNER_BENEFICIARY_NAME_MISSING");
+		if (prov === "WISE") {
+			if (String(process.env.WISE_ENABLE || "false").toLowerCase() !== "true")
+				reasons.push("WISE_ENABLE=false");
+			if (String(process.env.WISE_ENVIRONMENT || "").toLowerCase() !== "live")
+				reasons.push("WISE_ENVIRONMENT_NOT_LIVE");
+			if (!process.env.WISE_API_KEY) reasons.push("WISE_API_KEY_MISSING");
+			if (!process.env.WISE_PROFILE_ID) reasons.push("WISE_PROFILE_ID_MISSING");
+		} else {
+			if (!c.iban) reasons.push("OWNER_IBAN_MISSING");
+			if (!c.swift) reasons.push("OWNER_SWIFT_MISSING");
+		}
 		try {
 			const allow = JSON.parse(c.allowlist || "[]");
-			if (!Array.isArray(allow) || allow.length === 0) return true;
+			if (!Array.isArray(allow) || allow.length === 0)
+				reasons.push("OWNER_BENEFICIARY_ALLOWLIST_EMPTY");
 		} catch {
-			return true;
+			reasons.push("OWNER_BENEFICIARY_ALLOWLIST_INVALID_JSON");
 		}
-		return false;
+		return reasons;
 	}
 	if (r === "payoneer") {
 		const c = cfg?.creds?.payoneer || {};
-		if (!c.enabled) return true;
-		if (!getOwnerAccountForType("payoneer")) return true;
-		if (
-			isPlaceholder(c.base) ||
-			isPlaceholder(c.clientId) ||
-			isPlaceholder(c.clientSecret)
-		)
-			return true;
-		return false;
+		if (!c.enabled) reasons.push("PAYONEER_ENABLE=false");
+		if (!getOwnerAccountForType("payoneer"))
+			reasons.push("OWNER_PAYONEER_EMAIL_MISSING");
+		if (isPlaceholder(c.base)) reasons.push("PAYONEER_API_BASE_MISSING");
+		if (isPlaceholder(c.clientId)) reasons.push("PAYONEER_CLIENT_ID_MISSING");
+		if (isPlaceholder(c.clientSecret))
+			reasons.push("PAYONEER_CLIENT_SECRET_MISSING");
+		return reasons;
 	}
 	if (r === "payoneer_standard") {
 		const c = cfg?.creds?.payoneer_standard || {};
-		if (!c.enabled) return true;
+		if (!c.enabled) reasons.push("PAYONEER_ENABLE_STANDARD=false");
 		const email = String(c.email || "").trim();
-		if (!email || !email.includes("@")) return true;
-		return false;
+		if (!email || !email.includes("@")) reasons.push("PAYONEER_EMAIL_MISSING");
+		return reasons;
 	}
 	if (r === "crypto") {
 		const c = cfg?.creds?.crypto || {};
-		if (!c.enabled) return true;
-		if (!c.address) return true;
-		return false;
+		if (!c.enabled) reasons.push("CRYPTO_WITHDRAW_ENABLE=false");
+		if (!c.address) reasons.push("TRUST_WALLET_ADDRESS_MISSING");
+		return reasons;
 	}
 	if (r === "cryptobox") {
 		const c = cfg?.creds?.cryptobox || {};
-		if (!c.enabled) return true;
-		return false;
+		if (!c.enabled) reasons.push("CRYPTOBOX_ENABLE=false");
+		return reasons;
 	}
 	if (r === "wise") {
 		const c = cfg?.creds?.wise || {};
-		if (!c.enabled) return true;
+		if (!c.enabled) reasons.push("WISE_ENABLE=false");
 		const email = String(c.email || "").trim();
-		if (!email || !email.includes("@")) return true;
+		if (!email || !email.includes("@")) reasons.push("OWNER_WISE_EMAIL_MISSING");
 		if (String(process.env.WISE_ENVIRONMENT || "").toLowerCase() !== "live")
-			return true;
-		if (!process.env.WISE_API_KEY) return true;
-		return false;
+			reasons.push("WISE_ENVIRONMENT_NOT_LIVE");
+		if (!process.env.WISE_API_KEY) reasons.push("WISE_API_KEY_MISSING");
+		if (!process.env.WISE_PROFILE_ID) reasons.push("WISE_PROFILE_ID_MISSING");
+		return reasons;
 	}
 	if (r === "googlepay") {
 		const c = cfg?.creds?.googlepay || {};
-		if (!c.enabled) return true;
+		if (!c.enabled) reasons.push("GOOGLEPAY_ENABLE=false");
 		const email = String(c.email || "").trim();
-		if (!email || !email.includes("@")) return true;
-		return false;
+		if (!email || !email.includes("@")) reasons.push("GOOGLEPAY_EMAIL_MISSING");
+		return reasons;
 	}
 	if (r === "smart_contract_owner") {
 		const c = cfg?.creds?.smart_contract_owner || {};
-		if (!c.enabled) return true;
-		if (!c.contractAddress) return true;
-		return false;
+		if (!c.enabled) reasons.push("OWNER_VAULT_ENABLE=false");
+		if (!c.contractAddress) reasons.push("OWNER_VAULT_CONTRACT_ADDRESS_MISSING");
+		return reasons;
 	}
-	return true;
+	return ["UNKNOWN_ROUTE"];
+}
+
+export function missingCredentials(route, cfg) {
+	return explainMissingCredentials(route, cfg).length > 0;
 }
 
 export function getOwnerAccountForType(type) {
@@ -219,6 +271,7 @@ export function getOwnerAccountForType(type) {
 	if (t === "bank_transfer") {
 		return (
 			process.env.OWNER_IBAN ||
+			process.env.OWNER_BANK_RIB ||
 			process.env.MOROCCAN_BANK_RIB ||
 			process.env.BANK_IBAN ||
 			null
@@ -226,6 +279,8 @@ export function getOwnerAccountForType(type) {
 	}
 	if (t === "crypto") {
 		return (
+			process.env.OWNER_CRYPTO_ADDRESS ||
+			process.env.OWNER_TRUST_WALLET ||
 			process.env.TRUST_WALLET_ADDRESS ||
 			process.env.TRUST_WALLET_USDT_ERC20 ||
 			null
@@ -234,11 +289,34 @@ export function getOwnerAccountForType(type) {
 	if (t === "cryptobox") {
 		return process.env.BINANCE_CRYPTOBOX_URL || null;
 	}
+	if (t === "mpc") {
+		return process.env.MPC_ORG_NAME || process.env.MPC_PROVIDER || null;
+	}
+	if (t === "safe") {
+		return process.env.SAFE_ADDRESS || null;
+	}
 	if (t === "wise") {
-		return normEmail(process.env.OWNER_WISE_EMAIL);
+		return (
+			normEmail(process.env.OWNER_WISE_EMAIL) ||
+			normEmail(process.env.OWNER_WISE_RECIPIENT_ID)
+		);
 	}
 	if (t === "googlepay") {
-		return normEmail(process.env.OWNER_GOOGLEPAY_EMAIL);
+		return (
+			normEmail(process.env.OWNER_GOOGLEPAY_EMAIL) ||
+			process.env.OWNER_GOOGLEPAY_ID ||
+			null
+		);
+	}
+	if (t === "plaid") {
+		return (
+			process.env.PLAID_OWNER_ACCOUNT_ID ||
+			process.env.OWNER_BANK_ACCOUNT_NUM ||
+			null
+		);
+	}
+	if (t === "cheque") {
+		return process.env.OWNER_BENEFICIARY_NAME || null;
 	}
 	if (t === "smart_contract_owner") {
 		return process.env.OWNER_VAULT_CONTRACT_ADDRESS || null;
@@ -249,5 +327,6 @@ export function getOwnerAccountForType(type) {
 export const OwnerSettlementEnforcer = {
 	getPaymentConfiguration,
 	missingCredentials,
+	explainMissingCredentials,
 	getOwnerAccountForType,
 };

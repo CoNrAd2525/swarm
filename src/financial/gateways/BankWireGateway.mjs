@@ -1,101 +1,55 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { WiseGateway } from "../../finance/gateways/WiseGateway.mjs";
 
+/**
+ * BankWireGateway (LIVE ONLY)
+ *
+ * Simulation paths are removed. This gateway will NOT submit any payment unless
+ * explicitly configured for LIVE provider and required env flags are set.
+ * Use RouteManager failover or disable the route until a real provider is integrated.
+ */
 export class BankWireGateway {
 	constructor({ provider = process.env.BANK_WIRE_PROVIDER, audit } = {}) {
 		this.provider = String(provider || "").toUpperCase();
 		this.audit = audit;
+		this.wise = new WiseGateway({ audit: this.audit });
 	}
 
-	computeBeneficiaryFingerprint({ name, iban, swift }) {
-		const norm = `${String(name || "").trim()}|${String(iban || "")
+	_normIban(v) {
+		return String(v || "")
 			.replace(/\s+/g, "")
-			.toUpperCase()}|${String(swift || "")
-			.trim()
-			.toUpperCase()}`;
-		return crypto.createHash("sha256").update(norm).digest("hex");
+			.toUpperCase()
+			.trim();
 	}
 
-	computeBeneficiaryFingerprintV2(beneficiary) {
-		const b = beneficiary || {};
-		const currency = String(b.currency || "").trim().toUpperCase();
-		const name = String(b.name || "").trim();
-		const iban = String(b.iban || "")
-			.replace(/\s+/g, "")
-			.toUpperCase();
-		const swift = String(b.swift || b.bic || "").trim().toUpperCase();
-		const accountNumber = String(b.accountNumber || "").trim();
-		const routingNumber = String(b.routingNumber || "").trim();
-		const sortCode = String(b.sortCode || "").trim();
-		const bankCode = String(b.bankCode || "").trim();
-		const branchCode = String(b.branchCode || "").trim();
+	_normDigits(v) {
+		return String(v || "").replace(/\D+/g, "").trim();
+	}
 
+	computeBeneficiaryFingerprint({
+		name,
+		currency,
+		iban,
+		swift,
+		routing,
+		sortCode,
+		accountNumber,
+	}) {
 		const norm = [
-			currency,
-			name,
-			iban,
-			swift,
-			accountNumber,
-			routingNumber,
-			sortCode,
-			bankCode,
-			branchCode,
-		]
-			.map((x) => String(x || "").trim())
-			.join("|");
+			String(name || "").trim(),
+			String(currency || "").toUpperCase().trim(),
+			this._normIban(iban),
+			String(swift || "").trim().toUpperCase(),
+			this._normDigits(routing),
+			this._normDigits(sortCode),
+			this._normDigits(accountNumber),
+		].join("|");
 		return crypto.createHash("sha256").update(norm).digest("hex");
 	}
 
-	parseOwnerBeneficiaries() {
-		const raw = process.env.OWNER_BENEFICIARIES_JSON;
-		if (raw) {
-			let parsed = null;
-			try {
-				parsed = JSON.parse(raw);
-			} catch {
-				parsed = null;
-			}
-			if (!Array.isArray(parsed))
-				throw new Error("BankWireGateway: OWNER_BENEFICIARIES_JSON must be an array");
-			return parsed.map((b) => ({
-				currency: String(b?.currency || "").toUpperCase(),
-				name: b?.name,
-				iban: b?.iban,
-				swift: b?.swift,
-				bic: b?.bic,
-				accountNumber: b?.accountNumber,
-				routingNumber: b?.routingNumber,
-				sortCode: b?.sortCode,
-				bankCode: b?.bankCode,
-				branchCode: b?.branchCode,
-				accountType: b?.accountType,
-				bankName: b?.bankName,
-				bankCountry: b?.bankCountry,
-				bankAddress: b?.bankAddress,
-			}));
-		}
-
-		return [
-			{
-				currency: String(process.env.OWNER_BANK_CURRENCY || "USD").toUpperCase(),
-				name: process.env.OWNER_BENEFICIARY_NAME,
-				iban: process.env.OWNER_IBAN,
-				swift: process.env.OWNER_SWIFT,
-				accountNumber: process.env.OWNER_ACCOUNT_NUMBER,
-				routingNumber: process.env.OWNER_ROUTING_NUMBER,
-				sortCode: process.env.OWNER_SORT_CODE,
-				bankCode: process.env.OWNER_BANK_CODE,
-				branchCode: process.env.OWNER_BRANCH_CODE,
-				accountType: process.env.OWNER_ACCOUNT_TYPE,
-				bankName: process.env.OWNER_BANK_NAME,
-				bankCountry: process.env.OWNER_BANK_COUNTRY || undefined,
-				bankAddress: process.env.OWNER_BANK_ADDRESS || undefined,
-			},
-		];
-	}
-
-	ensureReady() {
+	ensureReady({ currency } = {}) {
 		const live =
 			String(process.env.SWARM_LIVE || "false").toLowerCase() === "true";
 		const enabled =
@@ -104,12 +58,51 @@ export class BankWireGateway {
 		if (!enabled)
 			throw new Error("BankWireGateway: BANK_WIRE_ENABLE=true required");
 
-		if (this.provider !== "LIVE") {
+		const provider = String(this.provider || "").toUpperCase();
+		if (!["LIVE", "WISE"].includes(provider)) {
 			throw new Error(
-				"BankWireGateway: Simulation disabled. Set BANK_WIRE_PROVIDER=LIVE or disable route",
+				`BankWireGateway: Unsupported BANK_WIRE_PROVIDER=${provider} (use WISE for automated execution or LIVE for manual instructions)`,
 			);
 		}
 
+		const ccy = String(currency || process.env.OWNER_BANK_CURRENCY || "USD")
+			.toUpperCase()
+			.trim();
+		const owner = {
+			name: process.env.OWNER_BENEFICIARY_NAME,
+			currency: ccy,
+			iban: process.env.OWNER_IBAN,
+			swift: process.env.OWNER_SWIFT,
+			routing: process.env.OWNER_ROUTING_NUMBER || process.env.OWNER_ROUTING,
+			sortCode: process.env.OWNER_SORT_CODE,
+			accountNumber: process.env.OWNER_ACCOUNT_NUMBER,
+			bankName: process.env.OWNER_BANK_NAME,
+			bankCountry: process.env.OWNER_BANK_COUNTRY || undefined,
+		};
+		if (!owner.name) {
+			throw new Error("BankWireGateway: Missing OWNER_BENEFICIARY_NAME");
+		}
+		const hasEur = !!this._normIban(owner.iban);
+		const hasUsd = !!this._normDigits(owner.routing) && !!this._normDigits(owner.accountNumber);
+		const hasGbp = !!this._normDigits(owner.sortCode) && !!this._normDigits(owner.accountNumber);
+		if (!hasEur && !hasUsd && !hasGbp) {
+			throw new Error(
+				"BankWireGateway: Missing bank destination (need OWNER_IBAN or OWNER_ROUTING_NUMBER+OWNER_ACCOUNT_NUMBER or OWNER_SORT_CODE+OWNER_ACCOUNT_NUMBER)",
+			);
+		}
+
+		const fp = this.computeBeneficiaryFingerprint(owner);
+		const legacyFp =
+			hasEur && owner.swift
+				? crypto
+						.createHash("sha256")
+						.update(
+							`${String(owner.name || "").trim()}|${this._normIban(owner.iban)}|${String(owner.swift || "")
+								.trim()
+								.toUpperCase()}`,
+						)
+						.digest("hex")
+				: null;
 		const allowJson = process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON || "[]";
 		let allow = [];
 		try {
@@ -117,37 +110,25 @@ export class BankWireGateway {
 		} catch {
 			allow = [];
 		}
-		const allowSet =
-			Array.isArray(allow) ? new Set(allow.map((x) => String(x))) : new Set();
-
-		const beneficiaries = this.parseOwnerBeneficiaries();
-		if (beneficiaries.length === 0)
-			throw new Error("BankWireGateway: No owner beneficiaries configured");
-
-		const usable = beneficiaries.filter((b) => {
-			if (!b?.name) return false;
-			if (!b?.currency) return false;
-			const hasIban = Boolean(b?.iban && b?.swift);
-			const hasAccount = Boolean(
-				b?.accountNumber &&
-					(b?.routingNumber || b?.sortCode || b?.bankCode || b?.swift || b?.bic),
-			);
-			return hasIban || hasAccount;
-		});
-		if (usable.length === 0)
-			throw new Error(
-				"BankWireGateway: Owner beneficiaries missing required fields",
-			);
-
-		const anyAllowed = usable.some((b) =>
-			allowSet.has(this.computeBeneficiaryFingerprintV2(b)),
+		const allowSet = new Set(
+			Array.isArray(allow) ? allow.map((x) => String(x)) : [],
 		);
-		if (!anyAllowed)
+		const allowed = allowSet.has(fp) || (legacyFp ? allowSet.has(legacyFp) : false);
+		if (!allowed)
 			throw new Error(
 				"BankWireGateway: Owner beneficiary not allowlisted (OWNER_BENEFICIARY_ALLOWLIST_JSON)",
 			);
 
-		return { beneficiaries: usable, allowSet };
+		if (provider === "WISE") {
+			if (String(process.env.WISE_ENABLE || "false").toLowerCase() !== "true")
+				throw new Error("BankWireGateway: WISE_ENABLE=true required");
+			if (String(process.env.WISE_ENVIRONMENT || "").toLowerCase() !== "live")
+				throw new Error("BankWireGateway: WISE_ENVIRONMENT=live required");
+			if (!process.env.WISE_API_KEY || !process.env.WISE_PROFILE_ID)
+				throw new Error("BankWireGateway: Missing WISE_API_KEY/WISE_PROFILE_ID");
+		}
+
+		return { owner };
 	}
 
 	normalizeTransactions(transactions) {
@@ -175,21 +156,33 @@ export class BankWireGateway {
 	}
 
 	async executeTransfer(transactions) {
-		const { beneficiaries, allowSet } = this.ensureReady();
-		const { amount, currency, reference } = this.normalizeTransactions(transactions);
+		const { amount, currency, reference } =
+			this.normalizeTransactions(transactions);
+		const { owner } = this.ensureReady({ currency });
 
-		const beneficiary =
-			beneficiaries.find(
-				(b) => String(b.currency || "").toUpperCase() === String(currency),
-			) || null;
-		if (!beneficiary)
-			throw new Error(`BankWireGateway: No beneficiary configured for ${currency}`);
-
-		const fp = this.computeBeneficiaryFingerprintV2(beneficiary);
-		if (!allowSet.has(fp))
-			throw new Error(
-				"BankWireGateway: Selected beneficiary not allowlisted (OWNER_BENEFICIARY_ALLOWLIST_JSON)",
-			);
+		if (String(this.provider || "").toUpperCase() === "WISE") {
+			const res = await this.wise.executeOwnerBankTransfer({
+				amount,
+				currency,
+				reference,
+			});
+			return {
+				ok: true,
+				route: "bank_wire",
+				mode: "automated",
+				reference,
+				amount,
+				currency,
+				beneficiary: {
+					name: owner.name,
+					currency: owner.currency,
+					bankCountry: owner.bankCountry,
+				},
+				transactionId: res.transactionId,
+				status: res.status,
+				created_at: new Date().toISOString(),
+			};
+		}
 
 		const instructions = {
 			ok: true,
@@ -198,21 +191,7 @@ export class BankWireGateway {
 			reference,
 			amount,
 			currency,
-			beneficiary: {
-				currency: beneficiary.currency,
-				name: beneficiary.name,
-				iban: beneficiary.iban || null,
-				swift: beneficiary.swift || beneficiary.bic || null,
-				accountNumber: beneficiary.accountNumber || null,
-				routingNumber: beneficiary.routingNumber || null,
-				sortCode: beneficiary.sortCode || null,
-				bankCode: beneficiary.bankCode || null,
-				branchCode: beneficiary.branchCode || null,
-				accountType: beneficiary.accountType || null,
-				bankName: beneficiary.bankName || null,
-				bankCountry: beneficiary.bankCountry || null,
-				bankAddress: beneficiary.bankAddress || null,
-			},
+			beneficiary: owner,
 			created_at: new Date().toISOString(),
 		};
 
@@ -238,7 +217,7 @@ export class BankWireGateway {
 				"BANK_WIRE_INSTRUCTIONS_READY",
 				null,
 				null,
-				{ ...instructions, filePath },
+				instructions,
 				"System",
 			);
 		}
