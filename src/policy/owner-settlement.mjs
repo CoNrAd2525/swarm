@@ -268,7 +268,7 @@ export function getOwnerAccountForType(type) {
 			normEmail(process.env.OWNER_PAYONEER_EMAIL) ||
 			normEmail(process.env.PAYONEER_EMAIL)
 		);
-	if (t === "bank_transfer") {
+	if (t === "bank_transfer" || t === "bank") {
 		return (
 			process.env.OWNER_IBAN ||
 			process.env.OWNER_BANK_RIB ||
