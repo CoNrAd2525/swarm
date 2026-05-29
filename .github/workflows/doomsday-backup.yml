@@ -12,6 +12,13 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      DOOMSDAY_ARCHIVE_PASSPHRASE: ${{ secrets.DOOMSDAY_ARCHIVE_PASSPHRASE }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_DOOMSDAY_BUCKET: ${{ secrets.SUPABASE_DOOMSDAY_BUCKET }}
+      GITLAB_MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL }}
+      CODEBERG_MIRROR_URL: ${{ secrets.CODEBERG_MIRROR_URL }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,8 +29,6 @@ jobs:
         run: git fetch --prune --tags origin '+refs/heads/*:refs/heads/*'
 
       - name: Verify encryption secret
-        env:
-          DOOMSDAY_ARCHIVE_PASSPHRASE: ${{ secrets.DOOMSDAY_ARCHIVE_PASSPHRASE }}
         run: |
           if [ -z "${DOOMSDAY_ARCHIVE_PASSPHRASE}" ]; then
             echo "Missing DOOMSDAY_ARCHIVE_PASSPHRASE"
@@ -37,8 +42,6 @@ jobs:
           tar -czf "khwarizmian_swarm_${ts}.tgz" khwarizmian_swarm
 
       - name: Encrypt archive
-        env:
-          DOOMSDAY_ARCHIVE_PASSPHRASE: ${{ secrets.DOOMSDAY_ARCHIVE_PASSPHRASE }}
         run: |
           openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$DOOMSDAY_ARCHIVE_PASSPHRASE" -in "khwarizmian_swarm_${TS}.tgz" -out "khwarizmian_swarm_${TS}.tgz.enc"
           sha256sum "khwarizmian_swarm_${TS}.tgz.enc" | awk '{print $1}' > "khwarizmian_swarm_${TS}.tgz.enc.sha256"
@@ -53,13 +56,9 @@ jobs:
             khwarizmian_swarm_${{ env.TS }}.tgz.enc.sha256
 
       - name: Upload to Supabase Storage
-        if: ${{ secrets.SUPABASE_URL != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_DOOMSDAY_BUCKET: ${{ secrets.SUPABASE_DOOMSDAY_BUCKET || 'doomsday' }}
+        if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' }}
         run: |
-          bucket="${SUPABASE_DOOMSDAY_BUCKET}"
+          bucket="${SUPABASE_DOOMSDAY_BUCKET:-doomsday}"
           base="${SUPABASE_URL}/storage/v1"
           curl -sS -X POST "${base}/bucket" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
@@ -79,17 +78,13 @@ jobs:
             --data-binary @"khwarizmian_swarm_${TS}.tgz.enc.sha256"
 
       - name: Mirror to GitLab
-        if: ${{ secrets.GITLAB_MIRROR_URL != '' }}
-        env:
-          GITLAB_MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL }}
+        if: ${{ env.GITLAB_MIRROR_URL != '' }}
         run: |
           git remote add gitlab "${GITLAB_MIRROR_URL}"
           git push gitlab --mirror
 
       - name: Mirror to Codeberg
-        if: ${{ secrets.CODEBERG_MIRROR_URL != '' }}
-        env:
-          CODEBERG_MIRROR_URL: ${{ secrets.CODEBERG_MIRROR_URL }}
+        if: ${{ env.CODEBERG_MIRROR_URL != '' }}
         run: |
           git remote add codeberg "${CODEBERG_MIRROR_URL}"
           git push codeberg --mirror
