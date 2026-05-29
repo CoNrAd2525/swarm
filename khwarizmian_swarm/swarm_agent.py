@@ -14,7 +14,7 @@ class SwarmAgent:
         command = self.protocol.verify_and_decode_packet(command_packet_str)
         if not command:
             print(f"Agent {self.agent_id}: ERROR - Packet verification failed. Possible forgery.")
-            return
+            return False, "verification_failed"
         intent = command['intent']
         parameters = command['parameters']
         is_authorized, reason = self.kernel.authorize_action(intent, parameters)
@@ -23,6 +23,7 @@ class SwarmAgent:
             self.execute_action(intent, parameters)
         else:
             print(f"Agent {self.agent_id}: BLOCKED - {reason}")
+        return is_authorized, reason
 
     def execute_action(self, intent, parameters):
         handlers = {

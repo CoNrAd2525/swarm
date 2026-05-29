@@ -19,7 +19,7 @@ class EthicalKernel:
         if action_type in self.prohibited_actions:
             self._audit_log.append({'blocked': action_type, 'reason': 'Law 1'})
             return False, f"VIOLATION: Action '{action_type}' is prohibited by EthicalKernel Law 1."
-        if 'kill' in action_type.lower() or 'destroy' in action_type.lower():
+        if any(k in action_type.lower() for k in ('kill', 'destroy', 'weaponize', 'harm', 'attack')):
             self._audit_log.append({'blocked': action_type, 'reason': 'prohibited language'})
             return False, f"VIOLATION: Action '{action_type}' contains prohibited language."
         self._audit_log.append({'authorized': action_type, 'params': parameters})
