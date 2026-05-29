@@ -1,0 +1,95 @@
+name: Doomsday Backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 3 * * 0'
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Fetch all refs
+        run: git fetch --prune --tags origin '+refs/heads/*:refs/heads/*'
+
+      - name: Verify encryption secret
+        env:
+          DOOMSDAY_ARCHIVE_PASSPHRASE: ${{ secrets.DOOMSDAY_ARCHIVE_PASSPHRASE }}
+        run: |
+          if [ -z "${DOOMSDAY_ARCHIVE_PASSPHRASE}" ]; then
+            echo "Missing DOOMSDAY_ARCHIVE_PASSPHRASE"
+            exit 1
+          fi
+
+      - name: Build archive
+        run: |
+          ts=$(date -u +%Y%m%dT%H%M%SZ)
+          echo "TS=$ts" >> "$GITHUB_ENV"
+          tar -czf "khwarizmian_swarm_${ts}.tgz" khwarizmian_swarm
+
+      - name: Encrypt archive
+        env:
+          DOOMSDAY_ARCHIVE_PASSPHRASE: ${{ secrets.DOOMSDAY_ARCHIVE_PASSPHRASE }}
+        run: |
+          openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$DOOMSDAY_ARCHIVE_PASSPHRASE" -in "khwarizmian_swarm_${TS}.tgz" -out "khwarizmian_swarm_${TS}.tgz.enc"
+          sha256sum "khwarizmian_swarm_${TS}.tgz.enc" | awk '{print $1}' > "khwarizmian_swarm_${TS}.tgz.enc.sha256"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: doomsday-${{ env.TS }}
+          name: Doomsday Backup ${{ env.TS }}
+          files: |
+            khwarizmian_swarm_${{ env.TS }}.tgz.enc
+            khwarizmian_swarm_${{ env.TS }}.tgz.enc.sha256
+
+      - name: Upload to Supabase Storage
+        if: ${{ secrets.SUPABASE_URL != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DOOMSDAY_BUCKET: ${{ secrets.SUPABASE_DOOMSDAY_BUCKET || 'doomsday' }}
+        run: |
+          bucket="${SUPABASE_DOOMSDAY_BUCKET}"
+          base="${SUPABASE_URL}/storage/v1"
+          curl -sS -X POST "${base}/bucket" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data "{\"id\":\"${bucket}\",\"name\":\"${bucket}\",\"public\":false}" >/dev/null 2>&1 || true
+
+          object_path="swarm/main/${TS}/khwarizmian_swarm.tgz.enc"
+          curl -sS -X PUT "${base}/object/${bucket}/${object_path}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"khwarizmian_swarm_${TS}.tgz.enc"
+
+          sha_path="swarm/main/${TS}/khwarizmian_swarm.tgz.enc.sha256"
+          curl -sS -X PUT "${base}/object/${bucket}/${sha_path}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: text/plain" \
+            --data-binary @"khwarizmian_swarm_${TS}.tgz.enc.sha256"
+
+      - name: Mirror to GitLab
+        if: ${{ secrets.GITLAB_MIRROR_URL != '' }}
+        env:
+          GITLAB_MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL }}
+        run: |
+          git remote add gitlab "${GITLAB_MIRROR_URL}"
+          git push gitlab --mirror
+
+      - name: Mirror to Codeberg
+        if: ${{ secrets.CODEBERG_MIRROR_URL != '' }}
+        env:
+          CODEBERG_MIRROR_URL: ${{ secrets.CODEBERG_MIRROR_URL }}
+        run: |
+          git remote add codeberg "${CODEBERG_MIRROR_URL}"
+          git push codeberg --mirror
