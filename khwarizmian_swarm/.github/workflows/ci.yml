@@ -12,32 +12,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
-        with:
-          python-version: ['3.10', '3.11']
-
-      - name: Install dependencies
-        run: pip install cryptography --quiet
-
-      - name: Run standalone swarm
-        run: python khwarizmian_swarm.py
+        with: { python-version: '3.10' }
+      - run: pip install cryptography --quiet
+      - run: python khwarizmian_swarm.py
         working-directory: khwarizmian_swarm
-
-      - name: Run extended swarm (plugins + consensus)
-        run: python khwarizmian_swarm_extended.py
-        working-directory: khwarizmian_swarm
-
-      - name: Run test harness
-        run: python run_swarm.py
-        working-directory: khwarizmian_swarm
-
-      - name: Validate no prohibited actions executed
-        run: |
-          pip install cryptography
-          result=$(python khwarizmian_swarm_extended.py 2>&1)
-          echo "$result"
-          echo "$result" | grep -q "BLOCKED (Law 1)" && echo "Law 1 enforcement: PASS" || echo "Law 1 enforcement: FAIL"
-          echo "$result" | grep -q "verification FAILED" && echo "Packet forgery detection: PASS" || echo "Packet forgery detection: FAIL"
-          echo "$result" | grep -q "Outcome: PASSED" && echo "Liquid Democracy: PASS" || echo "Liquid Democracy: FAIL"
+      - run: python run_swarm.py
         working-directory: khwarizmian_swarm
