@@ -1,6 +1,9 @@
 name: Doomsday Backup
 
 on:
+  push:
+    branches:
+      - '**'
   workflow_dispatch:
   schedule:
     - cron: '15 3 * * 0'
