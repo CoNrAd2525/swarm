@@ -559,7 +559,7 @@ async function queryRevenueEvents(query) {
 		`[${new Date().toISOString()}] Found ${recs.length} revenue events.`,
 	);
 	if (!Array.isArray(recs) || recs.length === 0) return [];
-	return recs
+	const mapped = recs
 		.map((row) => ({
 			id: row[cfg.fieldMap.externalId] ?? row.id ?? null,
 			amount: Number(row[cfg.fieldMap.amount] ?? 0),
@@ -569,6 +569,61 @@ async function queryRevenueEvents(query) {
 			created_at: row[cfg.fieldMap.occurredAt] ?? null,
 		}))
 		.filter((e) => e.id && Number.isFinite(e.amount) && e.amount > 0);
+	if (mapped.length === 0 && recs.length > 0) {
+		try {
+			const row = recs[0] || {};
+			const keys = Object.keys(row);
+			const fm = cfg.fieldMap || {};
+			const sample = {
+				at: new Date().toISOString(),
+				entity: cfg.entityName,
+				fieldMap: fm,
+				rowKeys: keys.slice(0, 200),
+				fields: {
+					id: {
+						key: fm.externalId,
+						present: fm.externalId ? row[fm.externalId] != null : false,
+						type: fm.externalId ? typeof row[fm.externalId] : null,
+					},
+					amount: {
+						key: fm.amount,
+						present: fm.amount ? row[fm.amount] != null : false,
+						type: fm.amount ? typeof row[fm.amount] : null,
+						coerced: fm.amount ? Number(row[fm.amount] ?? 0) : null,
+					},
+					currency: {
+						key: fm.currency,
+						present: fm.currency ? row[fm.currency] != null : false,
+						type: fm.currency ? typeof row[fm.currency] : null,
+					},
+					verification_proof: {
+						key: fm.verificationProof,
+						present: fm.verificationProof
+							? row[fm.verificationProof] != null
+							: false,
+						type: fm.verificationProof ? typeof row[fm.verificationProof] : null,
+					},
+					payout_batch_id: {
+						key: fm.payoutBatchId,
+						present: fm.payoutBatchId ? row[fm.payoutBatchId] != null : false,
+						type: fm.payoutBatchId ? typeof row[fm.payoutBatchId] : null,
+					},
+					status: {
+						key: fm.status,
+						present: fm.status ? row[fm.status] != null : false,
+						type: fm.status ? typeof row[fm.status] : null,
+					},
+				},
+			};
+			fs.mkdirSync(path.resolve("exports", "reports"), { recursive: true });
+			fs.writeFileSync(
+				path.resolve("exports", "reports", "revenue_event_fieldmap_debug.json"),
+				`${JSON.stringify(sample, null, 2)}\n`,
+				"utf8",
+			);
+		} catch {}
+	}
+	return mapped;
 }
 
 // ============================================================================
