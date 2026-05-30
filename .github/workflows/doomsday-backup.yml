@@ -16,6 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     if: ${{ env.DOOMSDAY_ARCHIVE_PASSPHRASE != '' }}
+    environment: doomsday
+    concurrency:
+      group: doomsday-backup
+      cancel-in-progress: true
     env:
       DOOMSDAY_ARCHIVE_PASSPHRASE: ${{ secrets.DOOMSDAY_ARCHIVE_PASSPHRASE }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -23,6 +27,8 @@ jobs:
       SUPABASE_DOOMSDAY_BUCKET: ${{ secrets.SUPABASE_DOOMSDAY_BUCKET }}
       GITLAB_MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL }}
       CODEBERG_MIRROR_URL: ${{ secrets.CODEBERG_MIRROR_URL }}
+      DOOMSDAY_PRESIGNED_PUT_URL: ${{ secrets.DOOMSDAY_PRESIGNED_PUT_URL }}
+      DOOMSDAY_PRESIGNED_PUT_URL_SHA256: ${{ secrets.DOOMSDAY_PRESIGNED_PUT_URL_SHA256 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,6 +54,12 @@ jobs:
         run: |
           openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$DOOMSDAY_ARCHIVE_PASSPHRASE" -in "khwarizmian_swarm_${TS}.tgz" -out "khwarizmian_swarm_${TS}.tgz.enc"
           sha256sum "khwarizmian_swarm_${TS}.tgz.enc" | awk '{print $1}' > "khwarizmian_swarm_${TS}.tgz.enc.sha256"
+
+      - name: Upload to Presigned URL
+        if: ${{ env.DOOMSDAY_PRESIGNED_PUT_URL != '' && env.DOOMSDAY_PRESIGNED_PUT_URL_SHA256 != '' }}
+        run: |
+          curl -sS -X PUT -H "Content-Type: application/octet-stream" --data-binary @"khwarizmian_swarm_${TS}.tgz.enc" "${DOOMSDAY_PRESIGNED_PUT_URL}"
+          curl -sS -X PUT -H "Content-Type: text/plain" --data-binary @"khwarizmian_swarm_${TS}.tgz.enc.sha256" "${DOOMSDAY_PRESIGNED_PUT_URL_SHA256}"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

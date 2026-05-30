@@ -21,6 +21,7 @@ permissions:
 jobs:
   withdraw:
     runs-on: ubuntu-latest
+    environment: owner
     concurrency:
       group: owner-crypto-withdraw
       cancel-in-progress: false
@@ -69,3 +70,4 @@ jobs:
             git push
           else
             echo "No files to commit."
+          fi

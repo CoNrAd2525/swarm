@@ -9,9 +9,12 @@ jobs:
   health:
     runs-on: ubuntu-latest
     environment: prod
+    concurrency:
+      group: site-watchdog
+      cancel-in-progress: true
     env:
       SITE_PUBLIC_URL: ${{ secrets.SITE_PUBLIC_URL }}
-      PAYPAL_OWNER_EMAIL: ${{ secrets.PAYPAL_OWNER_EMAIL }} # For smoke test context if needed
+      PAYPAL_OWNER_EMAIL: ${{ secrets.PAYPAL_OWNER_EMAIL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +35,4 @@ jobs:
         if: failure()
         run: |
           echo "::error::Health check failed for ${SITE_PUBLIC_URL}"
-          # Optional: Send email via SMTP or API if secrets exist
-          # if [ -n "${{ secrets.SMTP_HOST }}" ]; then ... fi
           echo "Would send alert to younesdgc@gmail.com"
