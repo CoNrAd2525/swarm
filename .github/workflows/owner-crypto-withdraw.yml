@@ -41,12 +41,17 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Install
-        run: npm ci
+        run: npm ci || npm i
       - name: Execute withdraw
         id: withdraw
         run: |
+          if [ -z "${BINANCE_API_KEY:-}" ] || [ -z "${BINANCE_API_SECRET:-}" ]; then
+            echo '{"ok":false,"reason":"missing_binance_secrets"}' > out.json
+            cat out.json
+            exit 0
+          fi
           node ./scripts/execute-crypto-withdraw.mjs --amount "${{ inputs.amount }}" > out.json || true
           cat out.json
       - name: Upload artifact
