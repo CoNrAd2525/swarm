@@ -400,9 +400,50 @@ async function performSettlementCycle() {
 			return;
 		}
 
-		logger.info(`📦 Found ${readyEvents.length} events ready for settlement`);
+		function resolveSettlementTotalCapUsd() {
+			const uncapped = String(process.env.UNCAPPED_CONFIRM || "").trim();
+			if (uncapped === "I_ACCEPT_UNCAPPED_SETTLEMENT") return null;
+			const raw = String(process.env.SETTLEMENT_TOTAL_CAP_USD || "").trim();
+			if (!raw) return 500;
+			const n = Number(raw);
+			return Number.isFinite(n) && n > 0 ? n : 500;
+		}
 
-		const grouped = _groupEventsByRail(readyEvents);
+		function applySettlementCap(events, capUsd) {
+			if (capUsd == null) return events;
+			const sorted = [...events].sort((a, b) => {
+				const ta = Date.parse(a?.created_at || "") || 0;
+				const tb = Date.parse(b?.created_at || "") || 0;
+				return tb - ta;
+			});
+			const out = [];
+			let sum = 0;
+			for (const e of sorted) {
+				const amt = Number(e?.amount || 0);
+				if (!Number.isFinite(amt) || amt <= 0) continue;
+				if (sum + amt > capUsd) continue;
+				out.push(e);
+				sum += amt;
+			}
+			logger.info(
+				`📌 Settlement cap applied: ${out.length}/${events.length} events selected, total=${sum.toFixed(2)} cap=${capUsd}`,
+			);
+			return out;
+		}
+
+		const capUsd = resolveSettlementTotalCapUsd();
+		const cappedEvents = applySettlementCap(readyEvents, capUsd);
+		if (cappedEvents.length === 0) {
+			logger.info("✅ No events selected under settlement cap");
+			await syncPendingWiseTransfers(externalGatewayManager);
+			return;
+		}
+
+		logger.info(
+			`📦 Found ${readyEvents.length} events ready for settlement (selected ${cappedEvents.length})`,
+		);
+
+		const grouped = _groupEventsByRail(cappedEvents);
 		const rails = CONFIG.RAIL_PRIORITY.filter((r) => grouped[r]?.length > 0);
 		for (const rail of rails) {
 			try {
@@ -531,6 +572,7 @@ async function queryRevenueEvents(query) {
 			})
 			.map((row) => ({
 				id: row.id ?? null,
+				external_id: row.external_id ?? row.event_id ?? row.eventId ?? null,
 				amount: Number(row.amount ?? 0),
 				currency: row.currency ?? cfg.defaultCurrency,
 				verification_proof: row.id,
@@ -568,12 +610,21 @@ async function queryRevenueEvents(query) {
 	if (!Array.isArray(recs) || recs.length === 0) return [];
 	const mapped = recs
 		.map((row) => ({
-			id: row[cfg.fieldMap.externalId] ?? row.id ?? null,
+			id: row.id ?? null,
+			external_id:
+				(cfg.fieldMap.externalId ? row[cfg.fieldMap.externalId] : null) ??
+				row.event_id ??
+				row.external_id ??
+				null,
 			amount: Number(row[cfg.fieldMap.amount] ?? 0),
 			currency: row[cfg.fieldMap.currency] ?? cfg.defaultCurrency,
 			verification_proof: row[cfg.fieldMap.verificationProof] ?? null,
 			status: row[cfg.fieldMap.status] ?? null,
-			created_at: row[cfg.fieldMap.occurredAt] ?? null,
+			created_at:
+				row[cfg.fieldMap.occurredAt] ??
+				row.confirmation_date ??
+				row.created_date ??
+				null,
 		}))
 		.filter((e) => {
 			if (!e.id || !Number.isFinite(e.amount) || !(e.amount > 0)) return false;
@@ -891,6 +942,8 @@ async function executePayPalSettlement(batch) {
 	logger.info("💳 Executing PayPal payout...");
 
 	if (!shouldWritePayoutLedger()) return { ok: true };
+	if ((process.env.ALLOW_PAYPAL_EXECUTION || "false").toLowerCase() !== "true")
+		return { ok: false, reason: "paypal_execution_not_allowed" };
 	if (!isPayPalPayoutSendEnabled())
 		return { ok: false, reason: "paypal_send_disabled" };
 	requireLiveMode("submit_paypal_payout_batch");
@@ -1037,6 +1090,8 @@ async function executePayoneerSettlement(batch) {
  */
 async function executeWiseSettlement(batch, gatewayManager) {
 	logger.info("💳 Executing Wise payout via API...");
+	if ((process.env.ALLOW_BANK_EXECUTION || "false").toLowerCase() !== "true")
+		return { ok: false, reason: "bank_execution_not_allowed" };
 
 	const _ownerAccounts = getOwnerAccounts();
 	const recipient =
@@ -1113,6 +1168,8 @@ async function executePlaidSettlement(batch) {
  */
 async function executeCryptoSettlement(batch, gatewayManager) {
 	logger.info("💳 Executing Crypto payout via API...");
+	if ((process.env.ALLOW_CRYPTO_EXECUTION || "false").toLowerCase() !== "true")
+		return { ok: false, reason: "crypto_execution_not_allowed" };
 
 	const ownerAccounts = getOwnerAccounts();
 	const destination = ownerAccounts.crypto;
@@ -1210,18 +1267,14 @@ async function markEventsSettled(eventIds, batchId) {
 
 	for (const eventId of eventIds) {
 		try {
-			const recs = await entity.filter(
-				{ [cfg.fieldMap.externalId]: eventId },
-				"-created_date",
-				1,
-				0,
-			);
-			if (recs.length > 0) {
-				await entity.update(recs[0].id, {
-					[cfg.fieldMap.payoutBatchId]: batchId,
-					[cfg.fieldMap.status]: "SETTLED",
-				});
-			}
+			const patch = {
+				...(cfg.fieldMap.payoutBatchId
+					? { [cfg.fieldMap.payoutBatchId]: batchId }
+					: {}),
+				...(cfg.fieldMap.status ? { [cfg.fieldMap.status]: "SETTLED" } : {}),
+				settled: true,
+			};
+			await entity.update(String(eventId), patch);
 		} catch (error) {
 			console.error(`❌ Failed to mark event ${eventId} as settled:`, error);
 		}
@@ -1237,7 +1290,11 @@ function isSundayNow() {
 }
 
 function shouldWritePayoutLedger() {
-	return (process.env.WRITE_PAYOUT_LEDGER || "true").toLowerCase() === "true";
+	const v =
+		process.env.BASE44_ENABLE_PAYOUT_LEDGER_WRITE ??
+		process.env.WRITE_PAYOUT_LEDGER ??
+		"true";
+	return String(v).toLowerCase() === "true";
 }
 
 function isPayPalPayoutSendEnabled() {
