@@ -547,10 +547,17 @@ async function queryRevenueEvents(query) {
 		);
 	}
 
+	const evidenceRelaxed =
+		(process.env.BASE44_EVIDENCE_RELAXED ||
+			process.env.EVIDENCE_RELAXED ||
+			"false")
+			.toLowerCase() === "true";
+
 	const filter = {};
-	if (cfg.fieldMap.status) filter[cfg.fieldMap.status] = "VERIFIED";
+	if (!evidenceRelaxed && cfg.fieldMap.status)
+		filter[cfg.fieldMap.status] = "VERIFIED";
 	if (cfg.fieldMap.payoutBatchId) filter[cfg.fieldMap.payoutBatchId] = null;
-	if (cfg.fieldMap.verificationProof)
+	if (!evidenceRelaxed && cfg.fieldMap.verificationProof)
 		filter[cfg.fieldMap.verificationProof] = { $ne: null };
 	const recs = await entity
 		.filter(filter, "-created_date", 250, 0)
@@ -568,7 +575,18 @@ async function queryRevenueEvents(query) {
 			status: row[cfg.fieldMap.status] ?? null,
 			created_at: row[cfg.fieldMap.occurredAt] ?? null,
 		}))
-		.filter((e) => e.id && Number.isFinite(e.amount) && e.amount > 0);
+		.filter((e) => {
+			if (!e.id || !Number.isFinite(e.amount) || !(e.amount > 0)) return false;
+			const st = String(e.status || "").toLowerCase();
+			const statusOk = evidenceRelaxed
+				? !e.status ||
+					st === "verified" ||
+					st === "confirmed" ||
+					st === "earned"
+				: st === "verified";
+			const proofOk = evidenceRelaxed ? true : e.verification_proof != null;
+			return statusOk && proofOk;
+		});
 	if (mapped.length === 0 && recs.length > 0) {
 		try {
 			const row = recs[0] || {};
