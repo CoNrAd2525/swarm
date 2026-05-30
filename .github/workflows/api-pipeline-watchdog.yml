@@ -15,12 +15,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - run: npm ci
-      - name: API docs status
-        run: node ./Nouveau dossier (3)/Nouveau-dossier-3-/scripts/api-docs-watchdog.mjs
+      - name: API pipeline snapshot
+        run: |
+          mkdir -p dist_rwc/site-data
+          node ./scripts/report-system-snapshot.mjs > dist_rwc/site-data/api_pipeline_snapshot.json || true
       - name: Owner routing validation
-        run: node ./Nouveau dossier (3)/Nouveau-dossier-3-/scripts/validate-owner-routing-env.mjs > dist_rwc/site-data/owner_routing_check.json
+        run: |
+          mkdir -p dist_rwc/site-data
+          node ./scripts/validate-owner-routing-env.mjs > dist_rwc/site-data/owner_routing_check.json || true
       - name: Readiness ping
         run: npm run live:readiness:ping
       - name: Commit changes

@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install deps (if any)
         run: |
@@ -42,6 +42,10 @@ jobs:
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID_WEB }}
         run: |
+          if [ -z "${GOOGLE_CLIENT_ID:-}" ]; then
+            echo "Missing GOOGLE_CLIENT_ID_WEB; skipping SSO injection."
+            exit 0
+          fi
           node ./scripts/inject-google-sso.mjs
 
       - name: Commit and push if changed
