@@ -803,12 +803,21 @@ async function createPayoutBatch(rail, events, options = {}) {
 		rail === "PAYPAL"
 			? ownerAccounts.paypal
 			: rail === "BANK_WIRE"
-				? ownerAccounts.bank.rib
-				: rail === "WISE"
-					? ownerAccounts.wise.recipientId || ownerAccounts.wise.email
-					: rail === "CRYPTO"
-						? ownerAccounts.crypto.address
-						: ownerAccounts.payoneer.accountId;
+				? ownerAccounts.bank.iban || ownerAccounts.bank.rib
+				: rail === "CHEQUE"
+					? ownerAccounts.bank.name
+					: rail === "PAYONEER"
+						? ownerAccounts.payoneer.accountId
+						: rail === "WISE"
+							? ownerAccounts.wise.recipientId || ownerAccounts.wise.email
+							: rail === "GOOGLEPAY"
+								? ownerAccounts.googlepay.email
+								: rail === "PLAID"
+									? ownerAccounts.plaid.accountId
+									: rail === "CRYPTO"
+										? ownerAccounts.crypto.address
+										: null;
+	if (!recipient) throw new Error(`missing_recipient_for_rail_${rail}`);
 
 	const batch = {
 		batch_id: `BATCH_${rail}_${Date.now()}`,
