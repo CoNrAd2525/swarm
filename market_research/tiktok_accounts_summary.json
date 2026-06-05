@@ -1,0 +1,127 @@
+{
+  "import_date": "2026-05-27",
+  "source": "younesli00 TikTok Following",
+  "total_accounts": 149,
+  "tiers": {
+    "mega": 1,
+    "macro": 13,
+    "mid": 28,
+    "micro": 64,
+    "nano": 43
+  },
+  "niches": {
+    "ecommerce": 17,
+    "art_design": 18,
+    "tech": 13,
+    "self_improvement": 3,
+    "spirituality": 3,
+    "finance": 2,
+    "health": 3,
+    "comedy": 1,
+    "religion": 2,
+    "general": 104
+  },
+  "top_accounts": [
+    {
+      "username": "qurantv1997",
+      "tier": "mega",
+      "followers": 1000000,
+      "niche": "religion"
+    },
+    {
+      "username": "techdropp",
+      "tier": "macro",
+      "followers": 480700,
+      "niche": "tech"
+    },
+    {
+      "username": "flourishingphilosophy",
+      "tier": "macro",
+      "followers": 474200,
+      "niche": "self_improvement"
+    },
+    {
+      "username": "moksha_3m",
+      "tier": "macro",
+      "followers": 392800,
+      "niche": "spirituality"
+    },
+    {
+      "username": "creeps.world",
+      "tier": "macro",
+      "followers": 301100,
+      "niche": "general"
+    },
+    {
+      "username": "queen_counsel",
+      "tier": "macro",
+      "followers": 268900,
+      "niche": "self_improvement"
+    },
+    {
+      "username": "thoughtplunge",
+      "tier": "macro",
+      "followers": 277900,
+      "niche": "self_improvement"
+    },
+    {
+      "username": "uatac_uniform",
+      "tier": "macro",
+      "followers": 164100,
+      "niche": "ecommerce"
+    },
+    {
+      "username": "restorationofthebreach",
+      "tier": "macro",
+      "followers": 160000,
+      "niche": "religion"
+    },
+    {
+      "username": "meublesmaisonsafi",
+      "tier": "macro",
+      "followers": 143500,
+      "niche": "ecommerce"
+    }
+  ],
+  "high_engagement_gems": [
+    {
+      "username": "lfasi.shop",
+      "tier": "nano",
+      "followers": 164,
+      "engagement_rate": 32.55
+    },
+    {
+      "username": "redabxqnjfs",
+      "tier": "nano",
+      "followers": 51,
+      "engagement_rate": 73.53
+    },
+    {
+      "username": "ditaye01",
+      "tier": "nano",
+      "followers": 16,
+      "engagement_rate": 62.5
+    },
+    {
+      "username": "patron.watches",
+      "tier": "nano",
+      "followers": 100,
+      "engagement_rate": 74.17
+    },
+    {
+      "username": "culturium",
+      "tier": "nano",
+      "followers": 100,
+      "engagement_rate": 74.17
+    }
+  ],
+  "swarm_status_breakdown": {
+    "prospect": 149,
+    "contacted": 0,
+    "active_partner": 0,
+    "rejected": 0,
+    "monitoring": 0
+  },
+  "entity": "TikTokAccount",
+  "endpoint": "https://superagent-d5a9f123.base44.app/functions/swarmSupervisor"
+}
