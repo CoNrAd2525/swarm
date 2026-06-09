@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-06-09T16:29:41.701Z",
+  "env": {
+    "SWARM_LIVE": false,
+    "BASE44_ENABLE_PAYOUT_LEDGER_WRITE": false,
+    "BASE44_ENABLE_PAYPAL_PAYOUT_STATUS_WRITE": false,
+    "BASE44_EVIDENCE_RELAXED": false,
+    "BUNKER_MODE": false,
+    "PAYPAL_OWNER_EMAIL": false,
+    "PAYPAL_CLIENT_ID": false,
+    "PAYPAL_CLIENT_SECRET": false
+  },
+  "components": {
+    "paypal_gateway_present": true
+  },
+  "gates": {
+    "payment_kill_switch": false,
+    "owner_routing_verified": false,
+    "client_creds_present": false
+  },
+  "direct_rails_ready": {
+    "paypal": false,
+    "crypto_usdt_erc20": true,
+    "payoneer": true,
+    "bank_wire": true
+  },
+  "overall_ready": false
+}
