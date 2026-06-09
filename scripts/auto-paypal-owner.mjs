@@ -23,19 +23,19 @@ function buildWebscrLink(email, amount, currency, itemName){
   params.set("bn","PP-BuyNowBF:btn_buynowCC_LG.gif:NonHosted");
   return "https://www.paypal.com/cgi-bin/webscr?" + params.toString();
 }
-const ownerEmail = process.env.PAYPAL_OWNER_EMAIL || "younestsouli2019@gmail.com";
+const ownerEmail = process.env.PAYPAL_OWNER_EMAIL || "";
 const srcCsv = path.resolve("archive","owner_settlement_requests.csv");
-const outJson = path.resolve("dist_rwc","site-data","payer_links.json");
-const outCsv = path.resolve("dist_rwc","site-data","payer_links.csv");
+const outJson = path.resolve("rank","output","site-data","payer_links.json");
+const outCsv = path.resolve("rank","output","site-data","payer_links.csv");
 const rows = readCsv(srcCsv);
 const links = rows.map(r=>({
   ref: r.Reference || "",
   amount: Number(r.Amount||0),
   currency: r.Currency || "USD",
   route: "PayPal",
-  link: buildWebscrLink(ownerEmail, r.Amount, r.Currency, r.Reference)
+  link: ownerEmail ? buildWebscrLink(ownerEmail, r.Amount, r.Currency, r.Reference) : ""
 }));
 ensureDir(path.dirname(outJson));
 fs.writeFileSync(outJson, JSON.stringify(links,null,2), "utf8");
 fs.writeFileSync(outCsv, ["ref,amount,currency,route,link"].concat(links.map(l=>[l.ref,l.amount,l.currency,l.route,l.link].join(","))).join("\n"), "utf8");
-console.log(JSON.stringify({ ok:true, count: links.length, outJson, outCsv }));
+console.log(JSON.stringify({ ok:true, count: links.length, ownerEmailConfigured: !!ownerEmail, outJson, outCsv }));

@@ -970,6 +970,37 @@ function addOwnerRecipientsToPolicy(policy) {
 	if (ownerPayPal) policy.paypal.add(ownerPayPal);
 	if (ownerPayoneer) policy.payoneer.add(ownerPayoneer);
 	if (ownerBank) policy.bankWireAccounts.add(ownerBank);
+	try {
+		const ownerAllowlist = JSON.parse(
+			String(process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON || "[]"),
+		);
+		if (Array.isArray(ownerAllowlist)) {
+			for (const entry of ownerAllowlist) {
+				const rail = String(entry?.rail ?? "").trim().toLowerCase();
+				const email = normalizeEmailAddress(
+					entry?.email ?? entry?.recipient ?? entry?.paypal ?? null,
+				);
+				const payoneerEmail = normalizeEmailAddress(
+					entry?.payoneer ?? entry?.email ?? entry?.recipient ?? null,
+				);
+				const bank = normalizeBankAccount(
+					entry?.iban ?? entry?.account ?? entry?.recipient ?? null,
+				);
+				if ((!rail || rail === "paypal") && email) policy.paypal.add(email);
+				if ((!rail || rail === "payoneer") && payoneerEmail)
+					policy.payoneer.add(payoneerEmail);
+				if (
+					(!rail ||
+						rail === "bank" ||
+						rail === "bank_wire" ||
+						rail === "bank_transfer") &&
+					bank
+				) {
+					policy.bankWireAccounts.add(bank);
+				}
+			}
+		}
+	} catch {}
 	const configured =
 		policy.paypal.size > 0 ||
 		policy.payoneer.size > 0 ||
@@ -1084,7 +1115,7 @@ function isRecipientAllowedByPolicy(recipientType, recipient, policy) {
 function requireAllowedRecipientsForPayPalSend(policy) {
 	if (policy?.paypal && policy.paypal.size > 0) return;
 	throw new Error(
-		"Refusing PayPal send without owner allowlist (set AUTONOMOUS_ALLOWED_PAYPAL_RECIPIENTS or AUTONOMOUS_ALLOWED_PAYOUT_RECIPIENTS_JSON)",
+		"Refusing PayPal send without owner allowlist (set OWNER_BENEFICIARY_ALLOWLIST_JSON or AUTONOMOUS_ALLOWED_PAYPAL_RECIPIENTS or AUTONOMOUS_ALLOWED_PAYOUT_RECIPIENTS_JSON)",
 	);
 }
 

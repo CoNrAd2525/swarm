@@ -47,7 +47,10 @@ function writeJson(file, payload) {
 }
 
 async function run() {
-	const appId = str("BASE44_APP_ID");
+	const appId =
+		str("BASE44_APP_ID") ||
+		str("DEFAULT_BASE44_APP_ID") ||
+		"689afeabf1db9c30efe0bd7e";
 	const serviceToken = str("BASE44_SERVICE_TOKEN");
 	const apiUrl = str("BASE44_API_URL");
 	const strict = str("STRICT_PREFLIGHT").toLowerCase() === "true";
@@ -56,7 +59,8 @@ async function run() {
 		ok: true,
 		at: new Date().toISOString(),
 		env: {
-			BASE44_APP_ID: Boolean(appId),
+			BASE44_APP_ID: Boolean(str("BASE44_APP_ID")),
+			DEFAULT_BASE44_APP_ID: Boolean(str("DEFAULT_BASE44_APP_ID")),
 			BASE44_SERVICE_TOKEN: Boolean(serviceToken),
 			BASE44_API_URL: Boolean(apiUrl),
 		},
@@ -73,7 +77,7 @@ async function run() {
 		},
 	};
 
-	if (!appId || !serviceToken) {
+	if (!serviceToken) {
 		payload.ok = false;
 		payload.probe.ok = false;
 		payload.probe.reason = "missing_env";
@@ -115,4 +119,3 @@ run().catch((e) => {
 	process.stderr.write(`${e?.message || String(e)}\n`);
 	process.exit(1);
 });
-

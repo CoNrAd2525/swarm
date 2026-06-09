@@ -15,12 +15,18 @@ jobs:
           node-version: "20"
       - name: Refresh dataset
         run: node ./scripts/refresh-scrapes.mjs
+      - name: Upload scrapes artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: refresh-scrapes
+          path: rank/output/site-data/scrapes.json
       - name: Commit changes (if any)
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             git config user.name "rwc-bot"
             git config user.email "rwc-bot@users.noreply.github.com"
-            git add dist_rwc/site-data/scrapes.json
+            git add rank/output/site-data/scrapes.json
             git commit -m "chore: refresh scrapes dataset"
             git push
           fi

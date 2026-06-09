@@ -59,6 +59,15 @@ function safeJsonParse(maybeJson, fallback) {
 	}
 }
 
+function parseOwnerBeneficiaryAllowlistJson() {
+	const raw = process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON;
+	if (raw == null || !String(raw).trim() || isPlaceholderValue(raw)) {
+		return [];
+	}
+	const parsed = safeJsonParse(String(raw), []);
+	return Array.isArray(parsed) ? parsed : [];
+}
+
 function getAllowedRecipientsPolicyFromEnv() {
 	const json =
 		process.env.AUTONOMOUS_ALLOWED_PAYOUT_RECIPIENTS_JSON ??
@@ -131,6 +140,24 @@ function getAllowedRecipientsPolicyFromEnv() {
 			bankWireAccounts.map((x) => normalizeBankAccount(x)).filter(Boolean),
 		),
 	};
+	for (const entry of parseOwnerBeneficiaryAllowlistJson()) {
+		const rail = String(entry?.rail ?? "").trim().toLowerCase();
+		const email = normalizeEmailAddress(
+			entry?.email ?? entry?.recipient ?? entry?.paypal ?? null,
+		);
+		const payoneerEmail = normalizeEmailAddress(
+			entry?.payoneer ?? entry?.email ?? entry?.recipient ?? null,
+		);
+		const bankAcct = normalizeBankAccount(
+			entry?.iban ?? entry?.recipient ?? entry?.account ?? null,
+		);
+		if ((!rail || rail === "paypal") && email) policy.paypal.add(email);
+		if ((!rail || rail === "payoneer") && payoneerEmail)
+			policy.payoneer.add(payoneerEmail);
+		if ((!rail || rail === "bank_wire" || rail === "bank" || rail === "bank_transfer") && bankAcct) {
+			policy.bankWireAccounts.add(bankAcct);
+		}
+	}
 	const configured =
 		policy.paypal.size > 0 ||
 		policy.payoneer.size > 0 ||

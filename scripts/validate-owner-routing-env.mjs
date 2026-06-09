@@ -13,11 +13,26 @@ function has(v) {
 	return v != null && String(v).trim() !== "";
 }
 
+function anyTrue(...names) {
+	return names.some((name) => b(process.env[name]));
+}
+
 function main() {
 	const cfg = OwnerSettlementEnforcer.getPaymentConfiguration();
 	const out = {
 		SWARM_LIVE: b(process.env.SWARM_LIVE),
 		routes: cfg.settlement_priority,
+		all_routes_enabled: anyTrue(
+			"ENABLE_ALL_OWNER_ROUTES",
+			"OWNER_ALL_ROUTES_ENABLED",
+			"ENABLE_ALL_PAYOUT_ROUTES",
+			"AUTONOMOUS_ENABLE_ALL_PAYOUT_ROUTES",
+		),
+		relaxed_limits: anyTrue(
+			"RELAX_OWNER_LIMITS",
+			"OWNER_LIMITS_RELAXED",
+			"RELAX_SETTLEMENT_LIMITS",
+		),
 		checks: [],
 	};
 

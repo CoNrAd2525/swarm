@@ -19,6 +19,41 @@ import { OwnerSettlementEnforcer } from "../src/policy/owner-settlement.mjs";
 
 const logger = console;
 
+// #region debug-point A:report-helper
+function reportDebugEvent(hypothesisId, location, msg, data) {
+	try {
+		const envPath = path.resolve(
+			process.cwd(),
+			".dbg",
+			"owner-payout-reconcile.env",
+		);
+		let url = "http://127.0.0.1:7777/event";
+		let sessionId = "owner-payout-reconcile";
+		try {
+			const envText = fs.readFileSync(envPath, "utf8");
+			const urlMatch = envText.match(/^DEBUG_SERVER_URL=(.+)$/m);
+			const sessionMatch = envText.match(/^DEBUG_SESSION_ID=(.+)$/m);
+			if (urlMatch?.[1]) url = String(urlMatch[1]).trim();
+			if (sessionMatch?.[1]) sessionId = String(sessionMatch[1]).trim();
+		} catch {}
+		const payload = JSON.stringify({
+			sessionId,
+			runId: "pre-fix",
+			hypothesisId,
+			location,
+			msg: `[DEBUG] ${msg}`,
+			data: data ?? {},
+			ts: Date.now(),
+		});
+		fetch(url, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: payload,
+		}).catch(() => {});
+	} catch {}
+}
+// #endregion
+
 // ============================================================================
 // LIVE BACKEND DEPENDENCIES - NO MOCKS
 // ============================================================================
@@ -272,6 +307,140 @@ function _validateAuthorizedOwnerAccounts(rail, recipientData) {
 	);
 }
 
+function _truthyEnv(name) {
+	return String(process.env[name] || "false").toLowerCase() === "true";
+}
+
+function _isAnyEnvTrue(...names) {
+	return names.some((name) => _truthyEnv(name));
+}
+
+function _allOwnerRoutesEnabled() {
+	return _isAnyEnvTrue(
+		"ENABLE_ALL_OWNER_ROUTES",
+		"OWNER_ALL_ROUTES_ENABLED",
+		"ENABLE_ALL_PAYOUT_ROUTES",
+		"AUTONOMOUS_ENABLE_ALL_PAYOUT_ROUTES",
+	);
+}
+
+function _ownerLimitsRelaxed() {
+	return _isAnyEnvTrue(
+		"RELAX_OWNER_LIMITS",
+		"OWNER_LIMITS_RELAXED",
+		"RELAX_SETTLEMENT_LIMITS",
+	);
+}
+
+function _ensureReportsDir() {
+	const dir = path.join(process.cwd(), "exports", "reports");
+	fs.mkdirSync(dir, { recursive: true });
+	return dir;
+}
+
+function _writeJsonReport(filename, obj) {
+	const dir = _ensureReportsDir();
+	const full = path.join(dir, filename);
+	fs.writeFileSync(full, JSON.stringify(obj, null, 2));
+	return full;
+}
+
+function _parseOwnerBeneficiaryAllowlist() {
+	let raw = String(process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON || "").trim();
+	if (!raw) raw = "[]";
+	let arr;
+	try {
+		arr = JSON.parse(raw);
+	} catch {
+		arr = [];
+	}
+	if (!Array.isArray(arr)) arr = [];
+	return arr
+		.map((x) => {
+			if (typeof x === "string") return { recipient: x };
+			if (x && typeof x === "object") return x;
+			return null;
+		})
+		.filter(Boolean);
+}
+
+function _normalizeRecipient(x) {
+	return String(x || "")
+		.trim()
+		.toLowerCase();
+}
+
+function _isRailMoneyMoving(rail) {
+	return rail === "PAYPAL" || rail === "WISE" || rail === "CRYPTO";
+}
+
+function _isRailExecutionEnabled(rail) {
+	if (rail === "PAYPAL") return isPayPalPayoutSendEnabled();
+	if (rail === "CRYPTO")
+		return _allOwnerRoutesEnabled() || _isAnyEnvTrue("ALLOW_CRYPTO_EXECUTION", "CRYPTO_WITHDRAW_ENABLE");
+	if (rail === "WISE")
+		return _allOwnerRoutesEnabled() || _isAnyEnvTrue("ALLOW_BANK_EXECUTION", "WISE_ENABLE");
+	return false;
+}
+
+function _enforceRecipientAllowlist(rail, recipient) {
+	if (!_isRailMoneyMoving(rail)) return;
+	if (!_isRailExecutionEnabled(rail)) return;
+	const allow = _parseOwnerBeneficiaryAllowlist();
+	if (allow.length === 0) throw new Error("missing_owner_beneficiary_allowlist");
+	const needle = _normalizeRecipient(recipient);
+	const ok = allow.some((entry) => {
+		const entryRail = entry?.rail ? String(entry.rail).toUpperCase() : null;
+		if (entryRail && entryRail !== rail) return false;
+		if (entry?.recipient) return _normalizeRecipient(entry.recipient) === needle;
+		if (entry?.iban) return _normalizeRecipient(entry.iban) === needle;
+		if (entry?.address) return _normalizeRecipient(entry.address) === needle;
+		if (entry?.email) return _normalizeRecipient(entry.email) === needle;
+		return false;
+	});
+	if (!ok) throw new Error(`recipient_not_allowlisted_for_${rail}`);
+}
+
+function _resolveSettlementTotalCapUsd() {
+	const uncapped = String(process.env.UNCAPPED_CONFIRM || "").trim();
+	if (uncapped === "I_ACCEPT_UNCAPPED_SETTLEMENT") return null;
+	const raw = String(process.env.SETTLEMENT_TOTAL_CAP_USD || "").trim();
+	if (!raw) return _ownerLimitsRelaxed() ? 25000 : 500;
+	const n = Number(raw);
+	return Number.isFinite(n) && n > 0 ? n : _ownerLimitsRelaxed() ? 25000 : 500;
+}
+
+function _resolveRailCapUsd(rail) {
+	const uncapped = String(process.env.UNCAPPED_CONFIRM || "").trim();
+	if (uncapped === "I_ACCEPT_UNCAPPED_SETTLEMENT") return null;
+	const k1 = `SETTLEMENT_CAP_USD_${String(rail).toUpperCase()}`;
+	const k2 = `SETTLEMENT_CAP_${String(rail).toUpperCase()}_USD`;
+	const k3 = `CAP_${String(rail).toUpperCase()}_USD`;
+	const raw = String(process.env[k1] || process.env[k2] || process.env[k3] || "").trim();
+	if (!raw) return _ownerLimitsRelaxed() ? 10000 : null;
+	const n = Number(raw);
+	return Number.isFinite(n) && n > 0 ? n : _ownerLimitsRelaxed() ? 10000 : null;
+}
+
+function _selectEventsUnderCap(events, capUsd) {
+	if (capUsd == null) return events;
+	const sorted = [...events].sort((a, b) => {
+		const ta = Date.parse(a?.created_at || "") || 0;
+		const tb = Date.parse(b?.created_at || "") || 0;
+		return tb - ta;
+	});
+	const out = [];
+	let sum = 0;
+	for (const e of sorted) {
+		const amt = Number(e?.amount || 0);
+		if (!Number.isFinite(amt) || amt <= 0) continue;
+		if (sum + amt > capUsd) continue;
+		out.push(e);
+		sum += amt;
+	}
+	return out;
+}
+
 // ============================================================================
 // MAIN SETTLEMENT LOOP
 // ============================================================================
@@ -381,6 +550,36 @@ async function syncPendingWiseTransfers(gatewayManager) {
  * Main settlement cycle - runs periodically
  */
 async function performSettlementCycle() {
+	const cycleStartedAt = new Date().toISOString();
+	const summary = {
+		started_at: cycleStartedAt,
+		evidence_relaxed:
+			(
+				process.env.BASE44_EVIDENCE_RELAXED ||
+				process.env.EVIDENCE_RELAXED ||
+				(_ownerLimitsRelaxed() ? "true" : "false")
+			).toLowerCase() === "true",
+		caps: {
+			total_usd: _resolveSettlementTotalCapUsd(),
+			per_rail_usd: {},
+		},
+		execution: {
+			allow_bank: isWiseEnabled() || isBankWireEnabled(),
+			allow_paypal: isPayPalPayoutSendEnabled(),
+			allow_crypto: isCryptoEnabled(),
+		},
+		counts: {
+			ready_events: 0,
+			selected_events: 0,
+			settled_events: 0,
+		},
+		totals: {
+			selected_amount_usd: 0,
+			settled_amount_usd: 0,
+		},
+		rails: {},
+		errors: [],
+	};
 	try {
 		state.markCheck();
 		console.log(
@@ -392,50 +591,47 @@ async function performSettlementCycle() {
 
 		// Step 1: Fetch verified revenue events ready for settlement
 		const readyEvents = await queryRevenueEvents({});
+		summary.counts.ready_events = readyEvents.length;
 
 		if (readyEvents.length === 0) {
 			logger.info("✅ No events ready for settlement");
 			// Step 1.5: Sync pending Wise transfers even if no new events
 			await syncPendingWiseTransfers(externalGatewayManager);
+			summary.finished_at = new Date().toISOString();
+			_writeJsonReport("settlement_summary.json", summary);
 			return;
 		}
 
-		function resolveSettlementTotalCapUsd() {
-			const uncapped = String(process.env.UNCAPPED_CONFIRM || "").trim();
-			if (uncapped === "I_ACCEPT_UNCAPPED_SETTLEMENT") return null;
-			const raw = String(process.env.SETTLEMENT_TOTAL_CAP_USD || "").trim();
-			if (!raw) return 500;
-			const n = Number(raw);
-			return Number.isFinite(n) && n > 0 ? n : 500;
+		const perRailSelected = {};
+		for (const rail of CONFIG.RAIL_PRIORITY) {
+			const cap = _resolveRailCapUsd(rail);
+			if (cap != null) summary.caps.per_rail_usd[rail] = cap;
 		}
 
-		function applySettlementCap(events, capUsd) {
-			if (capUsd == null) return events;
-			const sorted = [...events].sort((a, b) => {
-				const ta = Date.parse(a?.created_at || "") || 0;
-				const tb = Date.parse(b?.created_at || "") || 0;
-				return tb - ta;
-			});
-			const out = [];
-			let sum = 0;
-			for (const e of sorted) {
-				const amt = Number(e?.amount || 0);
-				if (!Number.isFinite(amt) || amt <= 0) continue;
-				if (sum + amt > capUsd) continue;
-				out.push(e);
-				sum += amt;
-			}
-			logger.info(
-				`📌 Settlement cap applied: ${out.length}/${events.length} events selected, total=${sum.toFixed(2)} cap=${capUsd}`,
-			);
-			return out;
+		const groupedAll = _groupEventsByRail(readyEvents);
+		for (const rail of Object.keys(groupedAll)) {
+			const cap = _resolveRailCapUsd(rail);
+			perRailSelected[rail] = _selectEventsUnderCap(groupedAll[rail] || [], cap);
 		}
 
-		const capUsd = resolveSettlementTotalCapUsd();
-		const cappedEvents = applySettlementCap(readyEvents, capUsd);
+		const combined = Object.values(perRailSelected).flat();
+		const capUsd = _resolveSettlementTotalCapUsd();
+		const cappedEvents = _selectEventsUnderCap(combined, capUsd);
+		const selectedTotal = cappedEvents.reduce(
+			(sum, e) => sum + (Number(e?.amount || 0) || 0),
+			0,
+		);
+		summary.counts.selected_events = cappedEvents.length;
+		summary.totals.selected_amount_usd = Number(selectedTotal.toFixed(2));
+		logger.info(
+			`📌 Caps applied: ready=${readyEvents.length} selected=${cappedEvents.length} total=${selectedTotal.toFixed(2)} cap_total=${capUsd ?? "UNCAPPED"}`,
+		);
+
 		if (cappedEvents.length === 0) {
-			logger.info("✅ No events selected under settlement cap");
+			logger.info("✅ No events selected under settlement caps");
 			await syncPendingWiseTransfers(externalGatewayManager);
+			summary.finished_at = new Date().toISOString();
+			_writeJsonReport("settlement_summary.json", summary);
 			return;
 		}
 
@@ -446,20 +642,49 @@ async function performSettlementCycle() {
 		const grouped = _groupEventsByRail(cappedEvents);
 		const rails = CONFIG.RAIL_PRIORITY.filter((r) => grouped[r]?.length > 0);
 		for (const rail of rails) {
+			const railEvents = grouped[rail] || [];
+			summary.rails[rail] = {
+				ready_events: (groupedAll?.[rail] || []).length,
+				selected_events: railEvents.length,
+				selected_amount_usd: Number(
+					railEvents
+						.reduce((sum, e) => sum + (Number(e?.amount || 0) || 0), 0)
+						.toFixed(2),
+				),
+			};
 			try {
-				await _processRailBatch(rail, grouped[rail]);
+				const r = await _processRailBatch(rail, railEvents);
+				if (r?.batch_id) summary.rails[rail].batch_id = r.batch_id;
+				if (r?.ok === false) summary.rails[rail].status = "skipped";
+				if (r?.ok === true) summary.rails[rail].status = "executed";
+				if (r?.reason) summary.rails[rail].reason = r.reason;
+				if (Array.isArray(r?.settled_event_ids)) {
+					summary.rails[rail].settled_events = r.settled_event_ids.length;
+					summary.counts.settled_events += r.settled_event_ids.length;
+					summary.totals.settled_amount_usd = Number(
+						(summary.totals.settled_amount_usd + (r.settled_amount_usd || 0)).toFixed(2),
+					);
+				}
 			} catch (error) {
 				logger.error(`❌ Failed to process ${rail} batch:`, error.message);
 				state.addError(error);
+				summary.rails[rail].status = "failed";
+				summary.rails[rail].reason = error.message;
+				summary.errors.push({ rail, message: error.message });
 				// Continue to next rail
 			}
 		}
 
 		// Step 3: Final status sync
 		await syncPendingWiseTransfers(externalGatewayManager);
+		summary.finished_at = new Date().toISOString();
+		_writeJsonReport("settlement_summary.json", summary);
 	} catch (error) {
 		logger.error("❌ Settlement cycle error:", error);
 		state.addError(error);
+		summary.finished_at = new Date().toISOString();
+		summary.errors.push({ rail: null, message: error.message });
+		_writeJsonReport("settlement_summary.json", summary);
 	}
 }
 
@@ -516,9 +741,19 @@ async function queryRevenueEvents(query) {
 		`[${new Date().toISOString()}] Querying revenue events with: ${JSON.stringify(query)}`,
 	);
 
+	const evidenceRelaxed =
+		(process.env.BASE44_EVIDENCE_RELAXED ||
+			process.env.EVIDENCE_RELAXED ||
+			"false")
+			.toLowerCase() === "true";
+
 	const storePath = path.join(process.cwd(), ".base44-offline-store.json");
+	const autoDetectOfflineStore =
+		(process.env.BASE44_OFFLINE_AUTODETECT || "false").toLowerCase() === "true";
 	const hasOfflineStore =
-		fs.existsSync(storePath) && fs.statSync(storePath).size > 1000000; // > 1MB
+		autoDetectOfflineStore &&
+		fs.existsSync(storePath) &&
+		fs.statSync(storePath).size > 1000000;
 	const isOffline =
 		(process.env.BASE44_OFFLINE_MODE || "false").toLowerCase() === "true" ||
 		hasOfflineStore;
@@ -566,9 +801,13 @@ async function queryRevenueEvents(query) {
 				const isSettled =
 					row.settled === true || !!row.payoutBatchId || !!row.payout_batch_id;
 				const status = String(row.status || "").toLowerCase();
-				const isVerified =
-					!row.status || status === "verified" || status === "confirmed";
-				return !isSettled && isVerified;
+				const statusOk = evidenceRelaxed
+					? status !== "settled" &&
+						status !== "cancelled" &&
+						status !== "canceled" &&
+						status !== "refunded"
+					: !row.status || status === "verified" || status === "confirmed";
+				return !isSettled && statusOk;
 			})
 			.map((row) => ({
 				id: row.id ?? null,
@@ -588,12 +827,6 @@ async function queryRevenueEvents(query) {
 			(e) => e.id && Number.isFinite(e.amount) && e.amount > 0,
 		);
 	}
-
-	const evidenceRelaxed =
-		(process.env.BASE44_EVIDENCE_RELAXED ||
-			process.env.EVIDENCE_RELAXED ||
-			"false")
-			.toLowerCase() === "true";
 
 	const filter = {};
 	if (!evidenceRelaxed && cfg.fieldMap.status)
@@ -752,7 +985,13 @@ async function _processRailBatch(rail, events, options = {}) {
 			logger.info(
 				`⏳ Batch requires manual approval (${totalAmount} ${events[0]?.currency || "USD"})`,
 			);
-			return; // Wait for manual approval
+			return {
+				ok: false,
+				reason: "manual_approval_required",
+				batch_id: batch.batch_id,
+				settled_event_ids: [],
+				settled_amount_usd: 0,
+			};
 		}
 	}
 
@@ -771,7 +1010,13 @@ async function _processRailBatch(rail, events, options = {}) {
 			logger.info(
 				`⏳ Settlement execution not completed for ${rail}: ${String(execResult?.reason ?? "unknown")}`,
 			);
-			return;
+			return {
+				ok: false,
+				reason: String(execResult?.reason ?? "execution_not_completed"),
+				batch_id: batch.batch_id,
+				settled_event_ids: [],
+				settled_amount_usd: 0,
+			};
 		}
 		await markEventsSettled(
 			events.map((e) => e.id),
@@ -779,10 +1024,24 @@ async function _processRailBatch(rail, events, options = {}) {
 		);
 	} else {
 		logger.info("⏳ Execution scheduled for Sunday");
+		return {
+			ok: false,
+			reason: "scheduled_for_sunday",
+			batch_id: batch.batch_id,
+			settled_event_ids: [],
+			settled_amount_usd: 0,
+		};
 	}
 
 	state.markSettlement(totalAmount);
 	logger.info(`✅ Settled ${events.length} events via ${rail}`);
+	return {
+		ok: true,
+		reason: null,
+		batch_id: batch.batch_id,
+		settled_event_ids: events.map((e) => e.id),
+		settled_amount_usd: Number(totalAmount.toFixed(2)),
+	};
 }
 
 // ============================================================================
@@ -818,6 +1077,7 @@ async function createPayoutBatch(rail, events, options = {}) {
 										? ownerAccounts.crypto.address
 										: null;
 	if (!recipient) throw new Error(`missing_recipient_for_rail_${rail}`);
+	_enforceRecipientAllowlist(rail, recipient);
 
 	const batch = {
 		batch_id: `BATCH_${rail}_${Date.now()}`,
@@ -949,12 +1209,24 @@ async function executeSettlement(rail, batch) {
  */
 async function executePayPalSettlement(batch) {
 	logger.info("💳 Executing PayPal payout...");
+	// #region debug-point B:paypal-gates
+	reportDebugEvent(
+		"B",
+		"scripts/auto-settle-owner-daemon.mjs:executePayPalSettlement",
+		"checking paypal payout gates",
+		{
+			batchId: batch?.batch_id ?? null,
+			shouldWritePayoutLedger: shouldWritePayoutLedger(),
+			allowPayPalExecution: isPayPalPayoutSendEnabled(),
+			paypalSendEnabled: isPayPalPayoutSendEnabled(),
+			swarmLive: (process.env.SWARM_LIVE || "false").toLowerCase() === "true",
+		},
+	);
+	// #endregion
 
 	if (!shouldWritePayoutLedger()) return { ok: true };
-	if ((process.env.ALLOW_PAYPAL_EXECUTION || "false").toLowerCase() !== "true")
-		return { ok: false, reason: "paypal_execution_not_allowed" };
 	if (!isPayPalPayoutSendEnabled())
-		return { ok: false, reason: "paypal_send_disabled" };
+		return { ok: false, reason: "paypal_execution_not_allowed" };
 	requireLiveMode("submit_paypal_payout_batch");
 	const items = batch.items.map((item) => ({
 		recipient_type: "EMAIL",
@@ -970,6 +1242,18 @@ async function executePayPalSettlement(batch) {
 		emailMessage: `Payout batch ${batch.batch_id}`,
 	});
 	const paypalBatchId = response?.batch_header?.payout_batch_id ?? null;
+	// #region debug-point B:paypal-submitted
+	reportDebugEvent(
+		"B",
+		"scripts/auto-settle-owner-daemon.mjs:executePayPalSettlement",
+		"paypal payout submission result",
+		{
+			batchId: batch?.batch_id ?? null,
+			itemCount: items.length,
+			paypalBatchId,
+		},
+	);
+	// #endregion
 	logger.info("✅ PayPal payout submitted:", paypalBatchId);
 	const base44 = buildBase44ServiceClient();
 	const batchEntity = base44.asServiceRole.entities.PayoutBatch;
@@ -1099,7 +1383,7 @@ async function executePayoneerSettlement(batch) {
  */
 async function executeWiseSettlement(batch, gatewayManager) {
 	logger.info("💳 Executing Wise payout via API...");
-	if ((process.env.ALLOW_BANK_EXECUTION || "false").toLowerCase() !== "true")
+	if (!isWiseEnabled())
 		return { ok: false, reason: "bank_execution_not_allowed" };
 
 	const _ownerAccounts = getOwnerAccounts();
@@ -1177,7 +1461,7 @@ async function executePlaidSettlement(batch) {
  */
 async function executeCryptoSettlement(batch, gatewayManager) {
 	logger.info("💳 Executing Crypto payout via API...");
-	if ((process.env.ALLOW_CRYPTO_EXECUTION || "false").toLowerCase() !== "true")
+	if (!isCryptoEnabled())
 		return { ok: false, reason: "crypto_execution_not_allowed" };
 
 	const ownerAccounts = getOwnerAccounts();
@@ -1268,12 +1552,14 @@ async function updateLedgerForAPISettlement(batchId, status, gatewayRef) {
 async function markEventsSettled(eventIds, batchId) {
 	logger.info(`📝 Marking ${eventIds.length} events as settled`);
 
-	if (!shouldWritePayoutLedger()) return;
+	if (!shouldWritePayoutLedger()) return { updated: 0, failed: [] };
 
 	const base44 = buildBase44ServiceClient();
 	const cfg = getRevenueConfigFromEnv();
 	const entity = base44.asServiceRole.entities[cfg.entityName];
 
+	let updated = 0;
+	const failed = [];
 	for (const eventId of eventIds) {
 		try {
 			const patch = {
@@ -1284,10 +1570,13 @@ async function markEventsSettled(eventIds, batchId) {
 				settled: true,
 			};
 			await entity.update(String(eventId), patch);
+			updated += 1;
 		} catch (error) {
 			console.error(`❌ Failed to mark event ${eventId} as settled:`, error);
+			failed.push(String(eventId));
 		}
 	}
+	return { updated, failed };
 }
 
 // ============================================================================
@@ -1307,9 +1596,46 @@ function shouldWritePayoutLedger() {
 }
 
 function isPayPalPayoutSendEnabled() {
-	return (
-		(process.env.ENABLE_PAYPAL_PAYOUT_SEND || "false").toLowerCase() === "true"
+	if (_allOwnerRoutesEnabled()) return true;
+	if (
+		_isAnyEnvTrue(
+			"AUTONOMOUS_ALLOW_PAYPAL_PAYOUTS",
+			"BASE44_ALLOW_PAYPAL_PAYOUTS",
+		)
+	)
+		return true;
+	if (_truthyEnv("ALLOW_PAYPAL_EXECUTION")) return true;
+	if (_truthyEnv("ENABLE_PAYPAL_PAYOUT_SEND")) return true;
+	const approved = _isAnyEnvTrue("PAYPAL_PPP2_APPROVED", "PPP2_APPROVED");
+	const sendEnabled = _isAnyEnvTrue(
+		"PAYPAL_PPP2_ENABLE_SEND",
+		"PPP2_ENABLE_SEND",
 	);
+	return approved && sendEnabled;
+}
+
+function isBankWireEnabled() {
+	return _allOwnerRoutesEnabled() || _truthyEnv("BANK_WIRE_ENABLE");
+}
+
+function isWiseEnabled() {
+	return _allOwnerRoutesEnabled() || _isAnyEnvTrue("WISE_ENABLE", "ALLOW_BANK_EXECUTION");
+}
+
+function isCryptoEnabled() {
+	return _allOwnerRoutesEnabled() || _isAnyEnvTrue("CRYPTO_WITHDRAW_ENABLE", "ALLOW_CRYPTO_EXECUTION");
+}
+
+function isPayoneerEnabled() {
+	return _allOwnerRoutesEnabled() || _isAnyEnvTrue("PAYONEER_ENABLE", "PAYONEER_ENABLE_STANDARD");
+}
+
+function isGooglePayEnabled() {
+	return _allOwnerRoutesEnabled() || _truthyEnv("GOOGLEPAY_ENABLE");
+}
+
+function isPlaidEnabled() {
+	return _allOwnerRoutesEnabled() || _truthyEnv("PLAID_ENABLED");
 }
 
 function requireLiveMode(action) {
@@ -1447,40 +1773,144 @@ function selectOptimalOwnerAccount(amount, currency) {
 		!!accounts.paypal &&
 		isPayPalPayoutSendEnabled() &&
 		(process.env.SWARM_LIVE || "false").toLowerCase() === "true";
+	const bankWireReady =
+		isBankWireEnabled() &&
+		!!accounts.bank &&
+		(accounts.bank.rib || accounts.bank.iban) &&
+		accounts.bank.name;
+	const chequeReady = !!accounts.bank && accounts.bank.name;
+	const payoneerReady =
+		isPayoneerEnabled() && !!accounts.payoneer && accounts.payoneer.accountId;
+	const wiseReady =
+		isWiseEnabled() &&
+		!!accounts.wise &&
+		(accounts.wise.email || accounts.wise.recipientId);
+	const googlePayReady =
+		isGooglePayEnabled() && !!accounts.googlepay && accounts.googlepay.email;
+	const plaidReady =
+		isPlaidEnabled() && !!accounts.plaid && accounts.plaid.accountId;
+	const cryptoReady = isCryptoEnabled() && !!accounts.crypto && accounts.crypto.address;
+	// #region debug-point A:owner-rail-selection
+	reportDebugEvent(
+		"A",
+		"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+		"evaluating owner payout rail",
+		{
+			amount,
+			currency,
+			priority,
+			paypalReady,
+			bankWireReady,
+			chequeReady,
+			payoneerReady,
+			wiseReady,
+			googlePayReady,
+			plaidReady,
+			cryptoReady,
+		},
+	);
+	// #endregion
 
 	for (const rail of priority) {
 		const t = String(rail || "").toLowerCase();
-		if (t === "paypal" && paypalReady) return { type: "PAYPAL" };
-		if (
-			t === "bank_wire" &&
-			accounts.bank &&
-			(accounts.bank.rib || accounts.bank.iban) &&
-			accounts.bank.name
-		)
+		if (t === "paypal" && paypalReady) {
+			// #region debug-point A:owner-rail-picked
+			reportDebugEvent(
+				"A",
+				"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+				"selected owner payout rail",
+				{ rail: "PAYPAL", amount, currency },
+			);
+			// #endregion
+			return { type: "PAYPAL" };
+		}
+		if (t === "bank_wire" && bankWireReady) {
+			// #region debug-point A:owner-rail-picked
+			reportDebugEvent(
+				"A",
+				"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+				"selected owner payout rail",
+				{ rail: "BANK_WIRE", amount, currency },
+			);
+			// #endregion
 			return { type: "BANK_WIRE" };
-		if (t === "cheque" && accounts.bank && accounts.bank.name)
+		}
+		if (t === "cheque" && chequeReady) {
+			// #region debug-point A:owner-rail-picked
+			reportDebugEvent(
+				"A",
+				"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+				"selected owner payout rail",
+				{ rail: "CHEQUE", amount, currency },
+			);
+			// #endregion
 			return { type: "CHEQUE" };
-		if (t === "payoneer" && accounts.payoneer && accounts.payoneer.accountId)
+		}
+		if (t === "payoneer" && payoneerReady) {
+			// #region debug-point A:owner-rail-picked
+			reportDebugEvent(
+				"A",
+				"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+				"selected owner payout rail",
+				{ rail: "PAYONEER", amount, currency },
+			);
+			// #endregion
 			return { type: "PAYONEER" };
-		if (
-			t === "wise" &&
-			accounts.wise &&
-			(accounts.wise.email || accounts.wise.recipientId)
-		)
+		}
+		if (t === "wise" && wiseReady) {
+			// #region debug-point A:owner-rail-picked
+			reportDebugEvent(
+				"A",
+				"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+				"selected owner payout rail",
+				{ rail: "WISE", amount, currency },
+			);
+			// #endregion
 			return { type: "WISE" };
-		if (t === "googlepay" && accounts.googlepay && accounts.googlepay.email)
+		}
+		if (t === "googlepay" && googlePayReady) {
+			// #region debug-point A:owner-rail-picked
+			reportDebugEvent(
+				"A",
+				"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+				"selected owner payout rail",
+				{ rail: "GOOGLEPAY", amount, currency },
+			);
+			// #endregion
 			return { type: "GOOGLEPAY" };
-		if (
-			t === "plaid" &&
-			(process.env.PLAID_ENABLED || "false").toLowerCase() === "true" &&
-			accounts.plaid &&
-			accounts.plaid.accountId
-		)
+		}
+		if (t === "plaid" && plaidReady) {
+			// #region debug-point A:owner-rail-picked
+			reportDebugEvent(
+				"A",
+				"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+				"selected owner payout rail",
+				{ rail: "PLAID", amount, currency },
+			);
+			// #endregion
 			return { type: "PLAID" };
-		if (t === "crypto" && accounts.crypto && accounts.crypto.address)
+		}
+		if (t === "crypto" && cryptoReady) {
+			// #region debug-point A:owner-rail-picked
+			reportDebugEvent(
+				"A",
+				"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+				"selected owner payout rail",
+				{ rail: "CRYPTO", amount, currency },
+			);
+			// #endregion
 			return { type: "CRYPTO" };
+		}
 	}
 
+	// #region debug-point A:no-owner-rail
+	reportDebugEvent(
+		"A",
+		"scripts/auto-settle-owner-daemon.mjs:selectOptimalOwnerAccount",
+		"no owner payout rail found",
+		{ amount, currency, priority },
+	);
+	// #endregion
 	throw new Error(`No suitable owner account found for ${amount} ${currency}`);
 }
 

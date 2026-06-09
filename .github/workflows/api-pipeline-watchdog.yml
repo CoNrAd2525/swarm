@@ -15,18 +15,26 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
       - run: npm ci || npm i
       - name: API pipeline snapshot
         run: |
-          mkdir -p dist_rwc/site-data
-          node ./scripts/report-system-snapshot.mjs > dist_rwc/site-data/api_pipeline_snapshot.json || true
+          mkdir -p rank/output/site-data
+          node ./scripts/report-system-snapshot.mjs > rank/output/site-data/api_pipeline_snapshot.json || true
       - name: Owner routing validation
         run: |
-          mkdir -p dist_rwc/site-data
-          node ./scripts/validate-owner-routing-env.mjs > dist_rwc/site-data/owner_routing_check.json || true
+          mkdir -p rank/output/site-data
+          node ./scripts/validate-owner-routing-env.mjs > rank/output/site-data/owner_routing_check.json || true
       - name: Readiness ping
         run: npm run live:readiness:ping
+      - name: Upload watchdog artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-pipeline-watchdog
+          path: |
+            rank/output/site-data/api_pipeline_snapshot.json
+            rank/output/site-data/owner_routing_check.json
       - name: Commit changes
         run: |
           if [ "${{ vars.AUTOCOMMIT_ENABLE || 'false' }}" != "true" ]; then

@@ -5,6 +5,9 @@ import dotenv from "dotenv";
 
 dotenv.config({ override: true });
 
+const DEFAULT_BASE44_APP_ID =
+	process.env.DEFAULT_BASE44_APP_ID || "689afeabf1db9c30efe0bd7e";
+
 function normalizeUrlBase(url) {
 	const s = String(url ?? "").trim();
 	if (!s) return null;
@@ -382,6 +385,9 @@ function getOnlineAuth() {
 		const inferred = inferAppIdFromServiceToken(serviceToken);
 		if (inferred) appId = normalizeAppIdInput(inferred);
 	}
+	if (!appId && (serviceToken || apiKeyRaw)) {
+		appId = normalizeAppIdInput(DEFAULT_BASE44_APP_ID);
+	}
 	if (!appId)
 		throw new Error(
 			"Missing Base44 app id (set BASE44_APP_ID or supply BASE44_API_KEY with appId)",
@@ -423,6 +429,31 @@ export function buildBase44Client({
 
 export function buildBase44ServiceClient({ mode = "auto" } = {}) {
 	return buildBase44Client({ allowMissing: false, mode });
+}
+
+export async function ensureBase44UserAuth(base44) {
+	const email =
+		coerceNonEmptyString(process.env.BASE44_EMAIL) ||
+		coerceNonEmptyString(process.env.BASE44_LOGIN_EMAIL) ||
+		null;
+	const password =
+		coerceNonEmptyString(process.env.BASE44_PASSWORD) ||
+		coerceNonEmptyString(process.env.BASE44_LOGIN_PASSWORD) ||
+		null;
+	if (!email || !password) return { ok: false, reason: "missing_env" };
+	if (!base44?.auth?.loginViaEmailPassword)
+		return { ok: false, reason: "missing_sdk_auth" };
+	try {
+		await base44.auth.loginViaEmailPassword(email, password);
+		return { ok: true };
+	} catch (e) {
+		return {
+			ok: false,
+			reason: "login_failed",
+			status: Number.isFinite(e?.status) ? e.status : null,
+			message: e?.message || String(e),
+		};
+	}
 }
 
 export { resolveServerUrl };

@@ -1,7 +1,7 @@
 name: Deploy Static Site to GitHub Pages
 on:
   push:
-    branches: [release]
+    branches: [main, release]
   workflow_dispatch:
   schedule:
     - cron: "0 3 * * 1"
@@ -20,6 +20,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install deps (for build)
+        run: npm ci --omit=dev
+      - name: Build GitHub Pages bundle
+        run: node ./scripts/build-pages.mjs
       - name: Upload static artifact
         uses: actions/upload-pages-artifact@v3
         with:

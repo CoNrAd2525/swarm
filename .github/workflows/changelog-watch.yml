@@ -1,0 +1,43 @@
+name: Changelog Watch
+on:
+  schedule:
+    - cron: "15 4 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: changelog-watch
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci --omit=dev || npm ci || npm i
+      - name: Poll changelogs
+        run: node ./scripts/changelog-watch.mjs
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-watch
+          path: rank/output/site-data/changelog_watch.json
+      - name: Commit changes
+        run: |
+          if [ "${{ vars.AUTOCOMMIT_ENABLE || 'false' }}" != "true" ]; then
+            echo "Autocommit disabled."
+            exit 0
+          fi
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore: refresh changelog watch"
+            git push
+          else
+            echo "No changes to commit."
+          fi
+

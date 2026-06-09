@@ -55,7 +55,7 @@ function readiness(){
     overall_ready: ownerEmailOk && swarmLive && payoutsWriteOk && !killSwitch,
   };
 }
-const outPath = path.resolve("dist_rwc","site-data","payments_readiness.json");
+const outPath = path.resolve("rank","output","site-data","payments_readiness.json");
 ensureDir(path.dirname(outPath));
 const r = readiness();
 fs.writeFileSync(outPath, JSON.stringify(r,null,2), "utf8");

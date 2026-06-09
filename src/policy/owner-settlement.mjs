@@ -13,6 +13,26 @@ function normEmail(v) {
 	return s.includes("@") ? s.toLowerCase() : null;
 }
 
+function envTrue(...names) {
+	return names.some((name) => {
+		const v = process.env[name];
+		return v != null && String(v).toLowerCase() === "true";
+	});
+}
+
+function allOwnerRoutesEnabled() {
+	return envTrue(
+		"ENABLE_ALL_OWNER_ROUTES",
+		"OWNER_ALL_ROUTES_ENABLED",
+		"ENABLE_ALL_PAYOUT_ROUTES",
+		"AUTONOMOUS_ENABLE_ALL_PAYOUT_ROUTES",
+	);
+}
+
+function routeEnabled(...names) {
+	return allOwnerRoutesEnabled() || envTrue(...names);
+}
+
 export function getPaymentConfiguration() {
 	const SAFE_MODE =
 		String(
@@ -25,57 +45,39 @@ export function getPaymentConfiguration() {
 		.split(/[,\s]+/g)
 		.map((r) => r.trim())
 		.filter(Boolean);
+	const allRoutes = allOwnerRoutesEnabled();
 	const creds = {
 		mpc: {
-			enabled:
-				String(process.env.MPC_ENABLE || "false").toLowerCase() === "true",
+			enabled: routeEnabled("MPC_ENABLE"),
 			provider: process.env.MPC_PROVIDER || "FIREBLOCKS",
 			org: process.env.MPC_ORG_NAME || "",
 		},
 		safe: {
-			enabled:
-				String(process.env.SAFE_ENABLE || "false").toLowerCase() === "true",
+			enabled: routeEnabled("SAFE_ENABLE"),
 			chain: String(process.env.SAFE_CHAIN || "").toUpperCase(),
 			address: process.env.SAFE_ADDRESS || "",
 		},
 		paypal: {
 			clientId: process.env.PAYPAL_CLIENT_ID,
 			clientSecret: process.env.PAYPAL_CLIENT_SECRET,
-			approved:
-				String(
-					process.env.PAYPAL_PPP2_APPROVED ||
-						process.env.PPP2_APPROVED ||
-						"false",
-				).toLowerCase() === "true",
-			enableSend:
-				String(
-					process.env.PAYPAL_PPP2_ENABLE_SEND ||
-						process.env.PPP2_ENABLE_SEND ||
-						"false",
-				).toLowerCase() === "true",
+			approved: allRoutes || routeEnabled("PAYPAL_PPP2_APPROVED", "PPP2_APPROVED"),
+			enableSend: allRoutes ||
+				routeEnabled("PAYPAL_PPP2_ENABLE_SEND", "PPP2_ENABLE_SEND"),
 			disabled: (() => {
 				const raw =
 					String(process.env.PAYPAL_DISABLED || "false").toLowerCase() ===
 					"true";
 				const approved =
-					String(
-						process.env.PAYPAL_PPP2_APPROVED ||
-							process.env.PPP2_APPROVED ||
-							"false",
-					).toLowerCase() === "true";
+					allRoutes ||
+					routeEnabled("PAYPAL_PPP2_APPROVED", "PPP2_APPROVED");
 				const sendEnabled =
-					String(
-						process.env.PAYPAL_PPP2_ENABLE_SEND ||
-							process.env.PPP2_ENABLE_SEND ||
-							"false",
-					).toLowerCase() === "true";
+					allRoutes ||
+					routeEnabled("PAYPAL_PPP2_ENABLE_SEND", "PPP2_ENABLE_SEND");
 				return raw || !(approved && sendEnabled);
 			})(),
 		},
 		bank: {
-			enabled:
-				String(process.env.BANK_WIRE_ENABLE || "false").toLowerCase() ===
-				"true",
+			enabled: routeEnabled("BANK_WIRE_ENABLE"),
 			provider: String(process.env.BANK_WIRE_PROVIDER || "").toUpperCase(),
 			beneficiaryName: process.env.OWNER_BENEFICIARY_NAME,
 			iban: process.env.OWNER_IBAN,
@@ -83,49 +85,43 @@ export function getPaymentConfiguration() {
 			allowlist: process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON || "[]",
 		},
 		payoneer: {
-			enabled:
-				String(process.env.PAYONEER_ENABLE || "false").toLowerCase() === "true",
+			enabled: routeEnabled("PAYONEER_ENABLE"),
 			base: process.env.PAYONEER_API_BASE,
 			clientId: process.env.PAYONEER_CLIENT_ID,
 			clientSecret: process.env.PAYONEER_CLIENT_SECRET,
 		},
 		payoneer_standard: {
-			enabled:
-				String(
-					process.env.PAYONEER_ENABLE_STANDARD || "false",
-				).toLowerCase() === "true",
+			enabled: routeEnabled("PAYONEER_ENABLE_STANDARD"),
 			email: process.env.OWNER_PAYONEER_EMAIL || process.env.PAYONEER_EMAIL,
 		},
 		crypto: {
-			enabled:
-				String(process.env.CRYPTO_WITHDRAW_ENABLE || "false").toLowerCase() ===
-				"true",
+			enabled: routeEnabled("CRYPTO_WITHDRAW_ENABLE", "ALLOW_CRYPTO_EXECUTION"),
 			address:
 				process.env.TRUST_WALLET_ADDRESS || process.env.TRUST_WALLET_USDT_ERC20,
 		},
 		cryptobox: {
-			enabled:
-				String(process.env.CRYPTOBOX_ENABLE || "false").toLowerCase() ===
-				"true",
+			enabled: routeEnabled("CRYPTOBOX_ENABLE"),
 			url:
 				process.env.BINANCE_CRYPTOBOX_URL ||
 				"https://www.binance.com/en/my/wallet/account/payment/cryptobox",
 		},
 		wise: {
-			enabled:
-				String(process.env.WISE_ENABLE || "false").toLowerCase() === "true",
+			enabled: routeEnabled("WISE_ENABLE", "ALLOW_BANK_EXECUTION"),
 			email: process.env.OWNER_WISE_EMAIL,
 		},
+		plaid: {
+			enabled: routeEnabled("PLAID_ENABLED"),
+			accountId:
+				process.env.PLAID_OWNER_ACCOUNT_ID ||
+				process.env.OWNER_BANK_ACCOUNT_NUM ||
+				"",
+		},
 		googlepay: {
-			enabled:
-				String(process.env.GOOGLEPAY_ENABLE || "false").toLowerCase() ===
-				"true",
+			enabled: routeEnabled("GOOGLEPAY_ENABLE"),
 			email: process.env.OWNER_GOOGLEPAY_EMAIL,
 		},
 		smart_contract_owner: {
-			enabled:
-				String(process.env.OWNER_VAULT_ENABLE || "false").toLowerCase() ===
-				"true",
+			enabled: routeEnabled("OWNER_VAULT_ENABLE"),
 			contractAddress: process.env.OWNER_VAULT_CONTRACT_ADDRESS,
 			chain: String(process.env.OWNER_VAULT_CHAIN || "").toUpperCase(),
 		},
@@ -234,6 +230,13 @@ export function explainMissingCredentials(route, cfg) {
 			reasons.push("WISE_ENVIRONMENT_NOT_LIVE");
 		if (!process.env.WISE_API_KEY) reasons.push("WISE_API_KEY_MISSING");
 		if (!process.env.WISE_PROFILE_ID) reasons.push("WISE_PROFILE_ID_MISSING");
+		return reasons;
+	}
+	if (r === "plaid") {
+		const c = cfg?.creds?.plaid || {};
+		if (!c.enabled) reasons.push("PLAID_ENABLED=false");
+		if (!String(c.accountId || "").trim())
+			reasons.push("PLAID_OWNER_ACCOUNT_ID_MISSING");
 		return reasons;
 	}
 	if (r === "googlepay") {

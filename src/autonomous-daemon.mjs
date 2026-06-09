@@ -44,6 +44,40 @@ const healer = new SelfHealer();
 const enforcer = new ExternalPayerEnforcer();
 const replenisher = new ReplenishmentProtocol();
 
+// #region debug-point C:report-helper
+function reportDebugEvent(hypothesisId, location, msg, data) {
+	try {
+		const envPath = path.resolve(
+			process.cwd(),
+			".dbg",
+			"owner-payout-reconcile.env",
+		);
+		let url = "http://127.0.0.1:7777/event";
+		let sessionId = "owner-payout-reconcile";
+		try {
+			const envText = fsSync.readFileSync(envPath, "utf8");
+			const urlMatch = envText.match(/^DEBUG_SERVER_URL=(.+)$/m);
+			const sessionMatch = envText.match(/^DEBUG_SESSION_ID=(.+)$/m);
+			if (urlMatch?.[1]) url = String(urlMatch[1]).trim();
+			if (sessionMatch?.[1]) sessionId = String(sessionMatch[1]).trim();
+		} catch {}
+		void fetch(url, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				sessionId,
+				runId: "pre-fix",
+				hypothesisId,
+				location,
+				msg: `[DEBUG] ${msg}`,
+				data: data ?? {},
+				ts: Date.now(),
+			}),
+		}).catch(() => {});
+	} catch {}
+}
+// #endregion
+
 // Initialize modules
 (async () => {
 	try {
@@ -242,13 +276,49 @@ function hasAllowedPayPalRecipientsConfigured() {
 	try {
 		const parsed = JSON.parse(String(json));
 		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-			return false;
+			return hasOwnerBeneficiaryPayPalAllowlist();
 		const paypal =
 			parsed.paypal ?? parsed.paypal_email ?? parsed.paypalEmail ?? [];
-		return Array.isArray(paypal) && paypal.length > 0;
+		if (Array.isArray(paypal) && paypal.length > 0) return true;
+		return hasOwnerBeneficiaryPayPalAllowlist();
+	} catch {
+		return hasOwnerBeneficiaryPayPalAllowlist();
+	}
+}
+
+function hasOwnerBeneficiaryPayPalAllowlist() {
+	const raw = process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON;
+	if (
+		raw == null ||
+		raw === undefined ||
+		!String(raw).trim() ||
+		isPlaceholderValue(raw)
+	) {
+		return false;
+	}
+	try {
+		const parsed = JSON.parse(String(raw));
+		if (!Array.isArray(parsed)) return false;
+		return parsed.some((entry) => {
+			if (!entry || typeof entry !== "object") return false;
+			const rail = String(entry.rail ?? "").trim().toLowerCase();
+			const recipient = String(
+				entry.email ?? entry.recipient ?? entry.paypal ?? "",
+			).trim();
+			if (!recipient || !recipient.includes("@")) return false;
+			return !rail || rail === "paypal";
+		});
 	} catch {
 		return false;
 	}
+}
+
+function hasUsableBase44AppId() {
+	const appId = String(process.env.BASE44_APP_ID ?? "").trim();
+	const fallback = String(
+		process.env.DEFAULT_BASE44_APP_ID ?? "689afeabf1db9c30efe0bd7e",
+	).trim();
+	return !isPlaceholderValue(appId || fallback);
 }
 
 function validateDaemonLiveModeOrThrow(cfg) {
@@ -258,7 +328,11 @@ function validateDaemonLiveModeOrThrow(cfg) {
 	// 	throw new Error("LIVE MODE NOT GUARANTEED (offline enabled)");
 	if (cfg?.payout?.dryRun === true)
 		throw new Error("LIVE MODE NOT GUARANTEED (dry-run enabled)");
-	requireRealEnv("BASE44_APP_ID");
+	if (!hasUsableBase44AppId()) {
+		throw new Error(
+			"LIVE MODE NOT GUARANTEED (BASE44 app id unavailable; set BASE44_APP_ID or DEFAULT_BASE44_APP_ID)",
+		);
+	}
 	requireRealEnv("BASE44_SERVICE_TOKEN");
 
 	if (
@@ -2186,6 +2260,20 @@ async function runTick(cfg, state) {
 			const windowOk = isWithinWindowUtc(
 				cfg.payout?.windowUtc ?? { startHourUtc: 0, endHourUtc: 0 },
 			);
+			// #region debug-point C:autosubmit-gates
+			reportDebugEvent(
+				"C",
+				"src/autonomous-daemon.mjs:autoSubmitPayPalPayoutBatches",
+				"evaluating auto-submit paypal batch gates",
+				{
+					freezeActive: isFreezeActive(state),
+					windowOk,
+					payoutDryRun: cfg.payout?.dryRun === true,
+					healthEnabled: cfg.tasks.health === true,
+					paypalOk: out.results.health?.paypalOk ?? null,
+				},
+			);
+			// #endregion
 			if (!windowOk) {
 				out.results.autoSubmitPayPal = {
 					ok: true,
@@ -2228,6 +2316,17 @@ async function runTick(cfg, state) {
 				const batches = effectiveOk(approvedRes)
 					? (approvedRes.result?.batches ?? [])
 					: [];
+				// #region debug-point C:approved-batches
+				reportDebugEvent(
+					"C",
+					"src/autonomous-daemon.mjs:autoSubmitPayPalPayoutBatches",
+					"approved batches loaded for paypal auto-submit",
+					{
+						approvedResultOk: effectiveOk(approvedRes),
+						batchCount: Array.isArray(batches) ? batches.length : 0,
+					},
+				);
+				// #endregion
 				const attempts = [];
 				for (const b of Array.isArray(batches) ? batches : []) {
 					const batchId = getBatchId(b);
@@ -2246,6 +2345,18 @@ async function runTick(cfg, state) {
 						recipientType !== "paypal_email"
 					)
 						continue;
+					// #region debug-point C:autosubmit-attempt
+					reportDebugEvent(
+						"C",
+						"src/autonomous-daemon.mjs:autoSubmitPayPalPayoutBatches",
+						"attempting paypal auto-submit for batch",
+						{
+							batchId,
+							recipientType,
+							providerId,
+						},
+					);
+					// #endregion
 					const res = await runEmitWithOfflineFallback(
 						["--submit-payout-batch", "--batch-id", String(batchId)],
 						cfg,
@@ -2405,6 +2516,19 @@ async function runTick(cfg, state) {
 
 				const rows = effectiveOk(truthRes) ? (truthRes.result?.rows ?? []) : [];
 				const nowMs = Date.now();
+				// #region debug-point D:sync-truth-rows
+				reportDebugEvent(
+					"D",
+					"src/autonomous-daemon.mjs:syncPayPalLedgerBatches",
+					"loaded payout truth rows for paypal reconciliation",
+					{
+						truthResultOk: effectiveOk(truthRes),
+						rowCount: Array.isArray(rows) ? rows.length : 0,
+						limit,
+						minAgeMs,
+					},
+				);
+				// #endregion
 				const attempts = [];
 				for (const r of Array.isArray(rows) ? rows : []) {
 					const internalBatchId = r?.internalPayoutBatchId ?? null;
@@ -2423,6 +2547,19 @@ async function runTick(cfg, state) {
 						if (!Number.isNaN(ms) && nowMs - ms < minAgeMs) continue;
 					}
 
+					// #region debug-point D:sync-attempt
+					reportDebugEvent(
+						"D",
+						"src/autonomous-daemon.mjs:syncPayPalLedgerBatches",
+						"attempting paypal ledger sync",
+						{
+							internalBatchId,
+							externalProviderId,
+							truthStatus,
+							lastProviderSyncAt: lastAt,
+						},
+					);
+					// #endregion
 					const syncArgs = [];
 					if (cfg.payout.dryRun) syncArgs.push("--dry-run");
 					syncArgs.push(

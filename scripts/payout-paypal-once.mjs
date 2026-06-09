@@ -25,6 +25,31 @@ function listCsv(v) {
 		.filter(Boolean);
 }
 
+function ownerPayPalAllowlist() {
+	const csv = listCsv(process.env.AUTONOMOUS_ALLOWED_PAYPAL_RECIPIENTS);
+	if (csv.length > 0) return csv.map((x) => String(x).toLowerCase());
+	const raw = String(process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON || "").trim();
+	if (!raw) return [];
+	try {
+		const parsed = JSON.parse(raw);
+		if (!Array.isArray(parsed)) return [];
+		return parsed
+			.map((entry) => {
+				const rail = String(entry?.rail ?? "").trim().toLowerCase();
+				if (rail && rail !== "paypal") return null;
+				const email = String(
+					entry?.email ?? entry?.recipient ?? entry?.paypal ?? "",
+				)
+					.trim()
+					.toLowerCase();
+				return email.includes("@") ? email : null;
+			})
+			.filter(Boolean);
+	} catch {
+		return [];
+	}
+}
+
 async function main() {
 	const args = parseArgs(process.argv);
 	const amount = Number(args.amount || process.env.PAYPAL_ONCE_AMOUNT || "0");
@@ -93,8 +118,9 @@ async function main() {
 			"true" &&
 		String(process.env.PAYPAL_PPP2_ENABLE_SEND ?? "false").toLowerCase() ===
 			"true";
-	const allowlist = listCsv(process.env.AUTONOMOUS_ALLOWED_PAYPAL_RECIPIENTS);
-	const allowlisted = allowlist.length === 0 ? true : allowlist.includes(email);
+	const allowlist = ownerPayPalAllowlist();
+	const allowlisted =
+		allowlist.length > 0 && allowlist.includes(String(email).toLowerCase());
 	const confirm =
 		String(args.confirm || process.env.PAYPAL_LIVE_CONFIRM || "").trim() ===
 		"I_CONFIRM_PAYPAL_PAYOUT";

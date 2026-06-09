@@ -7,12 +7,12 @@ This guide covers how to build, deploy, and monitor the RealWorldCerts site.
 Go to **Settings > Secrets and variables > Actions** and ensure these secrets are set:
 
 ### Production (Required)
-- `SITE_PUBLIC_URL`: `https://www.realworldcerts.com`
-- `PAYPAL_OWNER_EMAIL`: `younesdgc@gmail.com` (or your preferred routing email)
-- `DEPLOY_HOST`: IP or hostname of your production server.
-- `DEPLOY_USER`: SSH user (e.g., `root` or `ubuntu`).
-- `DEPLOY_SSH_KEY`: Private SSH key content (PEM format).
-- `DEPLOY_PATH`: Target directory on server (e.g., `/opt/realworldcerts`).
+- `SITE_PUBLIC_URL`: `https://<your-domain>` (only required if you deploy a running site)
+- `PAYPAL_OWNER_EMAIL`: `owner@example.com` (only required if you generate PayPal payment links)
+- `DEPLOY_HOST`: IP/hostname of your server (only required for SSH deploy workflows).
+- `DEPLOY_USER`: SSH user (only required for SSH deploy workflows).
+- `DEPLOY_SSH_KEY`: Private SSH key content (only required for SSH deploy workflows).
+- `DEPLOY_PATH`: Target directory on server (only required for SSH deploy workflows).
 
 ### Staging (Optional)
 - `STAGING_DEPLOY_HOST`
@@ -38,6 +38,11 @@ Go to **Settings > Secrets and variables > Actions** and ensure these secrets ar
   4. Restarts container (`docker compose up -d`).
   5. Verifies `/health`.
 
+### C. Publish Static Artifacts (GitHub Pages)
+**Workflow:** `Deploy Static Site to GitHub Pages`
+- **Trigger:** Push to `main`/`release`, manual dispatch, and weekly schedule.
+- **Action:** Publishes `rank/output` as a static site (schemas, watchdog snapshots, and other safe artifacts).
+
 ### C. Watchdog & Monitoring
 **Workflow:** `Site Watchdog`
 - **Trigger:** Schedule (Hourly) or Manual.
@@ -48,7 +53,7 @@ Go to **Settings > Secrets and variables > Actions** and ensure these secrets ar
   - `/feed.xml` (Valid RSS)
   - `/sitemap.xml`, `/robots.txt`
   - Content on core pages.
-- **Notification:** Logs failure and intended alert to `younesdgc@gmail.com`.
+- **Notification:** Logs failure and intended alert to the configured owner mailbox.
 
 ## 3. Local Development & Verification
 

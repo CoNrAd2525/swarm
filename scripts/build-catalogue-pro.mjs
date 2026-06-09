@@ -95,6 +95,16 @@ function toFileUrl(p) {
 	return `file:///${String(p).replace(/\\\\/g, "/")}`;
 }
 
+function toHref(p) {
+	const mode = String(process.env.CATALOGUE_LINK_MODE || "relative").toLowerCase();
+	if (mode === "file") return toFileUrl(p);
+	const rel = path.relative(process.cwd(), String(p));
+	const norm = rel.replace(/\\\\/g, "/");
+	if (!norm) return "./";
+	if (norm.startsWith(".")) return norm;
+	return `./${norm}`;
+}
+
 function listImages(baseDir) {
 	const allowed = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 	try {
@@ -345,7 +355,7 @@ function orderSections(sections, priority) {
 function cardFor(baseDir, p, opts = {}, imageMap) {
 	const mapped = imageMap?.[p.id] ? imageMap[p.id] : null;
 	const imgPath = mapped || findProductImage(baseDir, p);
-	const imgSrc = imgPath ? toFileUrl(imgPath) : placeholderImage(p.label);
+	const imgSrc = imgPath ? toHref(imgPath) : placeholderImage(p.label);
 	const pills = p.variants?.length
 		? `<div class="meta">${p.variants
 				.map(
@@ -438,7 +448,7 @@ function buildHtml(master, electronics, baseDir, imageMapGlobal) {
 			const fg = "#ffffff";
 			const logo =
 				t.logo_path && fs.existsSync(path.resolve(process.cwd(), t.logo_path))
-					? toFileUrl(path.resolve(process.cwd(), t.logo_path))
+					? toHref(path.resolve(process.cwd(), t.logo_path))
 					: "";
 			const logoHtml = logo
 				? `<img class="logo" src="${logo}" alt="${sec.brand} logo"/>`
@@ -482,7 +492,7 @@ function buildHtml(master, electronics, baseDir, imageMapGlobal) {
 				const fg = "#ffffff";
 				const logo =
 					t.logo_path && fs.existsSync(path.resolve(process.cwd(), t.logo_path))
-						? toFileUrl(path.resolve(process.cwd(), t.logo_path))
+						? toHref(path.resolve(process.cwd(), t.logo_path))
 						: "";
 				const logoHtml = logo
 					? `<img class="logo" src="${logo}" alt="${sec.brand} logo"/>`
@@ -538,7 +548,7 @@ function buildSectionHtml(kind, brand, items, baseDir, imageMapGlobal) {
 	const fg = "#ffffff";
 	const logo =
 		t.logo_path && fs.existsSync(path.resolve(process.cwd(), t.logo_path))
-			? toFileUrl(path.resolve(process.cwd(), t.logo_path))
+			? toHref(path.resolve(process.cwd(), t.logo_path))
 			: "";
 	const logoHtml = logo
 		? `<img class="logo" src="${logo}" alt="${brand} logo"/>`
@@ -711,14 +721,14 @@ function main() {
 				"--headless",
 				"--disable-gpu",
 				`--print-to-pdf=${outPdf}`,
-				toFileUrl(outHtml),
+				toHref(outHtml),
 			],
 			{ stdio: "ignore" },
 		);
 	}
 	if (edge && !noPdf) {
 		for (const entry of manifest) {
-			const url = toFileUrl(entry.html);
+			const url = toHref(entry.html);
 			const res = spawnSync(
 				edge,
 				["--headless", "--disable-gpu", `--print-to-pdf=${entry.pdf}`, url],

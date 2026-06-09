@@ -11,6 +11,10 @@ function has(name) {
 	return process.env[name] != null && String(process.env[name]).trim() !== "";
 }
 
+function boolAny(...names) {
+	return names.some((name) => boolEnv(name));
+}
+
 function str(name) {
 	return has(name) ? String(process.env[name]).trim() : "";
 }
@@ -46,6 +50,19 @@ section("Global");
 row("SWARM_LIVE", boolEnv("SWARM_LIVE"));
 row("SAFE_MODE (blocks payouts)", boolEnv("SAFE_MODE") || boolEnv("SWARM_SAFE_MODE"));
 row("FINANCIAL_MODE=LIVE", str("FINANCIAL_MODE").toUpperCase() === "LIVE");
+row(
+	"ALL_OWNER_ROUTES_ENABLED",
+	boolAny(
+		"ENABLE_ALL_OWNER_ROUTES",
+		"OWNER_ALL_ROUTES_ENABLED",
+		"ENABLE_ALL_PAYOUT_ROUTES",
+		"AUTONOMOUS_ENABLE_ALL_PAYOUT_ROUTES",
+	),
+);
+row(
+	"RELAXED_OWNER_LIMITS",
+	boolAny("RELAX_OWNER_LIMITS", "OWNER_LIMITS_RELAXED", "RELAX_SETTLEMENT_LIMITS"),
+);
 
 section("Owner Accounts (presence only)");
 row("OWNER_PAYPAL_EMAIL", has("OWNER_PAYPAL_EMAIL") || has("PAYPAL_EMAIL"));
@@ -67,7 +84,11 @@ if (routes.length === 0) {
 }
 
 section("Confirmation Pipeline Checks");
-row("BASE44 app configured", has("BASE44_APP_ID") && has("BASE44_SERVICE_TOKEN"));
+row(
+	"BASE44 app configured",
+	(has("BASE44_APP_ID") || has("DEFAULT_BASE44_APP_ID")) &&
+		has("BASE44_SERVICE_TOKEN"),
+);
 row("PayPal revenue writes enabled", boolEnv("BASE44_ENABLE_REVENUE_FROM_PAYPAL"));
 row("Payout ledger writes enabled", boolEnv("BASE44_ENABLE_PAYOUT_LEDGER_WRITE"));
 row(

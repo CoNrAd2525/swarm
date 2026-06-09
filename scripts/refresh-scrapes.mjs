@@ -65,7 +65,7 @@ function hostname(u){
   try{ return new URL(u).hostname; }catch{ return ""; }
 }
 async function refresh(){
-  const outPath = path.resolve("dist_rwc","site-data","scrapes.json");
+  const outPath = path.resolve("rank","output","site-data","scrapes.json");
   const items = readJsonSafe(outPath);
   const now = new Date().toISOString();
   const updated = [];
