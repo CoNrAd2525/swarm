@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-06-10]
+- feat(connectors): Added a shared Base44 connector request utility in `src/util/base44-request.mjs` and refactored `scripts/push-to-base44.mjs` onto the common request path
+- feat(webhooks): Hardened `src/wise-webhook-server.mjs` with optional IP allowlisting, persistent event dedupe, captured client IP metadata, and flush-on-shutdown behavior
+- feat(backups): Expanded `scripts/backup-project-state.mjs` to snapshot current swarm state, secure-cloud artifacts, docs, and the `apps/realworldcerts-next` frontend workspace
+- fix(cloud): Tightened `.github/workflows/backup-mirror.yml` so export/snapshot failures fail closed and sync-health artifacts publish with backup outputs
+- fix(sync): `src/swarm/health-monitor.mjs` now fails closed when mirror inventory is missing or empty, preventing false-green secure-cloud status
+
 ## [2026-03-31]
 - feat(security): Added automated secrets scan + rotation checklist and policy status outputs
 - feat(payments): Enforced hands-free settlement gating based on security posture and Plaid readiness

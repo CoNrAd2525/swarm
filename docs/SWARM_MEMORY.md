@@ -6,6 +6,14 @@ Swarm Memory is a distributed memory system designed for coordinating thousands 
 
 ## Recent Updates
 
+### Connector Hardening & Secure Cloud
+
+- Connector requests now flow through `src/util/base44-request.mjs` so Base44 app updates share one auth, timeout, and request-construction path.
+- Wise webhook intake now applies optional IP allowlisting plus persistent dedupe before recording payloads in `src/wise-webhook-server.mjs`.
+- Sync health snapshots fail closed when `data/mirror-sites.json` is missing or empty, preventing false-green secure-cloud status.
+- Backup routine coverage now includes current swarm state, secure-cloud artifacts, mirror inventory, generated site-data, and the `apps/realworldcerts-next` workspace.
+- Secure cloud backup workflow now fails closed on export/snapshot errors and includes sync-health outputs in uploaded artifacts.
+
 ### Mission Planning & Dependency Readiness
 
 - Mission ingestion now supports multi-phase pipelines (Phase 0 bootstrap + downstream phases) and can import both `pending` and `deployed` mission statuses (configurable).
