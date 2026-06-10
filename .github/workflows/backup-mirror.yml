@@ -6,7 +6,7 @@ on:
     - cron: "5 */6 * * *"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   backup:
@@ -32,11 +32,13 @@ jobs:
           cache: "npm"
       - run: npm ci
       - name: Export Base44 entities
-        run: node ./scripts/export-full-base44.mjs || true
+        run: node ./scripts/export-full-base44.mjs
       - name: Local snapshot
-        run: node ./scripts/backup-project-state.mjs || true
-      - name: Recovery + mirror sync (best effort)
-        run: node ./scripts/recovery-daemon.mjs --once || true
+        run: node ./scripts/backup-project-state.mjs
+      - name: Recovery + mirror sync
+        run: node ./scripts/recovery-daemon.mjs --once
+      - name: Swarm sync health snapshot
+        run: npm run swarm:monitor:sync
       - name: Upload backups (artifact)
         uses: actions/upload-artifact@v4
         with:
@@ -44,6 +46,10 @@ jobs:
           if-no-files-found: ignore
           path: |
             data/base44_export/**
+            data/finance/**
+            data/swarm/**
+            data/mirror-sites.json
             doomsday-vault/**
             backups/**
             logs/mirror-status.json
+            rank/output/site-data/**

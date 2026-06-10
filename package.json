@@ -42,6 +42,8 @@
     "crypto:prepare:cryptobox": "node ./scripts/prepare-cryptobox-instruction.mjs",
     "owner:prepare:vault": "node ./scripts/prepare-owner-vault-instruction.mjs",
     "payout:preflight": "node ./scripts/payout-preflight.mjs",
+    "connectors:push:base44": "node ./scripts/push-to-base44.mjs",
+    "backup:state": "node ./scripts/backup-project-state.mjs",
     "revenue:materialize:csv": "node ./scripts/materialize-revenue-csv.mjs",
     "env:validate:owner-routing": "node ./scripts/validate-owner-routing-env.mjs",
     "owner:routes:update": "node ./scripts/update-owner-routes.mjs",

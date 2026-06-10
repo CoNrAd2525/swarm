@@ -64,6 +64,12 @@ Owner settlement stays guarded:
 Run:
 - [backup-mirror.yml](../.github/workflows/backup-mirror.yml)
 
+Current hardening in this repo:
+- the backup workflow now fails closed instead of masking export/snapshot failures
+- the workflow emits a swarm sync-health snapshot before artifact upload
+- artifact coverage now includes `data/swarm`, `data/finance`, `data/mirror-sites.json`, and `rank/output/site-data`
+- local snapshots include current frontend app sources plus swarm state and generated site-data, not only legacy static paths
+
 Store Supabase credentials only in the mirror repo:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`

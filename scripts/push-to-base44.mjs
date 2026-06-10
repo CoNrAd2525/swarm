@@ -3,6 +3,10 @@
 // This script COMMITS everything to your Base44 app instance
 
 import "dotenv/config";
+import {
+	base44Request,
+	getBase44ConnectorConfig,
+} from "../src/util/base44-request.mjs";
 const REGISTRY_ACCOUNTS = {
 	bank: {
 		rib:
@@ -33,15 +37,7 @@ function recordSuccess(msg) {
 // BASE44 API CONFIGURATION
 // ============================================================================
 
-const BASE44_CONFIG = {
-	appId: process.env.BASE44_APP_ID,
-	serviceToken: process.env.BASE44_SERVICE_TOKEN,
-	apiUrl:
-		process.env.BASE44_API_URL ||
-		(process.env.BASE44_SERVER_URL
-			? `${process.env.BASE44_SERVER_URL}/api`
-			: "https://api.base44.com/v1"),
-};
+const BASE44_CONFIG = getBase44ConnectorConfig(process.env);
 
 // ============================================================================
 // OWNER ACCOUNTS - SOURCE OF TRUTH: RECIPIENT REGISTRY
@@ -70,7 +66,6 @@ const OWNER_ACCOUNTS = {
 class Base44Pusher {
 	constructor(config) {
 		this.config = config;
-		this.baseUrl = `${config.apiUrl}/apps/${config.appId}`;
 		this.commitLog = [];
 	}
 
@@ -95,65 +90,27 @@ class Base44Pusher {
 	}
 
 	async request(endpoint, method = "GET", body = null) {
-		const base = this.baseUrl.endsWith("/")
-			? this.baseUrl.slice(0, -1)
-			: this.baseUrl;
-		const ep = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-		const url = `${base}${ep}`;
-		const headers = {
-			Authorization: `Bearer ${this.config.serviceToken}`,
-			"X-Service-Token": this.config.serviceToken,
-			"Content-Type": "application/json",
-			"X-Client": "Owner-Revenue-System/2.0",
-		};
-
-		const options = { method, headers };
-		if (body) {
-			options.body = JSON.stringify(body);
-		}
-
 		this.log(`${method} ${endpoint}`, "push");
 
 		try {
-			const response = await fetch(url, options);
-			const text = await response.text();
-			const contentType = response.headers?.get("content-type") || "";
-
-			let data;
-			try {
-				data = text ? JSON.parse(text) : null;
-			} catch (e) {
-				data = { raw: text };
-			}
-
-			if (!response.ok) {
-				// Fallback for Method Not Allowed (405) - Try POST if PUT/PATCH fails
-				if (
-					response.status === 405 &&
-					(method === "PUT" || method === "PATCH")
-				) {
-					this.log(
-						`Method ${method} not allowed (405). Retrying with POST...`,
-						"warning",
-					);
-					return this.request(endpoint, "POST", body);
-				}
-				const isHtml =
-					contentType.includes("text/html") ||
-					(typeof text === "string" && text.toLowerCase().includes("<html"));
-				if (isHtml) {
-					throw new Error(
-						`Base44 API html_error: ${response.status} - html_response_detected`,
-					);
-				}
-				const allow = response.headers?.get("allow") || response.headers?.get("Allow") || "";
-				throw new Error(
-					`Base44 API error: ${response.status} - ${JSON.stringify(data)} - allow:${allow}`,
-				);
-			}
-
-			return data;
+			return await base44Request(endpoint, {
+				method,
+				body,
+				config: this.config,
+				includeAppPath: true,
+				clientName: "Owner-Revenue-System/2.0",
+			});
 		} catch (error) {
+			if (
+				String(error?.message || "").includes("BASE44_REQUEST_FAILED:405") &&
+				(method === "PUT" || method === "PATCH")
+			) {
+				this.log(
+					`Method ${method} not allowed (405). Retrying with POST...`,
+					"warning",
+				);
+				return this.request(endpoint, "POST", body);
+			}
 			this.log(`Request failed: ${error.message}`, "error");
 			throw error;
 		}

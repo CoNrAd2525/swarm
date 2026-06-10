@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { createDedupeStore } from "./dedupe-store.mjs";
+import { IPAllowlist } from "./security/ip-allowlist.mjs";
 import { parseArgs } from "./utils/cli.mjs";
 
 function readRawBody(req, { limitBytes }) {
@@ -54,7 +56,31 @@ function appendEventLog(evt) {
 	fs.appendFileSync(f, `${JSON.stringify(evt)}\n`, "utf8");
 }
 
-function buildServer({ port = 5056, pathPrefix = "/callback" } = {}) {
+function getClientIp(req) {
+	return (
+		String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+		req.socket?.remoteAddress ||
+		""
+	);
+}
+
+function getEventId(headers, parsedBody) {
+	return String(
+		headers["x-event-id"] ||
+			headers["x-request-id"] ||
+			headers["x-hook-id"] ||
+			parsedBody?.event_id ||
+			parsedBody?.id ||
+			"",
+	).trim();
+}
+
+function buildServer({
+	port = 5056,
+	pathPrefix = "/callback",
+	allowlist = new IPAllowlist(process.env.WISE_WEBHOOK_ALLOWED_IPS || ""),
+	dedupeStore = null,
+} = {}) {
 	return http.createServer(async (req, res) => {
 		const method = String(req.method || "GET").toUpperCase();
 		const p = getPathname(req);
@@ -62,6 +88,13 @@ function buildServer({ port = 5056, pathPrefix = "/callback" } = {}) {
 			json(res, 404, { ok: false });
 			return;
 		}
+
+		const clientIp = getClientIp(req);
+		if (!allowlist.isAllowed(clientIp)) {
+			json(res, 403, { ok: false, error: "forbidden_origin" });
+			return;
+		}
+
 		let raw = "";
 		try {
 			raw = await readRawBody(req, { limitBytes: 1024 * 1024 });
@@ -79,12 +112,22 @@ function buildServer({ port = 5056, pathPrefix = "/callback" } = {}) {
 		for (const k of Object.keys(req.headers || {})) {
 			hdrs[k.toLowerCase()] = req.headers[k];
 		}
+		const eventId = getEventId(hdrs, parsed);
+		if (dedupeStore && eventId && dedupeStore.isRecentlyDone(eventId)) {
+			json(res, 200, { ok: true, duplicate: true, event_id: eventId });
+			return;
+		}
 		const evt = {
 			received_at: new Date().toISOString(),
+			client_ip: clientIp,
+			event_id: eventId || null,
 			headers: hdrs,
 			body: parsed,
 		};
 		appendEventLog(evt);
+		if (dedupeStore && eventId) {
+			dedupeStore.markDone(eventId);
+		}
 		json(res, 200, { ok: true });
 	});
 }
@@ -95,7 +138,31 @@ async function main() {
 	const pathPrefix =
 		String(args.path ?? process.env.WISE_WEBHOOK_PATH ?? "/callback") ||
 		"/callback";
-	const server = buildServer({ port, pathPrefix });
+	const allowlist = new IPAllowlist(
+		process.env.WISE_WEBHOOK_ALLOWED_IPS || process.env.WEBHOOK_ALLOWED_IPS || "",
+	);
+	const dedupeStore = createDedupeStore({
+		filePath: path.resolve("data/wise/webhook-dedupe.json"),
+		ttlMs: Number(process.env.WISE_WEBHOOK_DEDUPE_TTL_MS || "604800000"),
+		maxEntries: Number(process.env.WISE_WEBHOOK_DEDUPE_MAX_ENTRIES || "10000"),
+		flushIntervalMs: Number(process.env.WISE_WEBHOOK_DEDUPE_FLUSH_MS || "5000"),
+	});
+	await dedupeStore.load().catch(() => {});
+	dedupeStore.start();
+	const flushAndExit = async (code) => {
+		try {
+			await dedupeStore.flush();
+		} catch {}
+		dedupeStore.stop();
+		process.exit(code);
+	};
+	process.on("SIGINT", () => {
+		flushAndExit(0).catch(() => process.exit(0));
+	});
+	process.on("SIGTERM", () => {
+		flushAndExit(0).catch(() => process.exit(0));
+	});
+	const server = buildServer({ port, pathPrefix, allowlist, dedupeStore });
 	server.listen(port, () => {
 		process.stdout.write(
 			JSON.stringify({
