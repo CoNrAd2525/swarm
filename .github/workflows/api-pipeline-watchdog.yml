@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm ci || npm i
+      - run: npm ci || npm install --no-audit --no-fund --no-package-lock
       - name: API pipeline snapshot
         run: |
           mkdir -p rank/output/site-data

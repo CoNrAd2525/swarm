@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: "20"
       - name: Install deps (policy gate)
-        run: npm ci --omit=dev
+        run: npm ci --omit=dev || npm ci || npm install --omit=dev --no-audit --no-fund --no-package-lock
       - name: Run policy gate
         run: node scripts/policy-gate.mjs
       - name: Upload policy status artifact

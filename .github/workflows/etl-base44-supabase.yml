@@ -25,7 +25,7 @@ jobs:
           node-version: "18"
           cache: "npm"
       - name: Install deps
-        run: npm ci
+        run: npm ci || npm install --no-audit --no-fund --no-package-lock
       - name: Run ETL
         env:
           BASE44_API_URL: ${{ secrets.BASE44_API_URL }}

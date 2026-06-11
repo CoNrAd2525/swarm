@@ -23,5 +23,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm ci
+      - run: npm ci || npm install --no-audit --no-fund --no-package-lock
       - run: npm run live:readiness:ping

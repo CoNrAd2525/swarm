@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "20"
       - name: Install deps (for build)
-        run: npm ci --omit=dev
+        run: npm ci --omit=dev || npm ci || npm install --omit=dev --no-audit --no-fund --no-package-lock
       - name: Build GitHub Pages bundle
         run: node ./scripts/build-pages.mjs
       - name: Upload static artifact

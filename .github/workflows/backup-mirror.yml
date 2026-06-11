@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-      - run: npm ci
+      - run: npm ci || npm install --no-audit --no-fund --no-package-lock
       - name: Export Base44 entities
         run: node ./scripts/export-full-base44.mjs
       - name: Local snapshot
