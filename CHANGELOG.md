@@ -6,7 +6,23 @@
 - feat(backups): Expanded `scripts/backup-project-state.mjs` to snapshot current swarm state, secure-cloud artifacts, docs, and the `apps/realworldcerts-next` frontend workspace
 - fix(cloud): Tightened `.github/workflows/backup-mirror.yml` so export/snapshot failures fail closed and sync-health artifacts publish with backup outputs
 - fix(sync): `src/swarm/health-monitor.mjs` now fails closed when mirror inventory is missing or empty, preventing false-green secure-cloud status
+- fix(frontend): Made the `apps/realworldcerts-next` directory utility modules and test runner more plain-Node friendly by removing internal alias imports from test-targeted modules and enabling Node specifier resolution in the test script
+- note(frontend): Local runtime verification still depends on sandbox package-materialization behavior; code diagnostics are clean, but app-local dependency installation remains environment-constrained
 
+## [2026-06-09]
+- feat(connectors): Added shared Base44 connector request utility and refactored `scripts/push-to-base44.mjs` to use a common signed request path
+- feat(connectors): Hardened `src/wise-webhook-server.mjs` with optional IP allowlisting, persistent dedupe, captured client IP metadata, and graceful dedupe flush on shutdown
+- feat(backup): Expanded `scripts/backup-project-state.mjs` to snapshot current swarm state, secure-cloud artifacts, docs, and the new Next.js frontend workspace
+- fix(cloud): Tightened `backup-mirror.yml` to fail closed on export/snapshot errors and publish sync-health artifacts alongside finance data
+- fix(sync): Mirror health monitoring now fails closed when mirror inventory is missing or empty
+- feat(frontend): Added `apps/realworldcerts-next`, a new Next.js 16 + TypeScript + Tailwind light-mode frontend prototype for RealWorldCerts with landing, directory, and listing detail routes
+- feat(frontend): Introduced bordered modular app shell, seeded directory data, filterable dashboard UI, and reusable card/badge/panel components inspired by arcX structure with a premium light treatment
+- feat(swarm): Added concrete cross-platform sync monitoring via `src/swarm/health-monitor.mjs` and `scripts/swarm-sync-monitor.mjs`, including snapshot output to `data/swarm` and `rank/output/site-data`
+- feat(finance): Hardened settlement orchestration with stronger owner directive validation, persistent payout velocity history, and direct Wise-path velocity plus owner checks
+- fix(resilience): Replaced no-op retry and unbounded idempotency cache implementations with bounded, reusable resilience primitives
+- perf(site): Added rate-limit bucket pruning and cap controls in `src/site-server.mjs` to prevent unbounded in-memory growth
+- test(core): Added targeted resilience coverage for retry and idempotent executor behavior
+- note(verification): Targeted swarm resilience tests pass and sync monitor runs successfully; manual sandbox constraints still affect the separate `apps/realworldcerts-next` dependency install path
 ## [2026-03-31]
 - feat(security): Added automated secrets scan + rotation checklist and policy status outputs
 - feat(payments): Enforced hands-free settlement gating based on security posture and Plaid readiness

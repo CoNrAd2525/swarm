@@ -8,11 +8,30 @@ Swarm Memory is a distributed memory system designed for coordinating thousands 
 
 ### Connector Hardening & Secure Cloud
 
+<<<<<<< HEAD
 - Connector requests now flow through `src/util/base44-request.mjs` so Base44 app updates share one auth, timeout, and request-construction path.
 - Wise webhook intake now applies optional IP allowlisting plus persistent dedupe before recording payloads in `src/wise-webhook-server.mjs`.
 - Sync health snapshots fail closed when `data/mirror-sites.json` is missing or empty, preventing false-green secure-cloud status.
 - Backup routine coverage now includes current swarm state, secure-cloud artifacts, mirror inventory, generated site-data, and the `apps/realworldcerts-next` workspace.
 - Secure cloud backup workflow now fails closed on export/snapshot errors and includes sync-health outputs in uploaded artifacts.
+=======
+- Added `apps/realworldcerts-next` as a dedicated high-fidelity frontend workspace for the RealWorldCerts directory experience, using a structured bordered shell and local typed seed data.
+- Added a real sync-health snapshot path through `src/swarm/health-monitor.mjs` and `scripts/swarm-sync-monitor.mjs`.
+- Sync health snapshots now materialize to:
+  - `data/swarm/sync-health.json`
+  - `rank/output/site-data/swarm-sync-health.json`
+- The monitor summarizes:
+  - stale or missing agent heartbeats
+  - degraded payment rail states stored in shared swarm memory
+  - pending settlement volume from payee link state
+  - mirror health using `data/mirror-sites.json`
+- Settlement safety now persists payout velocity history to `data/finance/payout-guardrail-history.json` so restart events do not reset runaway-spend protections.
+- Connector hardening now includes a shared Base44 request utility at `src/util/base44-request.mjs` and Wise webhook boundary controls using `src/security/ip-allowlist.mjs`.
+- Backup routine coverage now includes current swarm state, secure-cloud artifacts, mirror inventory, and the `apps/realworldcerts-next` frontend workspace.
+- Mirror sync health is intentionally fail-closed when `data/mirror-sites.json` is missing or empty so cloud status cannot report false green.
+- Frontend utility modules used by the local Node tests now avoid internal path aliases, and the test script enables Node specifier resolution for the stripped-TypeScript test path.
+- The remaining frontend verification blocker is environmental: app-local package installation inside the sandbox is not fully materializing the declared dependency tree.
+>>>>>>> 8b2a368 (fix: stabilize frontend utility test runtime)
 
 ### Mission Planning & Dependency Readiness
 
