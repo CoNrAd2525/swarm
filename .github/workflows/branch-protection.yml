@@ -1,0 +1,24 @@
+name: Branch Protection (Master)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Apply master branch protection
+        env:
+          GITHUB_ADMIN_TOKEN: ${{ secrets.GITHUB_ADMIN_TOKEN }}
+        run: |
+          if [ -z "${GITHUB_ADMIN_TOKEN:-}" ]; then
+            echo '{"ok":false,"error":"missing_secret:GITHUB_ADMIN_TOKEN"}'
+            exit 1
+          fi
+          node ./scripts/apply-branch-protection.mjs --repo "${{ github.repository }}" --branch master

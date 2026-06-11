@@ -4,6 +4,40 @@ function trimSlash(value) {
 	return String(value || "").replace(/\/+$/, "");
 }
 
+function decodeJwtPayload(token) {
+	const raw = String(token || "").trim();
+	const parts = raw.split(".");
+	if (parts.length < 2) return null;
+	const payload = parts[1];
+	try {
+		const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+		const padded =
+			normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+		const json = Buffer.from(padded, "base64").toString("utf8");
+		return JSON.parse(json);
+	} catch {
+		return null;
+	}
+}
+
+function inferAppIdFromServiceToken(serviceToken) {
+	const decoded = decodeJwtPayload(serviceToken);
+	if (!decoded) return "";
+	const candidates = [
+		decoded.appId,
+		decoded.app_id,
+		decoded.applicationId,
+		decoded.application_id,
+		decoded.app,
+		decoded.aid,
+	];
+	for (const c of candidates) {
+		const v = String(c ?? "").trim();
+		if (v) return v;
+	}
+	return "";
+}
+
 function joinUrl(base, endpoint) {
 	const left = trimSlash(base);
 	const right = String(endpoint || "").replace(/^\/+/, "");
@@ -19,10 +53,16 @@ export function getBase44ConnectorConfig(env = process.env) {
 			? joinUrl(trimSlash(serverUrl), "api")
 			: "https://api.base44.com/v1";
 
+	const serviceToken = String(env.BASE44_SERVICE_TOKEN || "").trim();
+	let appId = String(env.BASE44_APP_ID || env.DEFAULT_BASE44_APP_ID || "").trim();
+	if (!appId && serviceToken) {
+		appId = inferAppIdFromServiceToken(serviceToken);
+	}
+
 	return {
 		baseUrl,
-		appId: String(env.BASE44_APP_ID || env.DEFAULT_BASE44_APP_ID || "").trim(),
-		serviceToken: String(env.BASE44_SERVICE_TOKEN || "").trim(),
+		appId,
+		serviceToken,
 		secret: String(env.BASE44_API_SECRET || "").trim(),
 		timeoutMs: Number(env.BASE44_TIMEOUT || "30000"),
 	};
