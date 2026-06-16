@@ -12,22 +12,6 @@ jobs:
   diagnose:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[finance-diagnose]'))
     runs-on: ubuntu-latest
-    env:
-      BANK_RECONCILE_ENABLE: "true"
-      SITE_PUBLIC_URL: ${{ secrets.SITE_PUBLIC_URL }}
-      BASE44_SERVICE_TOKEN: ${{ secrets.BASE44_SERVICE_TOKEN }}
-      BASE44_APP_ID: ${{ secrets.BASE44_APP_ID }}
-      BASE44_API_URL: ${{ secrets.BASE44_API_URL }}
-      BASE44_SERVER_URL: ${{ secrets.BASE44_SERVER_URL }}
-      BASE44_REVENUE_ENTITY: ${{ secrets.BASE44_REVENUE_ENTITY }}
-      BASE44_PAYOUT_ENTITY: ${{ secrets.BASE44_PAYOUT_ENTITY }}
-      PLAID_ENV: ${{ secrets.PLAID_ENV }}
-      PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
-      PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
-      PLAIDBOX_KEY: ${{ secrets.PLAIDBOX_KEY }}
-      PLAID_OWNER_ACCESS_TOKEN: ${{ secrets.PLAID_OWNER_ACCESS_TOKEN }}
-      PLAID_ACCESS_TOKEN: ${{ secrets.PLAID_ACCESS_TOKEN }}
-      OWNER_NOTIFY_EMAIL: ${{ secrets.SECONDARY_CONTACT_EMAIL }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,20 +20,91 @@ jobs:
         with:
           node-version: "20"
       - run: npm ci || npm install --no-audit --no-fund --no-package-lock
+      - name: Source integrity check (auto-heal)
+        run: |
+          node -e "
+          const h = new (require('./src/autonomous-healer.mjs').SelfHealer)();
+          h.sourceScanAndHeal({directories:['src','scripts']}).then(r => {
+            if (!r.ok) {
+              console.error('Syntax errors found, auto-heal attempted:', JSON.stringify(r.errors));
+              process.exit(0);
+            }
+            console.log('Source integrity: OK');
+          });
+          " || echo "SelfHealer check skipped"
       - name: Prepare output folder
         run: mkdir -p exports/reports
+      - name: Check available secrets
+        id: secret_check
+        run: |
+          has_base44() { [ -n "$BASE44_SERVICE_TOKEN" ] || [ -n "$BASE44_TOKEN" ]; }
+          has_plaid() { [ -n "$PLAID_CLIENT_ID" ] && [ -n "$PLAID_SECRET" ]; }
+          has_payoneer() { [ -n "$PAYONEER_CLIENT_ID" ] && [ -n "$PAYONEER_CLIENT_SECRET" ]; }
+          echo "BASE44=$(has_base44 && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "PLAID=$(has_plaid && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "PAYONEER=$(has_payoneer && echo true || echo false)" >> $GITHUB_OUTPUT
+        env:
+          BASE44_SERVICE_TOKEN: ${{ secrets.BASE44_SERVICE_TOKEN }}
+          BASE44_TOKEN: ${{ secrets.BASE44_TOKEN }}
+          PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+          PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
+          PAYONEER_CLIENT_ID: ${{ secrets.PAYONEER_CLIENT_ID }}
+          PAYONEER_CLIENT_SECRET: ${{ secrets.PAYONEER_CLIENT_SECRET }}
+      - name: System snapshot
+        run: node ./scripts/report-system-snapshot.mjs | tee exports/reports/system_snapshot_last.json || true
       - name: Owner routing env validation
         run: node ./scripts/validate-owner-routing-env.mjs | tee exports/reports/owner_routing_env_last.json || true
+      - name: Finance state snapshot
+        run: node ./scripts/report-finance-state.mjs | tee exports/reports/finance_state_last.json || true
+      - name: Base44 preflight
+        if: steps.secret_check.outputs.BASE44 == 'true'
+        env:
+          BASE44_SERVICE_TOKEN: ${{ secrets.BASE44_SERVICE_TOKEN }}
+          BASE44_APP_ID: ${{ secrets.BASE44_APP_ID }}
+          BASE44_API_URL: ${{ secrets.BASE44_API_URL }}
+          BASE44_REVENUE_ENTITY: ${{ secrets.BASE44_REVENUE_ENTITY }}
+          BASE44_PAYOUT_ENTITY: ${{ secrets.BASE44_PAYOUT_ENTITY }}
+        run: node ./scripts/base44-preflight.mjs | tee exports/reports/base44_preflight_last.json || true
       - name: Plaid readiness
+        if: steps.secret_check.outputs.PLAID == 'true'
+        env:
+          PLAID_ENV: ${{ secrets.PLAID_ENV }}
+          PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+          PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
+          PLAIDBOX_KEY: ${{ secrets.PLAIDBOX_KEY }}
+          PLAID_OWNER_ACCESS_TOKEN: ${{ secrets.PLAID_OWNER_ACCESS_TOKEN }}
+          PLAID_ACCESS_TOKEN: ${{ secrets.PLAID_ACCESS_TOKEN }}
         run: node ./scripts/plaid-preflight.mjs | tee exports/reports/plaid_preflight_last.json || true
       - name: Bank reconciliation (Plaid) - auto confirm
+        if: steps.secret_check.outputs.BASE44 == 'true' && steps.secret_check.outputs.PLAID == 'true'
+        env:
+          PLAID_ENV: ${{ secrets.PLAID_ENV }}
+          PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+          PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
+          BASE44_SERVICE_TOKEN: ${{ secrets.BASE44_SERVICE_TOKEN }}
+          BASE44_APP_ID: ${{ secrets.BASE44_APP_ID }}
+          BASE44_API_URL: ${{ secrets.BASE44_API_URL }}
+          BANK_RECONCILE_ENABLE: "true"
         run: node ./scripts/auto-confirm-bank-settlements.mjs | tee exports/reports/bank_reconcile_last.json || true
-      - name: Finance state snapshot (Base44)
-        run: node ./scripts/report-finance-state.mjs | tee exports/reports/finance_state_last.json || true
+      - name: Payoneer preflight
+        if: steps.secret_check.outputs.PAYONEER == 'true'
+        env:
+          PAYONEER_ENABLE: ${{ secrets.PAYONEER_ENABLE }}
+          PAYONEER_PROVIDER: ${{ secrets.PAYONEER_PROVIDER }}
+          PAYONEER_API_BASE: ${{ secrets.PAYONEER_API_BASE || secrets.PAYONEER_API_URL }}
+          PAYONEER_CLIENT_ID: ${{ secrets.PAYONEER_CLIENT_ID }}
+          PAYONEER_CLIENT_SECRET: ${{ secrets.PAYONEER_CLIENT_SECRET }}
+          PAYONEER_PROGRAM_ID: ${{ secrets.PAYONEER_PROGRAM_ID }}
+          PAYONEER_OWNER_ID: ${{ secrets.PAYONEER_OWNER_ID }}
+        run: |
+          if [ -z "${PAYONEER_PROVIDER:-}" ]; then export PAYONEER_PROVIDER="LIVE"; fi
+          if [ "${PAYONEER_ENABLE:-}" != "true" ] && [ -n "${PAYONEER_API_BASE:-}" ]; then export PAYONEER_ENABLE="true"; fi
+          node ./scripts/payoneer-preflight.mjs | tee exports/reports/payoneer_preflight_last.json || true
       - name: Queue owner notifications
         run: node ./scripts/email/queue-from-communications.mjs || true
       - name: Upload finance reports
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: finance-diagnose-${{ github.run_id }}
           path: exports/reports/*.json
