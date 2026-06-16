@@ -398,7 +398,7 @@ function start({ port = 8080 } = {}) {
 				const raw = String(req.body || "");
 				const headers = req.headers || {};
 				const env =
-					String(process.env.PAYPAL_ENV || "").toLowerCase() || "sandbox";
+					String(process.env.PAYPAL_ENV || "").toLowerCase() || "live";
 				const domain =
 					env === "live"
 						? "https://api.paypal.com"
