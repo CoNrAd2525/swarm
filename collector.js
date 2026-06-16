@@ -72,7 +72,7 @@ const PAYMENT_PROCESSORS = {
     enabled: process.env.PAYPAL_ENABLED === 'true',
     type: 'wallet',
     priority: 1,
-    mode: process.env.PAYPAL_MODE || 'sandbox',
+    mode: process.env.PAYPAL_MODE || 'live',
     features: ['payout', 'balance', 'webhook', 'invoice', 'auto_approval'],
     maxDaily: parseFloat(process.env.PAYPAL_DAILY_LIMIT || '20000'),
     perTransaction: parseFloat(process.env.PAYPAL_PER_TRANSACTION_LIMIT || '5000'),
@@ -100,7 +100,7 @@ const PAYMENT_PROCESSORS = {
     type: 'bank',
     priority: 2,
     features: ['payout', 'balance', 'webhook', 'batch', 'fx'],
-    provider: process.env.PAYONEER_PROVIDER || 'sandbox',
+    provider: process.env.PAYONEER_PROVIDER || 'live',
     maxDaily: parseFloat(process.env.PAYONEER_DAILY_LIMIT || '25000'),
     minAmount: 50,
     maxAmount: 50000,
@@ -134,7 +134,7 @@ const PAYMENT_PROCESSORS = {
     features: ['ach', 'balance', 'identity', 'processor', 'webhook'],
     clientId: process.env.PLAID_CLIENT_ID,
     secret: process.env.PLAID_SECRET,
-    environment: process.env.PLAID_ENV || 'sandbox',
+    environment: process.env.PLAID_ENV || 'live',
     minAmount: 0.01,
     maxAmount: 25000,
     fees: 0.008, // 0.8%
@@ -723,7 +723,7 @@ class PayoneerProcessor {
     this.logger = logger.child({ processor: 'Payoneer' });
     this.baseUrl = config.provider === 'live' 
       ? 'https://api.payoneer.com/v2'
-      : 'https://api.sandbox.payoneer.com/v2';
+      : 'https://api.payoneer.com/v2';
   }
 
   async initialize() {
@@ -1096,7 +1096,7 @@ class PlaidProcessor {
     const configuration = new plaid.Configuration({
       basePath: this.config.environment === 'production' 
         ? plaid.PlaidEnvironments.production 
-        : plaid.PlaidEnvironments.sandbox,
+        : plaid.PlaidEnvironments.production,
       baseOptions: {
         headers: {
           'PLAID-CLIENT-ID': this.config.clientId,
