@@ -6,7 +6,7 @@ class PayPalAuthManager {
 		this.tokenExpiry = null;
 		this.clientId = process.env.PAYPAL_CLIENT_ID;
 		this.clientSecret = process.env.PAYPAL_CLIENT_SECRET;
-		this.environment = process.env.PAYPAL_ENVIRONMENT || "sandbox";
+		this.environment = process.env.PAYPAL_ENVIRONMENT || "live";
 		this.baseUrl =
 			this.environment === "live"
 				? "https://api.paypal.com"
@@ -90,7 +90,7 @@ class WiseAuthManager {
 	constructor() {
 		this.apiKey = process.env.WISE_API_KEY;
 		this.profileId = process.env.WISE_PROFILE_ID;
-		this.environment = process.env.WISE_ENVIRONMENT || "sandbox";
+		this.environment = process.env.WISE_ENVIRONMENT || "live";
 		this.baseUrl =
 			this.environment === "live"
 				? "https://api.wise.com"
@@ -136,7 +136,7 @@ class BinanceAuthManager {
 	constructor() {
 		this.apiKey = process.env.BINANCE_API_KEY;
 		this.apiSecret = process.env.BINANCE_API_SECRET;
-		this.environment = process.env.BINANCE_ENVIRONMENT || "testnet";
+		this.environment = process.env.BINANCE_ENVIRONMENT || "live";
 		this.baseUrl =
 			this.environment === "live"
 				? "https://api.binance.com"
@@ -175,7 +175,7 @@ class BinanceAuthManager {
 class BankingCircleAuthManager {
 	constructor() {
 		this.apiKey = process.env.BANKING_CIRCLE_API_KEY || process.env.BC_API_KEY;
-		this.environment = process.env.BANKING_CIRCLE_ENVIRONMENT || "sandbox";
+		this.environment = process.env.BANKING_CIRCLE_ENVIRONMENT || "live";
 		this.baseUrl =
 			this.environment === "live"
 				? "https://api.bankingcircle.com"

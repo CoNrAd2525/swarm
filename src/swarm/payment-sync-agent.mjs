@@ -99,8 +99,9 @@ export class PaymentSyncAgent {
 			const auth = Buffer.from(`${clientId}:${clientSecret}`).toString(
 				"base64",
 			);
-			const response = await fetch(
-				"https://api.sandbox.paypal.com/v1/oauth2/token",
+			const domain = $env:PAYPAL_ENV -eq 'live' ? 'https://api.paypal.com' : 'https://api.sandbox.paypal.com'
+		const response = await fetch(
+			$($domain/v1/oauth2/token",
 				{
 					method: "POST",
 					headers: {

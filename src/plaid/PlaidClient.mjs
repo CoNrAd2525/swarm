@@ -1,5 +1,5 @@
 function plaidBaseUrl(env) {
-	const mode = String(env.PLAID_ENV || "sandbox")
+	const mode = String(env.PLAID_ENV || "production")
 		.trim()
 		.toLowerCase();
 	if (mode === "production") return "https://production.plaid.com";
