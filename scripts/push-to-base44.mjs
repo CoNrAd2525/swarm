@@ -806,5 +806,5 @@ if (isMainModule) {
 	main();
 }
 
-export { Base44Pusher, Base44Deployment, SCHEMAS, OWNER_ACCOUNTS };
+export { Base44Pusher, Base44Deployment, SCHEMAS, OWNER_ACCOUNTS, main };
 

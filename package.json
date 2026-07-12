@@ -82,8 +82,8 @@
                     "ci:guardrails":  "node ./scripts/ci-guardrails.mjs",
                     "repo:merge":  "node ./scripts/merge-repos.mjs",
                     "etl:base44:supabase":  "node ./scripts/etl/base44-to-supabase.mjs",
-                    "connectors:push:base44:flow":  "powershell -NoProfile -Command \"$env:BASE44_API_URL=\u0027https://agent-flow-ai-9855ea98.base44.app/api\u0027; $env:BASE44_APP_ID=\u00276888ac155ebf84dd9855ea98\u0027; node ./scripts/push-to-base44.mjs\"",
-                    "connectors:push:base44:swarm":  "powershell -NoProfile -Command \"$env:BASE44_API_URL=\u0027https://agent-swarm-efe0bd7e.base44.app/api\u0027; $env:BASE44_APP_ID=\u0027689afeabf1db9c30efe0bd7e\u0027; node ./scripts/push-to-base44.mjs\""
+                    "connectors:push:base44:flow":  "node ./scripts/run-base44-profile.mjs flow",
+                    "connectors:push:base44:swarm":  "node ./scripts/run-base44-profile.mjs swarm"
                 },
     "dependencies":  {
                          "@base44/sdk":  "^0.8.13",
