@@ -40,7 +40,10 @@ rank/**
 !rank/README.md
 dist_rwc/
 logs/
+audits/
+.dependency-probe.txt
 swarm-new/
 repo-backup-2026-01-12.zip
 doomsday-vault/
 src/real/ledger/execution_failures.log
+
