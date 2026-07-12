@@ -1,4 +1,4 @@
-// scripts/push-to-base44.mjs
+﻿// scripts/push-to-base44.mjs
 // LIVE DEPLOYMENT: Push all schemas, configurations, and test data to Base44
 // This script COMMITS everything to your Base44 app instance
 
@@ -7,6 +7,7 @@ import {
 	base44Request,
 	getBase44ConnectorConfig,
 } from "../src/util/base44-request.mjs";
+import { resolveBase44Schemas } from "./base44-profile-config.mjs";
 const REGISTRY_ACCOUNTS = {
 	bank: {
 		rib:
@@ -30,7 +31,7 @@ const REGISTRY_ACCOUNTS = {
 	crypto_bybit_ton: { address: process.env.BYBIT_USDT_TON || "" },
 };
 function recordSuccess(msg) {
-	console.log(`✅ ${msg}`);
+	console.log(`âœ… ${msg}`);
 }
 
 // ============================================================================
@@ -79,12 +80,12 @@ class Base44Pusher {
 
 		const icon =
 			{
-				info: "ℹ️",
-				success: "✅",
-				error: "❌",
-				warning: "⚠️",
-				push: "⬆️",
-			}[type] || "ℹ️";
+				info: "â„¹ï¸",
+				success: "âœ…",
+				error: "âŒ",
+				warning: "âš ï¸",
+				push: "â¬†ï¸",
+			}[type] || "â„¹ï¸";
 
 		console.log(`${icon} ${message}`);
 	}
@@ -119,11 +120,12 @@ class Base44Pusher {
 	// Entity Operations
 	async getEntity(name) {
 		try {
-			return await this.request(`/entities/${name}`);
+			return await this.request(`/entities/${name}?limit=1`);
 		} catch (error) {
 			if (
 				error.message.includes("404") ||
-				error.message.includes("html_error")
+				error.message.includes("html_error") ||
+				error.message.includes("ValidationError")
 			) {
 				return null;
 			}
@@ -131,84 +133,14 @@ class Base44Pusher {
 		}
 	}
 
-	async createEntity(schema) {
-		try {
-			return await this.request("/entities", "POST", schema);
-		} catch (e) {
-			if (e.message.includes("405") || e.message.includes("404")) {
-				try {
-					return await this.request("/schemas", "POST", schema);
-				} catch {}
-				try {
-					return await this.request("/entity", "POST", schema);
-				} catch {}
-			}
-			throw e;
-		}
-	}
-
-	async updateEntity(name, schema) {
-		try {
-			return await this.request(`/entities/${name}`, "PUT", schema);
-		} catch (e) {
-			if (e.message.includes("405") || e.message.includes("404")) {
-				try {
-					return await this.request(`/entities/${name}`, "PATCH", schema);
-				} catch {}
-				try {
-					return await this.request("/entities", "POST", schema);
-				} catch {}
-				try {
-					return await this.request(`/schemas/${name}`, "PUT", schema);
-				} catch {}
-			}
-			throw e;
-		}
-	}
-
-	async listEntities() {
-		try {
-			return await this.request("/entities");
-		} catch (e) {
-			if (e.message.includes("405") || e.message.includes("404")) {
-				try {
-					return await this.request("/schemas");
-				} catch {}
-			}
-			throw e;
-		}
-	}
-
 	// Record Operations
 	async createRecord(entityName, record) {
 		try {
-			return await this.request(
-				`/entities/${entityName}/records`,
-				"POST",
-				record,
-			);
+			return await this.request(`/entities/${entityName}`, "POST", record);
 		} catch (e) {
 			if (e.message.includes("405") || e.message.includes("404")) {
 				try {
-					return await this.request(
-						`/entities/${entityName}/records/`,
-						"POST",
-						record,
-					);
-				} catch {}
-				try {
-					return await this.request(
-						`/records?entity=${encodeURIComponent(entityName)}`,
-						"POST",
-						record,
-					);
-				} catch {}
-				try {
-					return await this.request(
-						`/records/${entityName}`,
-						"POST",
-						record,
-					);
+					return await this.request(`/entities/${entityName}/bulk`, "POST", [record]);
 				} catch {}
 			}
 			throw e;
@@ -217,19 +149,11 @@ class Base44Pusher {
 
 	async updateRecord(entityName, recordId, updates) {
 		try {
-			return await this.request(
-				`/entities/${entityName}/records/${recordId}`,
-				"PUT",
-				updates,
-			);
+			return await this.request(`/entities/${entityName}/${recordId}`, "PUT", updates);
 		} catch (e) {
 			if (e.message.includes("405")) {
 				try {
-					return await this.request(
-						`/entities/${entityName}/records/${recordId}`,
-						"PATCH",
-						updates,
-					);
+					return await this.request(`/entities/${entityName}/${recordId}`, "PATCH", updates);
 				} catch {}
 			}
 			throw e;
@@ -238,30 +162,16 @@ class Base44Pusher {
 
 	async queryRecords(entityName, filters = {}) {
 		const params = new URLSearchParams(filters);
-		try {
-			return await this.request(`/entities/${entityName}/records?${params}`);
-		} catch (e) {
-			if (e.message.includes("404") || e.message.includes("405")) {
-				try {
-					return await this.request(`/records?entity=${encodeURIComponent(entityName)}&${params}`);
-				} catch {}
-			}
-			throw e;
-		}
+		return await this.request(`/entities/${entityName}?${params}`);
 	}
 
 	async deleteRecord(entityName, recordId) {
-		return await this.request(
-			`/entities/${entityName}/records/${recordId}`,
-			"DELETE",
-		);
+		return await this.request(`/entities/${entityName}/${recordId}`, "DELETE");
 	}
 
 	// Batch Operations
 	async batchCreateRecords(entityName, records) {
-		return await this.request(`/entities/${entityName}/records/batch`, "POST", {
-			records,
-		});
+		return await this.request(`/entities/${entityName}/bulk`, "POST", records);
 	}
 }
 
@@ -401,8 +311,10 @@ const SCHEMAS = {
 // ============================================================================
 
 class Base44Deployment {
-	constructor(pusher) {
+	constructor(pusher, { schemas = SCHEMAS, profileName = "legacy_finance" } = {}) {
 		this.pusher = pusher;
+		this.schemas = schemas;
+		this.profileName = profileName;
 		this.results = {
 			schemas: { created: [], updated: [], failed: [], exists: [] },
 			records: { created: [], failed: [] },
@@ -412,44 +324,30 @@ class Base44Deployment {
 
 	async deploySchemas() {
 		console.log("\n" + "=".repeat(60));
-		console.log("📦 DEPLOYING SCHEMAS TO BASE44");
+		console.log("ðŸ“¦ VALIDATING BASE44 ENTITIES");
 		console.log("=".repeat(60) + "\n");
 
-		for (const [name, schema] of Object.entries(SCHEMAS)) {
+		for (const [name, schema] of Object.entries(this.schemas)) {
 			this.pusher.log(`Processing: ${name}`, "info");
 
 			try {
-				// Check if exists
 				const existing = await this.pusher.getEntity(name);
 
 				if (existing) {
-					this.pusher.log(`Schema exists, checking fields...`, "info");
-
-					// Check for missing fields
-					const existingFieldNames = existing.fields?.map((f) => f.name) || [];
-					const requiredFieldNames = schema.fields.map((f) => f.name);
-					const missingFields = requiredFieldNames.filter(
-						(f) => !existingFieldNames.includes(f),
+					this.results.schemas.exists.push(name);
+					this.pusher.log(
+						`Entity reachable via record API; schema admin API not exposed`,
+						"success",
 					);
-
-					if (missingFields.length > 0) {
-						this.pusher.log(
-							`Missing fields: ${missingFields.join(", ")}`,
-							"warning",
-						);
-						this.pusher.log(`Updating schema...`, "push");
-						await this.pusher.updateEntity(name, schema);
-						this.results.schemas.updated.push(name);
-						this.pusher.log(`Schema updated successfully`, "success");
-					} else {
-						this.results.schemas.exists.push(name);
-						this.pusher.log(`Schema up-to-date`, "success");
-					}
 				} else {
-					this.pusher.log(`Schema does not exist, creating...`, "push");
-					await this.pusher.createEntity(schema);
-					this.results.schemas.created.push(name);
-					this.pusher.log(`Schema created successfully`, "success");
+					this.pusher.log(
+						`Entity not reachable in this app; manual schema creation may still be required`,
+						"warning",
+					);
+					this.results.schemas.failed.push({
+						name,
+						error: "entity_not_reachable_via_record_api",
+					});
 				}
 			} catch (error) {
 				this.pusher.log(`Failed: ${error.message}`, "error");
@@ -460,7 +358,7 @@ class Base44Deployment {
 
 	async createTestRecords() {
 		console.log("\n" + "=".repeat(60));
-		console.log("🧪 CREATING TEST RECORDS");
+		console.log("ðŸ§ª CREATING TEST RECORDS");
 		console.log("=".repeat(60) + "\n");
 
 		const timestamp = new Date().toISOString();
@@ -540,7 +438,7 @@ class Base44Deployment {
 			});
 			this.pusher.log(`Earning created: ${earning.earning_id}`, "success");
 			this.pusher.log(
-				`  → Beneficiary: ${earning.beneficiary} (OWNER)`,
+				`  â†’ Beneficiary: ${earning.beneficiary} (OWNER)`,
 				"success",
 			);
 		} catch (error) {
@@ -578,7 +476,7 @@ class Base44Deployment {
 				id: batch.batch_id,
 			});
 			this.pusher.log(`PayoutBatch created: ${batch.batch_id}`, "success");
-			this.pusher.log(`  → Recipient: ${batch.recipient} (OWNER)`, "success");
+			this.pusher.log(`  â†’ Recipient: ${batch.recipient} (OWNER)`, "success");
 		} catch (error) {
 			this.pusher.log(
 				`Failed to create PayoutBatch: ${error.message}`,
@@ -630,7 +528,7 @@ class Base44Deployment {
 
 	async validateOwnerDirective() {
 		console.log("\n" + "=".repeat(60));
-		console.log("🔒 VALIDATING OWNER DIRECTIVE (STRICT MODE)");
+		console.log("ðŸ”’ VALIDATING OWNER DIRECTIVE (STRICT MODE)");
 		console.log("=".repeat(60) + "\n");
 
 		const validations = [
@@ -659,7 +557,14 @@ class Base44Deployment {
 			this.pusher.log(`Validating: ${validation.name}...`, "info");
 			try {
 				const records = await this.pusher.queryRecords(validation.entity);
-				if (!records?.records || records.records.length === 0) {
+				const rows = Array.isArray(records?.value)
+					? records.value
+					: Array.isArray(records?.records)
+						? records.records
+						: Array.isArray(records)
+							? records
+							: [];
+				if (rows.length === 0) {
 					this.pusher.log(
 						`No records found (expected for new deployment)`,
 						"info",
@@ -668,7 +573,7 @@ class Base44Deployment {
 					continue;
 				}
 
-				const violations = records.records.filter((record) => {
+				const violations = rows.filter((record) => {
 					const value = record[validation.field]?.toLowerCase() || "";
 					return !validation.expectedValues.some((owner) =>
 						value.includes(owner.toLowerCase()),
@@ -683,7 +588,7 @@ class Base44Deployment {
 					);
 					violations.forEach((v) => {
 						this.pusher.log(
-							`  → ${v[validation.field]} (Unauthorized Recipient)`,
+							`  â†’ ${v[validation.field]} (Unauthorized Recipient)`,
 							"error",
 						);
 					});
@@ -693,7 +598,7 @@ class Base44Deployment {
 					});
 				} else {
 					this.pusher.log(
-						`All ${records.records.length} records compliant`,
+						`All ${rows.length} records compliant`,
 						"success",
 					);
 					this.results.validation.passed.push(validation.name);
@@ -716,42 +621,42 @@ class Base44Deployment {
 
 	printSummary() {
 		console.log("\n" + "=".repeat(60));
-		console.log("📊 DEPLOYMENT SUMMARY");
+		console.log("ðŸ“Š DEPLOYMENT SUMMARY");
 		console.log("=".repeat(60));
 
-		console.log("\n📦 Schemas:");
-		console.log(`   ✅ Created: ${this.results.schemas.created.length}`);
+		console.log("\nðŸ“¦ Schemas:");
+		console.log(`   âœ… Created: ${this.results.schemas.created.length}`);
 		if (this.results.schemas.created.length > 0) {
 			console.log(`      ${this.results.schemas.created.join(", ")}`);
 		}
-		console.log(`   ✓  Exists: ${this.results.schemas.exists.length}`);
+		console.log(`   âœ“  Exists: ${this.results.schemas.exists.length}`);
 		if (this.results.schemas.exists.length > 0) {
 			console.log(`      ${this.results.schemas.exists.join(", ")}`);
 		}
-		console.log(`   🔧 Updated: ${this.results.schemas.updated.length}`);
+		console.log(`   ðŸ”§ Updated: ${this.results.schemas.updated.length}`);
 		if (this.results.schemas.updated.length > 0) {
 			console.log(`      ${this.results.schemas.updated.join(", ")}`);
 		}
-		console.log(`   ❌ Failed: ${this.results.schemas.failed.length}`);
+		console.log(`   âŒ Failed: ${this.results.schemas.failed.length}`);
 		if (this.results.schemas.failed.length > 0) {
 			this.results.schemas.failed.forEach((f) => {
 				console.log(`      ${f.name}: ${f.error}`);
 			});
 		}
 
-		console.log("\n🧪 Test Records:");
-		console.log(`   ✅ Created: ${this.results.records.created.length}`);
+		console.log("\nðŸ§ª Test Records:");
+		console.log(`   âœ… Created: ${this.results.records.created.length}`);
 		this.results.records.created.forEach((r) => {
 			console.log(`      ${r.entity}: ${r.id}`);
 		});
-		console.log(`   ❌ Failed: ${this.results.records.failed.length}`);
+		console.log(`   âŒ Failed: ${this.results.records.failed.length}`);
 		this.results.records.failed.forEach((f) => {
 			console.log(`      ${f.entity}: ${f.error}`);
 		});
 
-		console.log("\n🔒 Owner Directive Validation:");
-		console.log(`   ✅ Passed: ${this.results.validation.passed.length}`);
-		console.log(`   ❌ Failed: ${this.results.validation.failed.length}`);
+		console.log("\nðŸ”’ Owner Directive Validation:");
+		console.log(`   âœ… Passed: ${this.results.validation.passed.length}`);
+		console.log(`   âŒ Failed: ${this.results.validation.failed.length}`);
 		if (this.results.validation.failed.length > 0) {
 			this.results.validation.failed.forEach((f) => {
 				console.log(`      ${f.name}: ${f.violations || f.error}`);
@@ -763,11 +668,11 @@ class Base44Deployment {
 
 		console.log("\n" + "=".repeat(60));
 		if (allSchemasOk && allValidationsOk) {
-			console.log("✅ DEPLOYMENT SUCCESSFUL");
-			console.log("🚀 System ready for production");
+			console.log("âœ… DEPLOYMENT SUCCESSFUL");
+			console.log("ðŸš€ System ready for production");
 		} else {
-			console.log("⚠️  DEPLOYMENT COMPLETED WITH WARNINGS");
-			console.log("📋 Review errors above and take corrective action");
+			console.log("âš ï¸  DEPLOYMENT COMPLETED WITH WARNINGS");
+			console.log("ðŸ“‹ Review errors above and take corrective action");
 		}
 		console.log("=".repeat(60) + "\n");
 	}
@@ -782,15 +687,15 @@ class Base44Deployment {
 // ============================================================================
 
 async function main() {
-	console.log("╔════════════════════════════════════════════════════════════╗");
-	console.log("║  BASE44 LIVE DEPLOYMENT - OWNER REVENUE SYSTEM            ║");
+	console.log("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+	console.log("â•‘  BASE44 LIVE DEPLOYMENT - OWNER REVENUE SYSTEM            â•‘");
 	console.log(
-		"╚════════════════════════════════════════════════════════════╝\n",
+		"â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•\n",
 	);
 	// SECURITY CHECK: Verify Owner Accounts
 	if (!OWNER_ACCOUNTS || Object.keys(OWNER_ACCOUNTS).length === 0) {
 		console.error(
-			"❌ CRITICAL SECURITY ERROR: OWNER_ACCOUNTS not loaded or empty.",
+			"âŒ CRITICAL SECURITY ERROR: OWNER_ACCOUNTS not loaded or empty.",
 		);
 		process.exit(1);
 	}
@@ -798,9 +703,11 @@ async function main() {
 	const invalidAccounts = Object.entries(OWNER_ACCOUNTS).filter(
 		([k, v]) => !v || v.includes("undefined"),
 	);
-	if (invalidAccounts.length > 0) {
+	const hasOwnerAccounts = invalidAccounts.length === 0;
+	const wantsTestData = process.argv.includes("--with-test-data");
+	if (wantsTestData && !hasOwnerAccounts) {
 		console.error(
-			"❌ CRITICAL SECURITY ERROR: Invalid Owner Account configurations:",
+			"âŒ CRITICAL SECURITY ERROR: Test-data deployment requires valid owner account configurations:",
 		);
 		invalidAccounts.forEach(([k, v]) => {
 			console.error(`   - ${k}: ${v}`);
@@ -808,39 +715,61 @@ async function main() {
 		process.exit(1);
 	}
 
-	if (!BASE44_CONFIG.appId || !BASE44_CONFIG.serviceToken) {
+	if (!BASE44_CONFIG.appId || (!BASE44_CONFIG.serviceToken && !BASE44_CONFIG.apiKey)) {
 		console.error(
-			"❌ ERROR: Missing BASE44_APP_ID or BASE44_SERVICE_TOKEN in environment",
+			"âŒ ERROR: Missing BASE44_APP_ID and Base44 auth (BASE44_SERVICE_TOKEN or BASE44_API_KEY) in environment",
 		);
 		process.exit(1);
 	}
 
-	console.log("📋 Configuration:");
+	console.log("ðŸ“‹ Configuration:");
 	console.log(`   App ID: ${BASE44_CONFIG.appId}`);
-	console.log(`   API URL: ${BASE44_CONFIG.apiUrl}`);
-	console.log("\n🔒 Owner Accounts:");
+	console.log(`   API URL: ${BASE44_CONFIG.baseUrl}`);
+	console.log("\nðŸ”’ Owner Accounts:");
+	console.log(`   configured: ${hasOwnerAccounts}`);
 	console.log(`   PayPal: ${OWNER_ACCOUNTS.paypal}`);
 	console.log(`   Bank: ${OWNER_ACCOUNTS.bank}`);
 	console.log(`   Payoneer: ${OWNER_ACCOUNTS.payoneer}`);
 
 	const pusher = new Base44Pusher(BASE44_CONFIG);
-	const deployment = new Base44Deployment(pusher);
+	const profile = resolveBase44Schemas({
+		config: BASE44_CONFIG,
+		legacySchemas: SCHEMAS,
+	});
+	const deployment = new Base44Deployment(pusher, profile);
 
 	try {
 		// Step 1: Deploy schemas
 		await deployment.deploySchemas();
 
 		// Step 2: Create test records
-		if (process.argv.includes("--with-test-data")) {
+		if (wantsTestData && deployment.profileName === "legacy_finance") {
 			await deployment.createTestRecords();
+		} else if (wantsTestData) {
+			pusher.log(
+				`Skipping test records for profile ${deployment.profileName}; this script only seeds legacy_finance entities.`,
+				"warning",
+			);
 		} else {
 			console.log(
-				"\n⏭️  Skipping test record creation (use --with-test-data to enable)",
+				"\nâ­ï¸  Skipping test record creation (use --with-test-data to enable)",
 			);
 		}
 
 		// Step 3: Validate owner directive
-		await deployment.validateOwnerDirective();
+		if (hasOwnerAccounts && deployment.profileName === "legacy_finance") {
+			await deployment.validateOwnerDirective();
+		} else if (deployment.profileName !== "legacy_finance") {
+			pusher.log(
+				`Owner route validation is not applicable to profile ${deployment.profileName}.`,
+				"info",
+			);
+		} else {
+			pusher.log(
+				"Owner route validation skipped because owner account env is not configured in this shell.",
+				"warning",
+			);
+		}
 
 		// Step 4: Print summary
 		deployment.printSummary();
@@ -850,7 +779,7 @@ async function main() {
 		// The user has audits dir now.
 		const fs = await import("fs");
 		const logPath = `./audits/base44-deployment-${Date.now()}.json`;
-		console.log(`\n💾 Saving deployment log to: ${logPath}`);
+		console.log(`\nðŸ’¾ Saving deployment log to: ${logPath}`);
 		fs.writeFileSync(
 			logPath,
 			JSON.stringify(deployment.getCommitLog(), null, 2),
@@ -858,7 +787,7 @@ async function main() {
 
 		process.exit(0);
 	} catch (error) {
-		console.error("\n💥 DEPLOYMENT FAILED:", error.message);
+		console.error("\nðŸ’¥ DEPLOYMENT FAILED:", error.message);
 		if (error.stack) {
 			console.error("\nStack trace:", error.stack);
 		}
@@ -878,3 +807,4 @@ if (isMainModule) {
 }
 
 export { Base44Pusher, Base44Deployment, SCHEMAS, OWNER_ACCOUNTS };
+

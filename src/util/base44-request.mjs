@@ -44,6 +44,21 @@ function joinUrl(base, endpoint) {
 	return `${left}/${right}`;
 }
 
+function baseUrlIsAppScoped(baseUrl) {
+	const raw = trimSlash(baseUrl);
+	if (!raw) return false;
+	try {
+		const parsed = new URL(raw);
+		if (/\/apps\/[^/]+/i.test(parsed.pathname)) return true;
+		return (
+			/\.base44\.app$/i.test(parsed.hostname) &&
+			!/^api\.base44\.com$/i.test(parsed.hostname)
+		);
+	} catch {
+		return /\/apps\/[^/]+/i.test(raw) || /\.base44\.app(\/|$)/i.test(raw);
+	}
+}
+
 export function getBase44ConnectorConfig(env = process.env) {
 	const apiUrl = String(env.BASE44_API_URL || "").trim();
 	const serverUrl = String(env.BASE44_SERVER_URL || "").trim();
@@ -54,6 +69,7 @@ export function getBase44ConnectorConfig(env = process.env) {
 			: "https://api.base44.com/v1";
 
 	const serviceToken = String(env.BASE44_SERVICE_TOKEN || "").trim();
+	const apiKey = String(env.BASE44_API_KEY || "").trim();
 	let appId = String(env.BASE44_APP_ID || env.DEFAULT_BASE44_APP_ID || "").trim();
 	if (!appId && serviceToken) {
 		appId = inferAppIdFromServiceToken(serviceToken);
@@ -63,6 +79,8 @@ export function getBase44ConnectorConfig(env = process.env) {
 		baseUrl,
 		appId,
 		serviceToken,
+		apiKey,
+		appScopedBase: baseUrlIsAppScoped(baseUrl),
 		secret: String(env.BASE44_API_SECRET || "").trim(),
 		timeoutMs: Number(env.BASE44_TIMEOUT || "30000"),
 	};
@@ -83,6 +101,9 @@ export function buildBase44Headers({
 	if (config.serviceToken) {
 		merged.Authorization = `Bearer ${config.serviceToken}`;
 		merged["X-Service-Token"] = config.serviceToken;
+	}
+	if (config.apiKey) {
+		merged.api_key = config.apiKey;
 	}
 
 	if (config.secret) {
@@ -111,10 +132,12 @@ export async function base44Request(endpoint, options = {}) {
 
 	let baseUrl = trimSlash(config.baseUrl);
 	if (includeAppPath) {
-		if (!config.appId) {
+		if (!config.appScopedBase && !config.appId) {
 			throw new Error("BASE44_APP_ID_REQUIRED");
 		}
-		baseUrl = joinUrl(baseUrl, `apps/${config.appId}`);
+		if (!config.appScopedBase) {
+			baseUrl = joinUrl(baseUrl, `apps/${config.appId}`);
+		}
 	}
 
 	const url = joinUrl(baseUrl, endpoint);
