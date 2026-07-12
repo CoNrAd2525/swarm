@@ -26,6 +26,25 @@ function parseCsvList(raw) {
 		.filter(Boolean);
 }
 
+function resolveFollowupDirs() {
+	const configured = String(
+		process.env.FOLLOWUPS_DIRS ||
+			"submitted.manually,settlements/payoneer,../settlements/payoneer",
+	)
+		.split(",")
+		.map((d) => d.trim())
+		.filter(Boolean);
+	const seen = new Set();
+	const resolved = [];
+	for (const dir of configured) {
+		const abs = path.resolve(dir);
+		if (seen.has(abs)) continue;
+		seen.add(abs);
+		resolved.push(abs);
+	}
+	return resolved;
+}
+
 function allowedMissionStatuses() {
 	const env = parseCsvList(process.env.SWARM_MISSION_IMPORT_STATUSES);
 	if (env.length) return new Set(env);
@@ -513,17 +532,39 @@ async function runCycle({ memory, replenisher, filePath }) {
 	} catch {
 		review = { ok: false };
 	}
+	let procurement = { ok: true, output: null };
+	try {
+		const pr = spawnSync(
+			process.execPath,
+			["scripts/check-procurement-request-receipts.mjs"],
+			{
+				cwd: process.cwd(),
+				encoding: "utf8",
+			},
+		);
+		procurement.output = (pr.stdout || "").trim();
+	} catch {
+		procurement = { ok: false };
+	}
+	let attijari = { ok: true, output: null };
+	try {
+		const pr = spawnSync(
+			process.execPath,
+			["scripts/check-attijari-wire-confirmations.mjs"],
+			{
+				cwd: process.cwd(),
+				encoding: "utf8",
+			},
+		);
+		attijari.output = (pr.stdout || "").trim();
+	} catch {
+		attijari = { ok: false };
+	}
 	let followups = { ok: true, ran: [] };
 	try {
-		const dirs = String(
-			process.env.FOLLOWUPS_DIRS || "submitted.manually,settlements/payoneer",
-		)
-			.split(",")
-			.map((d) => d.trim())
-			.filter((d) => !!d);
+		const dirs = resolveFollowupDirs();
 		const delay = String(process.env.FOLLOWUP_DELAY_HOURS || "24");
-		for (const d of dirs) {
-			const abs = path.resolve(d);
+		for (const abs of dirs) {
 			if (!fs.existsSync(abs)) continue;
 			const res = spawnSync(
 				process.execPath,
@@ -531,6 +572,7 @@ async function runCycle({ memory, replenisher, filePath }) {
 					"scripts/generate-payoneer-followups.mjs",
 					`--dir=${abs}`,
 					`--delay_hours=${delay}`,
+					"--auto_escalate=true",
 				],
 				{
 					cwd: process.cwd(),
@@ -558,6 +600,8 @@ async function runCycle({ memory, replenisher, filePath }) {
 		posp: { score: posp.score, proof: proofPath },
 		news,
 		payoneer,
+		procurement,
+		attijari,
 		review,
 		followups,
 		routes_file: routesFile,
@@ -604,4 +648,6 @@ const isMain = argvPath && path.resolve(selfPath) === argvPath;
 
 if (isMain) {
 	startSupervisor().catch(() => {});
+}
+}
 }

@@ -12,6 +12,11 @@ import {
 } from "../src/owner-directive.mjs";
 import { createPayPalPayoutBatch } from "../src/paypal-api.mjs";
 import { OwnerSettlementEnforcer } from "../src/policy/owner-settlement.mjs";
+import {
+	buildAttijariWirePacket,
+	buildPacketPath,
+	isAttijariBankName,
+} from "./lib/attijari-wire.mjs";
 
 // ============================================================================
 // LOGGER CONFIGURATION
@@ -1289,10 +1294,12 @@ async function executeBankWireSettlement(batch) {
 	logger.info("🏦 Generating Bank Wire Instructions...");
 
 	const owner = getOwnerAccounts().bank;
+	const isAttijari = isAttijariBankName(owner.bank_name);
 	const instructions = {
 		batch_id: batch.batch_id,
 		amount: batch.total_amount,
 		currency: batch.currency,
+		provider: isAttijari ? "ATTIJARIWAFA_BANK" : "BANK_WIRE_MANUAL",
 		beneficiary: {
 			name: owner.name,
 			rib: owner.rib,
@@ -1308,10 +1315,23 @@ async function executeBankWireSettlement(batch) {
 	const filename = `bank_wire_instruction_${batch.batch_id}.json`;
 	const exportsDir = path.join(process.cwd(), "exports", "bank-wire");
 	fs.mkdirSync(exportsDir, { recursive: true });
-	await fs.promises.writeFile(
-		path.join(exportsDir, filename),
-		JSON.stringify(instructions, null, 2),
-	);
+	const instructionPath = path.join(exportsDir, filename);
+	await fs.promises.writeFile(instructionPath, JSON.stringify(instructions, null, 2));
+
+	let packetPath = null;
+	if (isAttijari) {
+		const packet = buildAttijariWirePacket({
+			batchId: batch.batch_id,
+			amount: batch.total_amount,
+			currency: batch.currency,
+			beneficiary: instructions.beneficiary,
+			reference: instructions.reference,
+			instructionPath,
+			createdAt: instructions.created_at,
+		});
+		packetPath = buildPacketPath(batch.batch_id);
+		await fs.promises.writeFile(packetPath, JSON.stringify(packet, null, 2));
+	}
 
 	logger.info(`✅ Bank Wire instructions generated: ${filename}`);
 	await updateLedgerForAPISettlement(
@@ -1320,7 +1340,13 @@ async function executeBankWireSettlement(batch) {
 		`FILE:${filename}`,
 	);
 
-	return { ok: true, filename, instructions, exported: true };
+	return {
+		ok: true,
+		filename,
+		instructions,
+		exported: true,
+		...(packetPath ? { packetPath } : {}),
+	};
 }
 
 /**

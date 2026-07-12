@@ -40,5 +40,12 @@
     "type": "Company",
     "country": null,
     "state": null
+  },
+  "RWC_Ops": {
+    "display_name": "RealWorldCerts Operations Billing",
+    "email": "billing@realworldcerts.com",
+    "type": "Company",
+    "country": null,
+    "state": null
   }
 }

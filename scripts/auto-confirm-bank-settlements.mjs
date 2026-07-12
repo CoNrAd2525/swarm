@@ -2,9 +2,11 @@ import "dotenv/config";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildBase44ServiceClient } from "../src/base44-client.mjs";
 import { PlaidClient } from "../src/plaid/PlaidClient.mjs";
 import { getPlaidItemById, loadPlaidItems } from "../src/plaid/PlaidStore.mjs";
+import { isAttijariBankWire } from "./lib/bank-confirmation-guards.mjs";
 
 function str(name) {
 	const v = process.env[name];
@@ -273,6 +275,17 @@ async function main() {
 			});
 			continue;
 		}
+		if (isAttijariBankWire(b)) {
+			skipped_batches.push({
+				batch_id: batchId,
+				reason: "attijari_manual_confirmation_required",
+				created_at: createdAt,
+				amount,
+				currency,
+				gateway_ref: b?.gateway_ref ?? null,
+			});
+			continue;
+		}
 
 		const createdMs = createdAt ? Date.parse(createdAt) : Number.NaN;
 		const minTxMs = Number.isFinite(createdMs) ? createdMs - 24 * 60 * 60_000 : Number.NaN;
@@ -395,7 +408,15 @@ async function main() {
 	);
 }
 
-main().catch((e) => {
-	process.stdout.write(JSON.stringify({ ok: false, error: e?.message || String(e) }) + "\n");
-	process.exitCode = 1;
-});
+const selfPath = fileURLToPath(import.meta.url);
+const argvPath = process.argv[1] ? path.resolve(process.argv[1]) : null;
+const isMain = argvPath && path.resolve(selfPath) === argvPath;
+
+if (isMain) {
+	main().catch((e) => {
+		process.stdout.write(
+			JSON.stringify({ ok: false, error: e?.message || String(e) }) + "\n",
+		);
+		process.exitCode = 1;
+	});
+}

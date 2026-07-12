@@ -1,6 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { LocalSwarmStore } from "../local-store.mjs";
+import {
+	buildFundsRecoveryCommunication,
+	buildFundsRecoveryIncident,
+	buildFundsRecoveryPaths,
+} from "./funds-recovery.mjs";
 
 export class ReplenishmentProtocol {
 	constructor() {
@@ -73,6 +78,26 @@ export class ReplenishmentProtocol {
 		const reportPath = path.resolve("reports/replenishment_actions.jsonl");
 		await fs.mkdir(path.dirname(reportPath), { recursive: true });
 		await fs.appendFile(reportPath, JSON.stringify(report) + "\n");
+
+		const incident = buildFundsRecoveryIncident({
+			id: report.id,
+			deficit,
+			recoveredAmount,
+			seizedAssets,
+			targetReserve: this.TARGET_RESERVE,
+		});
+		const communication = buildFundsRecoveryCommunication(incident);
+		const recoveryPaths = buildFundsRecoveryPaths(incident.id);
+		await fs.mkdir(path.dirname(recoveryPaths.incident), { recursive: true });
+		await fs.mkdir(path.dirname(recoveryPaths.communication), { recursive: true });
+		await fs.writeFile(
+			recoveryPaths.incident,
+			JSON.stringify(incident, null, 2) + "\n",
+		);
+		await fs.writeFile(
+			recoveryPaths.communication,
+			JSON.stringify(communication, null, 2) + "\n",
+		);
 
 		console.log(
 			`✅ Replenishment Cycle Complete. Recovered: $${recoveredAmount.toFixed(2)}`,
