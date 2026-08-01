@@ -2594,10 +2594,33 @@ async function main() {
 	const args = parseArgs(process.argv);
 	const once = args.once === true;
 
-	// AUTONOMOUS SELF-CHECK AND AUTO-REPAIR (disabled in test environment)
+	// AUTONOMOUS SOURCE INTEGRITY SCAN AND AUTO-REPAIR
 	if (process.env.NODE_ENV !== "test") {
 		try {
-			// Check if we can parse ourselves without syntax errors
+			const scanResult = await healer.sourceScanAndHeal({
+				directories: ["src", "scripts"],
+			});
+			if (!scanResult.ok) {
+				console.error(
+					"Source integrity scan found syntax errors, attempting auto-repair...",
+				);
+				for (const err of scanResult.errors) {
+					process.stderr.write(
+						`${JSON.stringify({ ok: false, at: nowIso(), file: err.filePath, healed: err.healed, error: err.error })}\n`,
+					);
+				}
+			} else if (scanResult.errors.length > 0) {
+				console.log(
+					`[Daemon] Source integrity scan healed ${scanResult.errors.length} file(s).`,
+				);
+			}
+		} catch (e) {
+			process.stderr.write(
+				`${JSON.stringify({ ok: false, at: nowIso(), error: "Source scan error", details: e.message })}\n`,
+			);
+		}
+
+		try {
 			const selfCheckResult = await runNodeScript(
 				"src/autonomous-daemon.mjs",
 				["--check"],
@@ -2607,14 +2630,16 @@ async function main() {
 				console.error(
 					"Self-check failed: syntax error detected, attempting auto-repair",
 				);
-				// In a real implementation, this would attempt to fix common syntax issues
-				// For now, we'll just log and continue
-				process.stderr.write(
-					`${JSON.stringify({ ok: false, at: nowIso(), error: "Self-check failed", details: selfCheckResult.error })}\n`,
-				);
+				const healResult = await healer.sourceScanAndHeal({
+					directories: ["src", "scripts"],
+				});
+				if (!healResult.ok) {
+					process.stderr.write(
+						`${JSON.stringify({ ok: false, at: nowIso(), error: "Self-check failed after heal attempt", details: selfCheckResult.error })}\n`,
+					);
+				}
 			}
 		} catch (e) {
-			// Self-check failed, but we can still try to run in safe mode
 			process.stderr.write(
 				`${JSON.stringify({ ok: false, at: nowIso(), error: "Self-check error", details: e.message })}\n`,
 			);
