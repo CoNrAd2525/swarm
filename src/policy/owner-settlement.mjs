@@ -13,6 +13,11 @@ function normEmail(v) {
 	return s.includes("@") ? s.toLowerCase() : null;
 }
 
+function normBank(v) {
+	const s = String(v ?? "").trim();
+	return s ? s.replace(/\s+/g, "") : null;
+}
+
 function envTrue(...names) {
 	return names.some((name) => {
 		const v = process.env[name];
@@ -163,6 +168,9 @@ export function explainMissingCredentials(route, cfg) {
 		if (!["LIVE", "WISE"].includes(prov))
 			reasons.push("BANK_WIRE_PROVIDER_UNSUPPORTED");
 		const hasIban = !!String(process.env.OWNER_IBAN || "").trim();
+		const hasRib = !!String(
+			process.env.OWNER_BANK_RIB || process.env.MOROCCAN_BANK_RIB || "",
+		).trim();
 		const hasUsd =
 			!!String(process.env.OWNER_ROUTING_NUMBER || process.env.OWNER_ROUTING || "")
 				.replace(/\D+/g, "")
@@ -170,7 +178,8 @@ export function explainMissingCredentials(route, cfg) {
 		const hasGbp =
 			!!String(process.env.OWNER_SORT_CODE || "").replace(/\D+/g, "").trim() &&
 			!!String(process.env.OWNER_ACCOUNT_NUMBER || "").replace(/\D+/g, "").trim();
-		if (!hasIban && !hasUsd && !hasGbp) reasons.push("OWNER_BANK_DETAILS_MISSING");
+		if (!hasIban && !hasUsd && !hasGbp && !hasRib)
+			reasons.push("OWNER_BANK_DETAILS_MISSING");
 		if (!c.beneficiaryName) reasons.push("OWNER_BENEFICIARY_NAME_MISSING");
 		if (prov === "WISE") {
 			if (String(process.env.WISE_ENABLE || "false").toLowerCase() !== "true")
@@ -180,8 +189,8 @@ export function explainMissingCredentials(route, cfg) {
 			if (!process.env.WISE_API_KEY) reasons.push("WISE_API_KEY_MISSING");
 			if (!process.env.WISE_PROFILE_ID) reasons.push("WISE_PROFILE_ID_MISSING");
 		} else {
-			if (!c.iban) reasons.push("OWNER_IBAN_MISSING");
-			if (!c.swift) reasons.push("OWNER_SWIFT_MISSING");
+			if (!hasIban && !hasRib) reasons.push("OWNER_IBAN_OR_RIB_MISSING");
+			if (!c.swift && !hasRib) reasons.push("OWNER_SWIFT_MISSING");
 		}
 		try {
 			const allow = JSON.parse(c.allowlist || "[]");
@@ -273,10 +282,10 @@ export function getOwnerAccountForType(type) {
 		);
 	if (t === "bank_transfer" || t === "bank") {
 		return (
-			process.env.OWNER_IBAN ||
-			process.env.OWNER_BANK_RIB ||
-			process.env.MOROCCAN_BANK_RIB ||
-			process.env.BANK_IBAN ||
+			normBank(process.env.OWNER_IBAN) ||
+			normBank(process.env.OWNER_BANK_RIB) ||
+			normBank(process.env.MOROCCAN_BANK_RIB) ||
+			normBank(process.env.BANK_IBAN) ||
 			null
 		);
 	}
@@ -327,9 +336,44 @@ export function getOwnerAccountForType(type) {
 	return null;
 }
 
+export function getOwnerAccountForCategory(category) {
+	const c = String(category || "").trim().toLowerCase();
+	if (c === "salary" || c === "salaire") {
+		return (
+			normBank(process.env.OWNER_SALARY_BANK_RIB) ||
+			normBank(process.env.OWNER_SALARY_RIB) ||
+			getOwnerAccountForType("bank_transfer")
+		);
+	}
+	if (c === "debt" || c === "dettes") {
+		return (
+			normBank(process.env.OWNER_DEBT_BANK_RIB) ||
+			normBank(process.env.OWNER_DEBT_RIB) ||
+			getOwnerAccountForType("bank_transfer")
+		);
+	}
+	return null;
+}
+
+export function listOwnerDestinationsForRoute(route) {
+	const r = String(route || "").toLowerCase();
+	if (r === "bank_transfer" || r === "bank") {
+		const list = [
+			getOwnerAccountForType("bank_transfer"),
+			getOwnerAccountForCategory("salary"),
+			getOwnerAccountForCategory("debt"),
+		].filter(Boolean);
+		return Array.from(new Set(list.map((x) => String(x))));
+	}
+	const single = getOwnerAccountForType(r);
+	return single ? [single] : [];
+}
+
 export const OwnerSettlementEnforcer = {
 	getPaymentConfiguration,
 	missingCredentials,
 	explainMissingCredentials,
 	getOwnerAccountForType,
+	getOwnerAccountForCategory,
+	listOwnerDestinationsForRoute,
 };

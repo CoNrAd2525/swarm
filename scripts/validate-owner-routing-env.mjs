@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../src/load-env.mjs";
 import { OwnerSettlementEnforcer } from "../src/policy/owner-settlement.mjs";
 
 function b(v) {
@@ -119,6 +119,10 @@ function main() {
 		payoneer: OwnerSettlementEnforcer.getOwnerAccountForType("payoneer"),
 		bank_transfer:
 			OwnerSettlementEnforcer.getOwnerAccountForType("bank_transfer"),
+                salary_bank:
+                        OwnerSettlementEnforcer.getOwnerAccountForCategory("salary"),
+                debt_bank:
+                        OwnerSettlementEnforcer.getOwnerAccountForCategory("debt"),
 		crypto: OwnerSettlementEnforcer.getOwnerAccountForType("crypto"),
 		cryptobox: OwnerSettlementEnforcer.getOwnerAccountForType("cryptobox"),
 		smart_contract_owner: OwnerSettlementEnforcer.getOwnerAccountForType(

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { WiseGateway } from "../../finance/gateways/WiseGateway.mjs";
+import { OwnerSettlementEnforcer } from "../../policy/owner-settlement.mjs";
 
 /**
  * BankWireGateway (LIVE ONLY)
@@ -28,10 +29,49 @@ export class BankWireGateway {
 		return String(v || "").replace(/\D+/g, "").trim();
 	}
 
+        _normBank(v) {
+                return String(v || "").replace(/\s+/g, "").trim();
+        }
+
+        resolveOwnerForCurrency(currency, transactions = []) {
+                const ccy = String(currency || process.env.OWNER_BANK_CURRENCY || "USD")
+                        .toUpperCase()
+                        .trim();
+                const first = Array.isArray(transactions) ? transactions[0] || {} : {};
+                const explicitDest = this._normBank(
+                        first?.destination ?? first?.recipient_address ?? first?.recipient ?? "",
+                );
+                const knownBanks = new Set(
+                        OwnerSettlementEnforcer.listOwnerDestinationsForRoute("bank_transfer").map((x) =>
+                                this._normBank(x),
+                        ),
+                );
+                const chosenRib = explicitDest && knownBanks.has(explicitDest)
+                        ? explicitDest
+                        : this._normBank(
+                                        process.env.OWNER_BANK_RIB ||
+                                                process.env.MOROCCAN_BANK_RIB ||
+                                                "",
+                                ) || undefined;
+                return {
+                        name: process.env.OWNER_BENEFICIARY_NAME,
+                        currency: ccy,
+                        iban: process.env.OWNER_IBAN,
+                        rib: chosenRib,
+                        swift: process.env.OWNER_SWIFT,
+                        routing: process.env.OWNER_ROUTING_NUMBER || process.env.OWNER_ROUTING,
+                        sortCode: process.env.OWNER_SORT_CODE,
+                        accountNumber: process.env.OWNER_ACCOUNT_NUMBER,
+                        bankName: process.env.OWNER_BANK_NAME,
+                        bankCountry: process.env.OWNER_BANK_COUNTRY || undefined,
+                };
+        }
+
 	computeBeneficiaryFingerprint({
 		name,
 		currency,
 		iban,
+		rib,
 		swift,
 		routing,
 		sortCode,
@@ -41,6 +81,7 @@ export class BankWireGateway {
 			String(name || "").trim(),
 			String(currency || "").toUpperCase().trim(),
 			this._normIban(iban),
+			String(rib || "").trim(),
 			String(swift || "").trim().toUpperCase(),
 			this._normDigits(routing),
 			this._normDigits(sortCode),
@@ -49,7 +90,7 @@ export class BankWireGateway {
 		return crypto.createHash("sha256").update(norm).digest("hex");
 	}
 
-	ensureReady({ currency } = {}) {
+        ensureReady({ currency, transactions } = {}) {
 		const live =
 			String(process.env.SWARM_LIVE || "false").toLowerCase() === "true";
 		const enabled =
@@ -65,27 +106,20 @@ export class BankWireGateway {
 			);
 		}
 
-		const ccy = String(currency || process.env.OWNER_BANK_CURRENCY || "USD")
-			.toUpperCase()
-			.trim();
-		const owner = {
-			name: process.env.OWNER_BENEFICIARY_NAME,
-			currency: ccy,
-			iban: process.env.OWNER_IBAN,
-			swift: process.env.OWNER_SWIFT,
-			routing: process.env.OWNER_ROUTING_NUMBER || process.env.OWNER_ROUTING,
-			sortCode: process.env.OWNER_SORT_CODE,
-			accountNumber: process.env.OWNER_ACCOUNT_NUMBER,
-			bankName: process.env.OWNER_BANK_NAME,
-			bankCountry: process.env.OWNER_BANK_COUNTRY || undefined,
-		};
+                const owner = this.resolveOwnerForCurrency(currency, transactions);
 		if (!owner.name) {
 			throw new Error("BankWireGateway: Missing OWNER_BENEFICIARY_NAME");
 		}
 		const hasEur = !!this._normIban(owner.iban);
+		const hasRib = !!String(owner.rib || "").trim();
 		const hasUsd = !!this._normDigits(owner.routing) && !!this._normDigits(owner.accountNumber);
 		const hasGbp = !!this._normDigits(owner.sortCode) && !!this._normDigits(owner.accountNumber);
-		if (!hasEur && !hasUsd && !hasGbp) {
+		if (
+			!hasEur &&
+			!hasUsd &&
+			!hasGbp &&
+			!(provider === "LIVE" && hasRib)
+		) {
 			throw new Error(
 				"BankWireGateway: Missing bank destination (need OWNER_IBAN or OWNER_ROUTING_NUMBER+OWNER_ACCOUNT_NUMBER or OWNER_SORT_CODE+OWNER_ACCOUNT_NUMBER)",
 			);
@@ -103,6 +137,16 @@ export class BankWireGateway {
 						)
 						.digest("hex")
 				: null;
+		const ribFp = hasRib
+			? crypto
+					.createHash("sha256")
+					.update(
+						`${String(owner.name || "").trim()}|${String(owner.currency || "")
+							.toUpperCase()
+							.trim()}|${String(owner.rib || "").trim()}`,
+					)
+					.digest("hex")
+			: null;
 		const allowJson = process.env.OWNER_BENEFICIARY_ALLOWLIST_JSON || "[]";
 		let allow = [];
 		try {
@@ -113,7 +157,10 @@ export class BankWireGateway {
 		const allowSet = new Set(
 			Array.isArray(allow) ? allow.map((x) => String(x)) : [],
 		);
-		const allowed = allowSet.has(fp) || (legacyFp ? allowSet.has(legacyFp) : false);
+		const allowed =
+			allowSet.has(fp) ||
+			(legacyFp ? allowSet.has(legacyFp) : false) ||
+			(ribFp ? allowSet.has(ribFp) : false);
 		if (!allowed)
 			throw new Error(
 				"BankWireGateway: Owner beneficiary not allowlisted (OWNER_BENEFICIARY_ALLOWLIST_JSON)",
@@ -126,6 +173,9 @@ export class BankWireGateway {
 				throw new Error("BankWireGateway: WISE_ENVIRONMENT=live required");
 			if (!process.env.WISE_API_KEY || !process.env.WISE_PROFILE_ID)
 				throw new Error("BankWireGateway: Missing WISE_API_KEY/WISE_PROFILE_ID");
+			if (hasRib && !hasEur && !hasUsd && !hasGbp) {
+				throw new Error("BankWireGateway: WISE provider requires IBAN or routing details (RIB alone not supported)");
+			}
 		}
 
 		return { owner };
@@ -158,7 +208,7 @@ export class BankWireGateway {
 	async executeTransfer(transactions) {
 		const { amount, currency, reference } =
 			this.normalizeTransactions(transactions);
-		const { owner } = this.ensureReady({ currency });
+                const { owner } = this.ensureReady({ currency, transactions });
 
 		if (String(this.provider || "").toUpperCase() === "WISE") {
 			const res = await this.wise.executeOwnerBankTransfer({

@@ -7,7 +7,11 @@ function normalizeRoute(route) {
 export function enforceOwnerSettlementForRoute(route, transactions) {
 	const r = normalizeRoute(route);
 	const ownerDest = OwnerSettlementEnforcer.getOwnerAccountForType(r);
-	if (!ownerDest && r !== "smart_contract_owner")
+	const bankAllow =
+		r === "bank_transfer" || r === "bank"
+			? new Set(OwnerSettlementEnforcer.listOwnerDestinationsForRoute(r))
+			: null;
+	if (!ownerDest && r !== "smart_contract_owner" && !bankAllow?.size)
 		throw new Error(`missing_owner_destination_for_route:${r}`);
 	const list = Array.isArray(transactions) ? transactions : [];
 	if (list.length === 0) throw new Error("missing_transactions");
@@ -23,6 +27,21 @@ export function enforceOwnerSettlementForRoute(route, transactions) {
 				amount,
 				currency,
 				destination: t?.destination ?? null,
+				reference,
+			};
+		}
+		if (bankAllow) {
+			const desired = t?.destination ?? t?.recipient_address ?? null;
+			const normalized = desired == null ? "" : String(desired).replace(/\s+/g, "").trim();
+			const use =
+				normalized && bankAllow.has(normalized)
+					? normalized
+					: OwnerSettlementEnforcer.getOwnerAccountForType("bank_transfer");
+			if (!use) throw new Error("missing_owner_bank_destination");
+			return {
+				amount,
+				currency,
+				destination: use,
 				reference,
 			};
 		}

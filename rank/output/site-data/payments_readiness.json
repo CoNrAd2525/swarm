@@ -1,12 +1,13 @@
 {
-  "timestamp": "2026-06-12T10:59:23.864Z",
+  "timestamp": "2026-08-01T16:51:42.781Z",
   "env": {
-    "SWARM_LIVE": false,
-    "BASE44_ENABLE_PAYOUT_LEDGER_WRITE": false,
+    "SWARM_LIVE": true,
+    "BASE44_ENABLE_PAYOUT_LEDGER_WRITE": true,
     "BASE44_ENABLE_PAYPAL_PAYOUT_STATUS_WRITE": false,
     "BASE44_EVIDENCE_RELAXED": false,
     "BUNKER_MODE": false,
-    "PAYPAL_OWNER_EMAIL": false,
+    "OWNER_PAYPAL_EMAIL": true,
+    "PAYPAL_OWNER_EMAIL": true,
     "PAYPAL_CLIENT_ID": false,
     "PAYPAL_CLIENT_SECRET": false
   },
@@ -15,14 +16,58 @@
   },
   "gates": {
     "payment_kill_switch": false,
-    "owner_routing_verified": false,
+    "owner_routing_verified": true,
     "client_creds_present": false
   },
   "direct_rails_ready": {
-    "paypal": false,
+    "paypal": true,
     "crypto_usdt_erc20": true,
     "payoneer": true,
     "bank_wire": true
   },
-  "overall_ready": false
+  "rail_cards": [
+    {
+      "id": "bank_wire",
+      "label": "Bank Wire (ACH/SWIFT)",
+      "route": "bank_transfer",
+      "ready": true,
+      "destination_masked": "0078...4182",
+      "provider": "LIVE",
+      "missing": []
+    },
+    {
+      "id": "crypto_payouts",
+      "label": "Crypto Payouts",
+      "route": "crypto",
+      "ready": false,
+      "destination_masked": "",
+      "provider_priority": null,
+      "missing": [
+        "CRYPTO_WITHDRAW_ENABLE=false",
+        "TRUST_WALLET_ADDRESS_MISSING"
+      ]
+    },
+    {
+      "id": "autonomous_fund_execution",
+      "label": "Autonomous Fund Execution",
+      "route": "smart_contract_owner",
+      "ready": false,
+      "contract_masked": "",
+      "chain": null,
+      "missing": [
+        "OWNER_VAULT_ENABLE=false",
+        "OWNER_VAULT_CONTRACT_ADDRESS_MISSING"
+      ]
+    }
+  ],
+  "routing_rules": {
+    "personal_salary_pct": 0.1,
+    "personal_salary_schedule": "weekly",
+    "personal_salary_default_rail": "BANK_WIRE",
+    "salary_bank_rib_configured": true,
+    "debt_bank_rib_configured": true,
+    "salary_bank_rib_masked": "0078...4182",
+    "debt_bank_rib_masked": "0078...1372"
+  },
+  "overall_ready": true
 }

@@ -1,5 +1,8 @@
 $env:SWARM_LIVE="true"
 $env:FINANCIAL_MODE="DRY"
+$env:AUTONOMOUS_PAYOUT_LIVE="true"
+$env:BASE44_ENABLE_PAYOUT_LEDGER_WRITE="true"
+$env:PAYMENT_ROUTING_PRIORITY="bank_transfer,paypal,payoneer,crypto,wise,googlepay"
 
 # --- Base44 (required for SWARM + ETL) ---
 $env:BASE44_APP_ID=""
@@ -12,9 +15,24 @@ $env:PAYPAL_MODE="live"
 $env:PAYPAL_CLIENT_ID=""
 $env:PAYPAL_CLIENT_SECRET=""
 $env:PAYPAL_WEBHOOK_ID=""
+$env:OWNER_PAYPAL_EMAIL=""
 $env:PAYPAL_OWNER_EMAIL=""
 $env:PAYPAL_PPP2_APPROVED="false"
 $env:PAYPAL_PPP2_ENABLE_SEND="false"
+
+# --- Owner bank routing (Attijari / bank wire) ---
+$env:BANK_WIRE_ENABLE="true"
+$env:BANK_WIRE_PROVIDER="LIVE"
+$env:OWNER_BENEFICIARY_NAME=""
+$env:OWNER_BANK_NAME=""
+$env:OWNER_BANK_COUNTRY=""
+$env:OWNER_BANK_CURRENCY="USD"
+$env:OWNER_SWIFT=""
+$env:OWNER_BANK_RIB=""
+$env:MOROCCAN_BANK_RIB=""
+$env:OWNER_SALARY_BANK_RIB=""
+$env:OWNER_DEBT_BANK_RIB=""
+$env:OWNER_BENEFICIARY_ALLOWLIST_JSON="[]"
 
 # --- Site (owner access + watchdog) ---
 $env:OWNER_DASH_TOKEN=""
