@@ -1,0 +1,75 @@
+name: Procurement Request
+description: Request equipment or services needed to keep Swarm running reliably.
+title: "Procurement: "
+labels:
+  - procurement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste addresses, phone numbers, emails, bank details, or IDs into this issue.
+        Use a delivery profile reference like DELIVERY_PROFILE_ID=BOUZNIKA_H3_HIND or DELIVERY_PROFILE_ID=RABAT_IBNSINA_BACHIR.
+  - type: input
+    id: owner
+    attributes:
+      label: Owner
+      description: Who is this procurement for?
+      placeholder: Younes Tsouli
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New PC / Workstation
+        - Laptop
+        - Storage / Backup
+        - Network / Router
+        - Security / EDR
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: need
+    attributes:
+      label: What is needed
+      description: Describe the request clearly (items + quantities).
+      placeholder: "Example: 1x workstation for autonomous runs"
+    validations:
+      required: true
+  - type: input
+    id: delivery_profile_id
+    attributes:
+      label: Delivery profile id
+      description: Reference to a delivery profile stored privately (not in this issue).
+      placeholder: "DELIVERY_PROFILE_ID=BOUZNIKA_H3_HIND"
+    validations:
+      required: false
+  - type: textarea
+    id: specs
+    attributes:
+      label: Specs / Requirements
+      description: CPU/RAM/GPU/Storage/OS requirements and any constraints.
+      placeholder: "Example: 8+ cores, 32GB RAM, 1TB SSD, Windows 11 Pro"
+    validations:
+      required: false
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Urgency
+      options:
+        - Critical (blocking operations)
+        - High (frequent crashes / high risk)
+        - Medium
+        - Low
+    validations:
+      required: true
+  - type: textarea
+    id: justification
+    attributes:
+      label: Justification / Evidence
+      description: Add evidence (crash frequency, logs, EDR incidents, failing workflows).
+      placeholder: "Example: Machine crashes during catalogue builds; Defender exclusions incident."
+    validations:
+      required: false

@@ -1,0 +1,29 @@
+name: Workflow Health Operator
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 * * * *"
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  operator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Run auto-remediation
+        env:
+          AUTO_PR: ${{ vars.CI_OPERATOR_AUTO_PR }}
+          REPO_TOKEN: ${{ secrets.REPO_MAINTAINER_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node ./scripts/ci/auto_remediate.mjs

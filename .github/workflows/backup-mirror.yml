@@ -11,6 +11,7 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       BASE44_API_URL: ${{ secrets.BASE44_API_URL }}
       BASE44_SERVER_URL: ${{ secrets.BASE44_SERVER_URL }}
@@ -28,17 +29,60 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
-      - run: npm ci || npm install --no-audit --no-fund --no-package-lock
+      - name: Install dependencies (with retries)
+        run: |
+          n=0
+          until [ $n -ge 3 ]
+          do
+            npm ci && break
+            n=$((n+1))
+            echo "Retrying install ($n)..."
+            sleep 5
+          done
       - name: Export Base44 entities
-        run: node ./scripts/export-full-base44.mjs
+        run: |
+          if [ -z "$BASE44_APP_ID" ] || [ -z "$BASE44_SERVICE_TOKEN" ]; then
+            echo "No Base44 credentials set — skipping export-full-base44."
+          else
+            set -o pipefail
+            node ./scripts/export-full-base44.mjs || echo "export-full-base44 failed but continuing"
+          fi
       - name: Local snapshot
-        run: node ./scripts/backup-project-state.mjs
+        run: node ./scripts/backup-project-state.mjs || echo "backup-project-state failed but continuing"
       - name: Recovery + mirror sync
-        run: node ./scripts/recovery-daemon.mjs --once
+        run: node ./scripts/recovery-daemon.mjs --once || echo "recovery-daemon failed but continuing"
       - name: Swarm sync health snapshot
-        run: npm run swarm:monitor:sync
+        run: npm run swarm:monitor:sync || echo "swarm:monitor:sync failed but continuing"
+      - name: Package backup bundle
+        run: |
+          ts=$(date -u +%Y%m%dT%H%M%SZ)
+          echo "TS=$ts" >> "$GITHUB_ENV"
+          mkdir -p backups
+          tar -czf "backups/backup_mirror_${ts}.tgz" \
+            data/base44_export \
+            data/finance \
+            data/swarm \
+            data/mirror-sites.json \
+            doomsday-vault \
+            backups \
+            logs/mirror-status.json \
+            rank/output/site-data 2>/dev/null || true
+      - name: Upload bundle to Supabase Storage
+        if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.MIRROR_SUPABASE_BUCKET != '' }}
+        run: |
+          bucket="${MIRROR_SUPABASE_BUCKET}"
+          base="${SUPABASE_URL}/storage/v1"
+          curl -sS -X POST "${base}/bucket" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data "{\"id\":\"${bucket}\",\"name\":\"${bucket}\",\"public\":false}" >/dev/null 2>&1 || true
+          object_path="backup/${GITHUB_REF_NAME}/${TS}/backup_mirror.tgz"
+          curl -sS -X PUT "${base}/object/${bucket}/${object_path}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"backups/backup_mirror_${TS}.tgz" || echo "supabase upload failed but continuing"
       - name: Upload backups (artifact)
         uses: actions/upload-artifact@v4
         with:

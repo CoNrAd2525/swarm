@@ -140,7 +140,9 @@ class Base44Pusher {
 		} catch (e) {
 			if (e.message.includes("405") || e.message.includes("404")) {
 				try {
-					return await this.request(`/entities/${entityName}/bulk`, "POST", [record]);
+					return await this.request(`/entities/${entityName}/bulk`, "POST", [
+						record,
+					]);
 				} catch {}
 			}
 			throw e;
@@ -153,7 +155,11 @@ class Base44Pusher {
 		} catch (e) {
 			if (e.message.includes("405")) {
 				try {
-					return await this.request(`/entities/${entityName}/${recordId}`, "PATCH", updates);
+					return await this.request(
+						`/entities/${entityName}/${recordId}`,
+						"PATCH",
+						updates,
+					);
 				} catch {}
 			}
 			throw e;
@@ -162,7 +168,11 @@ class Base44Pusher {
 
 	async queryRecords(entityName, filters = {}) {
 		const params = new URLSearchParams(filters);
-		return await this.request(`/entities/${entityName}?${params}`);
+		try {
+			return await this.request(`/entities/${entityName}?${params}`);
+		} catch (e) {
+			throw e;
+		}
 	}
 
 	async deleteRecord(entityName, recordId) {
@@ -311,10 +321,10 @@ const SCHEMAS = {
 // ============================================================================
 
 class Base44Deployment {
-	constructor(pusher, { schemas = SCHEMAS, profileName = "legacy_finance" } = {}) {
+  constructor(pusher, { schemas = SCHEMAS, profileName = "legacy_finance" } = {}) {
 		this.pusher = pusher;
-		this.schemas = schemas;
-		this.profileName = profileName;
+          this.schemas = schemas;
+          this.profileName = profileName;
 		this.results = {
 			schemas: { created: [], updated: [], failed: [], exists: [] },
 			records: { created: [], failed: [] },
@@ -327,12 +337,11 @@ class Base44Deployment {
 		console.log("ðŸ“¦ VALIDATING BASE44 ENTITIES");
 		console.log("=".repeat(60) + "\n");
 
-		for (const [name, schema] of Object.entries(this.schemas)) {
+          for (const name of Object.keys(this.schemas)) {
 			this.pusher.log(`Processing: ${name}`, "info");
 
 			try {
 				const existing = await this.pusher.getEntity(name);
-
 				if (existing) {
 					this.results.schemas.exists.push(name);
 					this.pusher.log(
@@ -701,7 +710,7 @@ async function main() {
 	}
 
 	const invalidAccounts = Object.entries(OWNER_ACCOUNTS).filter(
-		([k, v]) => !v || v.includes("undefined"),
+		([, v]) => !v || v.includes("undefined"),
 	);
 	const hasOwnerAccounts = invalidAccounts.length === 0;
 	const wantsTestData = process.argv.includes("--with-test-data");
@@ -731,25 +740,25 @@ async function main() {
 	console.log(`   Bank: ${OWNER_ACCOUNTS.bank}`);
 	console.log(`   Payoneer: ${OWNER_ACCOUNTS.payoneer}`);
 
-	const pusher = new Base44Pusher(BASE44_CONFIG);
-	const profile = resolveBase44Schemas({
-		config: BASE44_CONFIG,
-		legacySchemas: SCHEMAS,
-	});
-	const deployment = new Base44Deployment(pusher, profile);
+  const pusher = new Base44Pusher(BASE44_CONFIG);
+  const profile = resolveBase44Schemas({
+          config: BASE44_CONFIG,
+          legacySchemas: SCHEMAS,
+  });
+  const deployment = new Base44Deployment(pusher, profile);
 
 	try {
 		// Step 1: Deploy schemas
 		await deployment.deploySchemas();
 
 		// Step 2: Create test records
-		if (wantsTestData && deployment.profileName === "legacy_finance") {
+          if (wantsTestData && deployment.profileName === "legacy_finance") {
 			await deployment.createTestRecords();
-		} else if (wantsTestData) {
-			pusher.log(
-				`Skipping test records for profile ${deployment.profileName}; this script only seeds legacy_finance entities.`,
-				"warning",
-			);
+          } else if (wantsTestData) {
+                  pusher.log(
+                          `Skipping test records for profile ${deployment.profileName}; this script only seeds legacy_finance entities.`,
+                          "warning",
+                  );
 		} else {
 			console.log(
 				"\nâ­ï¸  Skipping test record creation (use --with-test-data to enable)",
@@ -757,13 +766,13 @@ async function main() {
 		}
 
 		// Step 3: Validate owner directive
-		if (hasOwnerAccounts && deployment.profileName === "legacy_finance") {
+          if (hasOwnerAccounts && deployment.profileName === "legacy_finance") {
 			await deployment.validateOwnerDirective();
-		} else if (deployment.profileName !== "legacy_finance") {
-			pusher.log(
-				`Owner route validation is not applicable to profile ${deployment.profileName}.`,
-				"info",
-			);
+          } else if (deployment.profileName !== "legacy_finance") {
+                  pusher.log(
+                          `Owner route validation is not applicable to profile ${deployment.profileName}.`,
+                          "info",
+                  );
 		} else {
 			pusher.log(
 				"Owner route validation skipped because owner account env is not configured in this shell.",
@@ -797,7 +806,6 @@ async function main() {
 
 // Run if executed directly
 import { fileURLToPath } from "url";
-import path from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const isMainModule = process.argv[1] === __filename;
@@ -807,4 +815,3 @@ if (isMainModule) {
 }
 
 export { Base44Pusher, Base44Deployment, SCHEMAS, OWNER_ACCOUNTS, main };
-

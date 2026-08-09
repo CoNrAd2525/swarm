@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { PayPalGateway } from "../src/financial/gateways/PayPalGateway.mjs";
-import { ExternalGatewayManager } from "../src/finance/ExternalGatewayManager.mjs";
 import { spawnSync } from "node:child_process";
 
 function runSync(batchId) {
@@ -47,40 +46,28 @@ async function run() {
 	} catch (e) {
 		const msg = e && e.message ? e.message : String(e);
 		if (msg.includes("AUTHORIZATION_ERROR")) {
-			const storage = { load: () => null, save: (_t, _id, r) => r };
-			const audit = { log: () => {} };
-			const executor = { execute: async (_k, fn) => fn() };
-			const manager = new ExternalGatewayManager(storage, audit, executor);
-			const payoutBatchId = `AUTO-${Date.now()}`;
-			const items = [
-				{
-					amount: amt,
-					currency: cur,
-					recipient_email: dest,
-					note: "Owner Hands-Free Live Payout",
-				},
-			];
-			const prepared = await manager.initiateAutoSettlement(
-				payoutBatchId,
-				items,
-				`idem-${payoutBatchId}`,
-				"System",
-			);
-			const route = prepared.route_attempted || "bank_transfer";
-			const broadcast = await manager.broadcastSettlement(
-				route,
-				prepared,
-				items,
-				"System",
-			);
 			console.log(
 				JSON.stringify(
-					{ ok: true, fallback: { route, prepared, broadcast } },
+					{
+						ok: false,
+						error: "paypal_authorization_error_no_external_transfer",
+						no_external_transfer_executed: true,
+						requires_human_approval: false,
+						owner_hands_free_policy: true,
+						reroute_to_builder_executor: true,
+						message:
+							"No external transfer was executed. PayPal authorization failed before a live payout batch could be created. Owner hands-free policy remains enabled; rerun through the real Builder+ payout executor once live route prerequisites are satisfied.",
+						details: {
+							amount: amt,
+							currency: cur,
+							destination: dest,
+						},
+					},
 					null,
 					2,
 				),
 			);
-			return;
+			process.exit(1);
 		}
 		console.error("PAYPAL_PAYOUT_FAILED", msg);
 		process.exit(1);

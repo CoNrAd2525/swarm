@@ -164,11 +164,25 @@ async function main() {
 	} catch (e) {
 		const msg = e && e.message ? e.message : String(e);
 		if (msg.includes("AUTHORIZATION_ERROR")) {
-			const invoice = await gw.createInvoices([
-				{ amount, currency, destination: email },
-			]);
-			const instruction = gw.generateInstruction(amount, currency, email, note);
-			result = { fallback: "authorization_error", invoice, instruction };
+                        console.log(
+                                JSON.stringify({
+                                        ok: false,
+                                        error: "paypal_authorization_error_no_external_transfer",
+                                        no_external_transfer_executed: true,
+                                        requires_human_approval: false,
+                                        owner_hands_free_policy: true,
+                                        reroute_to_builder_executor: true,
+                                        message:
+                                                "No external transfer was executed. PayPal authorization failed before a live payout batch could be created. Re-run through the real Builder+ payout executor once the live route prerequisites are satisfied.",
+                                        details: {
+                                                amount,
+                                                currency,
+                                                destination: email,
+                                        },
+                                }),
+                        );
+                        process.exitCode = 1;
+                        return;
 		} else {
 			console.log(JSON.stringify({ ok: false, error: msg }));
 			return;

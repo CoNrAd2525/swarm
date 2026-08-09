@@ -38,6 +38,15 @@ function readJsonMaybe(filePath) {
 	}
 }
 
+function isMissingReference(value) {
+        const v = String(value ?? "").trim();
+        if (!v) return true;
+        if (/^ATTIJARI_\d+$/i.test(v)) return true;
+        if (/^(TODO|CHANGEME|REPLACE_ME)$/i.test(v)) return true;
+        if (/^<.*>$/.test(v)) return true;
+        return false;
+}
+
 async function main() {
 	const args = parseArgs(process.argv);
 	const batchId = args._?.[0];
@@ -47,9 +56,12 @@ async function main() {
 		);
 	}
 
-	const transactionId = String(
-		args["transaction-id"] ?? `ATTIJARI_${Date.now()}`,
-	).trim();
+        const transactionId = String(args["transaction-id"] ?? "").trim();
+        if (isMissingReference(transactionId)) {
+                throw new Error(
+                        "A real Attijari transaction reference is required. Re-run with --transaction-id <ATTIJARI_REFERENCE> after the bank wire is actually submitted.",
+                );
+        }
 	const receiptUrl = String(args["receipt-url"] ?? "").trim();
 	const submittedAt = String(args["submitted-at"] ?? new Date().toISOString());
 	const instructionPath = buildInstructionPath(batchId);

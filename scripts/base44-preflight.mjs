@@ -46,10 +46,13 @@ function writeJson(file, payload) {
 }
 
 async function run() {
+	const appId =
+		str("BASE44_APP_ID") ||
+		str("DEFAULT_BASE44_APP_ID") ||
+		"689afeabf1db9c30efe0bd7e";
+	const serviceToken = str("BASE44_SERVICE_TOKEN");
+	const apiUrl = str("BASE44_API_URL");
 	const strict = str("STRICT_PREFLIGHT").toLowerCase() === "true";
-	const config = getBase44ConnectorConfig(process.env);
-	const authToken = config.serviceToken || config.apiKey;
-	const probeEntity = str("BASE44_PREFLIGHT_ENTITY") || "Agent";
 
 	const payload = {
 		ok: true,
@@ -57,43 +60,32 @@ async function run() {
 		env: {
 			BASE44_APP_ID: Boolean(str("BASE44_APP_ID")),
 			DEFAULT_BASE44_APP_ID: Boolean(str("DEFAULT_BASE44_APP_ID")),
-			BASE44_SERVICE_TOKEN: Boolean(config.serviceToken),
-			BASE44_API_KEY: Boolean(config.apiKey),
-			BASE44_API_URL: Boolean(str("BASE44_API_URL")),
+			BASE44_SERVICE_TOKEN: Boolean(serviceToken),
+			BASE44_API_URL: Boolean(apiUrl),
 		},
 		server: {
-			base_url: safeUrl(config.baseUrl),
-			app_id: config.appId || null,
-			app_scoped_base: Boolean(config.appScopedBase),
+			resolved_server_url: safeUrl(resolveServerUrl()),
+			base44_api_url: safeUrl(apiUrl),
 		},
-		token: tokenMeta(authToken),
+		token: tokenMeta(serviceToken),
 		probe: {
 			ok: null,
-			entity: probeEntity,
 			status: null,
 			message: null,
 			reason: null,
 		},
 	};
 
-	if (!authToken) {
+	if (!serviceToken) {
 		payload.ok = false;
 		payload.probe.ok = false;
 		payload.probe.reason = "missing_env";
 	} else {
 		try {
-			const result = await base44Request(`/entities/${probeEntity}?limit=1`, {
-				method: "GET",
-				config,
-				includeAppPath: true,
-				clientName: "SwarmBase44Preflight/2026.07",
-			});
+			const client = buildBase44Client();
+			await ensureBase44UserAuth(client).catch(() => {});
+			await client.entities.PayoutBatch.list("-created_date", 1, 0);
 			payload.probe.ok = true;
-			payload.probe.result_shape = Array.isArray(result)
-				? "array"
-				: result && typeof result === "object"
-					? "object"
-					: typeof result;
 		} catch (e) {
 			payload.ok = false;
 			payload.probe.ok = false;

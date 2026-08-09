@@ -1,0 +1,30 @@
+name: Procurement Sync (Supabase)
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  issues: read
+  contents: read
+
+jobs:
+  sync:
+    if: contains(github.event.issue.labels.*.name, 'procurement')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Sync to Supabase Storage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_PROCUREMENT_BUCKET: ${{ secrets.SUPABASE_PROCUREMENT_BUCKET }}
+          MIRROR_SUPABASE_BUCKET: ${{ secrets.MIRROR_SUPABASE_BUCKET }}
+        run: node ./scripts/ci/sync_procurement_to_supabase.mjs

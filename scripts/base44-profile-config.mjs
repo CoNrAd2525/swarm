@@ -1,4 +1,4 @@
-﻿function entityMap(names) {
+function entityMap(names) {
 	return Object.fromEntries(
 		names.map((name) => [name, { name, description: `${name} entity`, fields: [] }]),
 	);
