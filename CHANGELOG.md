@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-08-12]
+- upgrade(workflows): bumped all 18 swarm-worktree-sync workflows to actions/checkout@v5, setup-node@v5, upload-artifact@v5, runtime Node 24 with cache: npm, 3-retry npm ci loop, set -euo pipefail on financial/commit steps, concurrency groups, continue-on-error for operational, AUTOCOMMIT gates
+- fix(autocommit): bank-reconcile.yml, changelog-watch.yml, payout-health.yml, generate-now.yml — eliminated `git add -A` completely removed, replaced with explicit per-path whitelist staging, AUTOCOMMIT_ENABLE=false default, --cached --stat diagnostic, ref-name-safe push
+- fix(srm): harden push-to-base44.mjs — PII mask on PayPal/RIB/wallet/Payoneer logs, owner-accounts empty-string bypass, BASE44_PUSH_ENABLE dry-run default, recordSuccess arity 1→3 JSONL, mkdirSync recursive, invalidAccounts banner mask, violation list mask
+- upgrade(base44): harden run-base44-profile.mjs — mask recipient routes/credentials filename in banner, BASE44_PUSH_ENABLE, builder-wire recipientResults meta mask, delegation to push-to-base44.setDryRun
+- upgrade(base44): harden base44-preflight.mjs — env-check-only default, removed broken buildBase44Client call, use shared base44Request live probe when BASE44_PREFLIGHT_LIVE=true, sanitize token messages
+- upgrade(base44): harden export-full-base44.mjs — BASE44_EXPORT_LIVE gate, deepMask PII scrub all output, manifest emit, offline-store deepMask parse
+- docs(mirrors): MIRRORS_AND_SECURE_CLOUD.md Section 7 August 2026 audit — v5 actions, Node 24, curl DOS guards, docker password-stdin, vercel@41 pin, payout gates, owner-PII script hardening list
+- deploy(vercel): vercel-proxy.yml + vercel-static.yml pinned vercel@41, install vercel pin, deploys npx vercel@41 guarded
+- upgrade(base44): vercel-proxy vercel-static node24, etl-base44-supabase node18→24
+- base44 changelog: BASE44_CHANGELOG.md Version 2026.08.12 — summarizes push/profile/preflight/export entrypoint hardening
+
 ## [2026-06-10]
 - feat(connectors): Added a shared Base44 connector request utility in `src/util/base44-request.mjs` and refactored `scripts/push-to-base44.mjs` onto the common request path
 - feat(webhooks): Hardened `src/wise-webhook-server.mjs` with optional IP allowlisting, persistent event dedupe, captured client IP metadata, and flush-on-shutdown behavior

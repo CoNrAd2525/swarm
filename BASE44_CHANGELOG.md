@@ -1,5 +1,21 @@
 # Base44 App Update Changelogs
 
+## Version 2026.08.12 - Workflow + SRM Hardening + PII Masking Pass
+
+### 🚀 Deployment / Orchestration
+- [run-base44-profile.mjs](../scripts/run-base44-profile.mjs): Builder+ payout executor profile runner now masks all recipient account identifiers, swift/bic, bank names and credential file paths in stdout banner. Adds profile-level `BASE44_PUSH_ENABLE` dry-run gate and delegates `setDryRun()` to push-to-base44. Recipient route metadata (type + currency) printed but values masked.
+- [base44-preflight.mjs](../scripts/base44-preflight.mjs): Switched to env-check-only default (requires `BASE44_PREFLIGHT_LIVE=true` for live probe). Removed broken `buildBase44Client()` / `ensureBase44UserAuth()` (never imported) and replaced with shared `base44Request` probe. All error messages token-sanitized.
+- [export-full-base44.mjs](../scripts/export-full-base44.mjs): `BASE44_EXPORT_LIVE=true` now required for API fetch (default dry-run). All JSON output PII-scrubbed via `deepMask()` (keys matching email/iban/beneficiary/recipient/wallet/address/account_identifier/swift/bic/rib → masked). Emits per-entity manifest, records count of exported records per entity, offline store backup parsed and masked.
+- [push-to-base44.mjs](../scripts/push-to-base44.mjs): Fixed owner-accounts empty-string bypass, PII masks on all owner routing logs, dry-run default via `BASE44_PUSH_ENABLE`, `recordSuccess(msg, details, scope)` arity-3 signature writing JSONL to `audits/`, `./audits` `mkdirSync recursive`.
+
+### 🛡️ Guardrails
+- Eliminated plaintext owner routing data in preflight banner logs; sensitive error strings match hex tokens ≥ 24 chars and truncate to `XXXX…XXXX`
+- 4x base44 entrypoints (push-to-base44, run-base44-profile, base44-preflight, export-full-base44) now fail-safe DRY-RUN unless their respective ENABLE vars are set explicitly.
+- Live probes only trigger when ENABLE flags = "true"; status is surfaced through JSON report at `exports/reports/base44_preflight_last.json`.
+
+### 🔗 Integration Notes
+- Mirror + secure-cloud copy instructions updated (see [MIRRORS_AND_SECURE_CLOUD.md](../docs/MIRRORS_AND_SECURE_CLOUD.md) Section 7) so any clean mirror boots with workflow v5 actions, Node 24, curl DOS guards, commit whitelists, and PII-scrubbed Base44 outputs.
+
 ## Version 2026.02.25 - Base44 Coordination & Owner Directive Validation
 
 ### 🚀 Deployment

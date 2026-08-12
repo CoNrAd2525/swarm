@@ -45,6 +45,34 @@ function writeJson(file, payload) {
 	return file;
 }
 
+function sanitizeMsg(text) {
+	const s = String(text || "");
+	if (!s) return s;
+	const m = s.replace(/[a-f0-9]{24,}/g, (m) => `${m.slice(0, 4)}…${m.slice(-4)}`);
+	return m;
+}
+
+function resolveServerUrl() {
+	const base = str("BASE44_SERVER_URL") || str("BASE44_API_URL") || "";
+	return base || null;
+}
+
+async function probeOnce({ appId, serviceToken, apiUrl }) {
+	const config = getBase44ConnectorConfig({
+		BASE44_APP_ID: appId,
+		BASE44_SERVICE_TOKEN: serviceToken,
+		BASE44_API_URL: apiUrl,
+	});
+	const res = await base44Request("/entities/PayoutBatch", {
+		method: "GET",
+		config,
+		includeAppPath: true,
+		clientName: "PreflightProbe/2026.08",
+		query: { limit: 1, order_by: "-created_date" },
+	});
+	return { ok: true, res };
+}
+
 async function run() {
 	const appId =
 		str("BASE44_APP_ID") ||
@@ -53,10 +81,12 @@ async function run() {
 	const serviceToken = str("BASE44_SERVICE_TOKEN");
 	const apiUrl = str("BASE44_API_URL");
 	const strict = str("STRICT_PREFLIGHT").toLowerCase() === "true";
+	const dryProbeOnly = process.env.BASE44_PREFLIGHT_LIVE !== "true";
 
 	const payload = {
 		ok: true,
 		at: new Date().toISOString(),
+		mode: dryProbeOnly ? "env_check_only" : "live_probe",
 		env: {
 			BASE44_APP_ID: Boolean(str("BASE44_APP_ID")),
 			DEFAULT_BASE44_APP_ID: Boolean(str("DEFAULT_BASE44_APP_ID")),
@@ -80,19 +110,21 @@ async function run() {
 		payload.ok = false;
 		payload.probe.ok = false;
 		payload.probe.reason = "missing_env";
+	} else if (dryProbeOnly) {
+		payload.probe.ok = true;
+		payload.probe.reason = "skipped_live_probe_set_BASE44_PREFLIGHT_LIVE_true";
 	} else {
 		try {
-			const client = buildBase44Client();
-			await ensureBase44UserAuth(client).catch(() => {});
-			await client.entities.PayoutBatch.list("-created_date", 1, 0);
+			await probeOnce({ appId, serviceToken, apiUrl });
 			payload.probe.ok = true;
 		} catch (e) {
 			payload.ok = false;
 			payload.probe.ok = false;
-			payload.probe.status = Number.isFinite(e?.status) ? e.status : null;
-			payload.probe.message = e?.message || String(e);
-			payload.probe.reason =
-				e?.data?.extra_data?.reason || e?.data?.reason || null;
+			payload.probe.status = Number.isFinite(e?.status) ? e.status : (Number.isFinite(e?.response?.status) ? e.response.status : null);
+			payload.probe.message = sanitizeMsg(e?.message || String(e));
+			payload.probe.reason = sanitizeMsg(
+				e?.data?.extra_data?.reason || e?.data?.reason || (e?.response?.data ? String(e.response.data).slice(0, 200) : null) || null,
+			);
 		}
 	}
 

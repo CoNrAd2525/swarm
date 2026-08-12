@@ -30,6 +30,31 @@ function getProfileArg() {
 	return raw;
 }
 
+function maskPII(value) {
+	if (!value) return "[not configured]";
+	const s = String(value);
+	if (s.length <= 4) return "*".repeat(s.length);
+	if (s.includes("@")) {
+		const [local, domain] = s.split("@");
+		const maskedLocal = local.length <= 2 ? "*".repeat(local.length) :
+			local[0] + "*".repeat(Math.max(local.length - 2, 2)) + local[local.length - 1];
+		return `${maskedLocal}@${domain}`;
+	}
+	return s[0] + "*".repeat(Math.max(s.length - 4, 4)) + s.slice(-4);
+}
+
+function maskRecipient(recipient) {
+	if (!recipient) return recipient;
+	return {
+		...recipient,
+		account_identifier: maskPII(recipient.account_identifier),
+		bank_name: maskPII(recipient.bank_name),
+		country: recipient.country || null,
+		swift_bic: maskPII(recipient.swift_bic),
+		sort_code: maskPII(recipient.sort_code),
+	};
+}
+
 function nonEmpty(...values) {
 	for (const value of values) {
 		const text = String(value || "").trim();
@@ -197,9 +222,12 @@ async function wireBuilderPayoutExecutor() {
 	const timestamp = new Date().toISOString();
 	const dryRun = runExecutorDryRun();
 	const recipientResults = [];
-	for (const recipient of buildRecipients()) {
+	const rawRecipients = buildRecipients();
+	for (const recipient of rawRecipients) {
+		const publish = maskRecipient(recipient);
 		const result = await upsertBy("PayoutRecipient", "name", recipient.name, recipient);
-		recipientResults.push({ id: result.record?.id || null, name: recipient.name, created: result.created });
+		recipientResults.push({ id: result.record?.id || null, name: recipient.name, created: result.created, route: maskPII(recipient.account_identifier), route_type: recipient.recipient_type, currency: recipient.currency });
+		console.log(`[builder-wire] recipient=${recipient.name} route=${publish.account_identifier} type=${recipient.recipient_type} currency=${recipient.currency} created=${result.created}`);
 	}
 	const agent = await upsertBy("Agent", "name", "Builder+ Payout Executor", {
 		name: "Builder+ Payout Executor",
@@ -269,9 +297,10 @@ async function main() {
 		`${JSON.stringify({
 			ok: true,
 			profile,
-			credentials_file: file,
+			credentials_file: maskPII(path.basename(file)),
 			base_url: process.env.BASE44_API_URL,
 			app_id: process.env.BASE44_APP_ID,
+			has_api_key: Boolean(process.env.BASE44_API_KEY),
 			auth_mode: "api_key",
 		})}\n`,
 	);
@@ -281,10 +310,13 @@ async function main() {
 		return;
 	}
 
+	const dryRun = process.env.BASE44_PUSH_ENABLE !== "true" || process.argv.includes("--dry-run");
+	console.log(`[run-base44-profile] profile=${profile} dry_run=${dryRun} (set BASE44_PUSH_ENABLE=true to push live)`);
 	const mod = await import("./push-to-base44.mjs");
 	if (typeof mod.main !== "function") {
 		throw new Error("PUSH_TO_BASE44_MAIN_NOT_EXPORTED");
 	}
+	if (typeof mod.setDryRun === "function") mod.setDryRun(dryRun);
 	await mod.main();
 }
 
