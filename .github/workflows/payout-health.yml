@@ -8,46 +8,74 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: payout-health
+  cancel-in-progress: false
+
 jobs:
   health:
     runs-on: ubuntu-latest
     env:
+      AUTOCOMMIT_ENABLE: ${{ vars.AUTOCOMMIT_ENABLE || 'false' }}
       BASE44_API_URL: ${{ secrets.BASE44_API_URL }}
       BASE44_SERVER_URL: ${{ secrets.BASE44_SERVER_URL }}
       BASE44_APP_ID: ${{ secrets.BASE44_APP_ID }}
       BASE44_SERVICE_TOKEN: ${{ secrets.BASE44_SERVICE_TOKEN }}
       PAYOUT_HEALTH_MAX_HOURS: ${{ vars.PAYOUT_HEALTH_MAX_HOURS || '24' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
-      - run: npm ci || npm install --no-audit --no-fund --no-package-lock
+      - name: Install dependencies (with retries)
+        run: |
+          set -euo pipefail
+          n=0
+          until [ $n -ge 3 ]; do
+            if npm ci --no-audit --no-fund 2>/dev/null; then break; fi
+            n=$((n+1)); echo "Install retry ($n)..."; sleep 5
+          done
       - name: Export Base44 entities (best effort)
-        run: node ./scripts/export-full-base44.mjs || true
+        run: node ./scripts/export-full-base44.mjs || echo "export-full-base44 failed but continuing"
       - name: Payout pipeline health report
         run: |
+          set -euo pipefail
           mkdir -p exports/reports
-          node ./scripts/report-payout-health.mjs data/base44_export/PayoutBatch.json | tee exports/reports/payout_health_last.txt || true
+          node ./scripts/report-payout-health.mjs data/base44_export/PayoutBatch.json > exports/reports/payout_health_last.txt 2>&1 || echo "report-payout-health failed but continuing"
       - name: Finance state snapshot (Base44)
-        run: node ./scripts/report-finance-state.mjs | tee exports/reports/finance_state_last.json || true
+        run: node ./scripts/report-finance-state.mjs > exports/reports/finance_state_last.json 2>&1 || echo "report-finance-state failed but continuing"
       - name: Upload reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: payout-health-${{ github.run_id }}
           path: exports/reports/*
+          if-no-files-found: ignore
       - name: Commit generated reports
         run: |
+          set -euo pipefail
+          if [ "${AUTOCOMMIT_ENABLE}" != "true" ]; then
+            echo "Autocommit disabled via AUTOCOMMIT_ENABLE (default false)."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          ALLOWED=(
+            "exports/reports/payout_health_last.txt"
+            "exports/reports/finance_state_last.json"
+            "data/base44_export"
+            "data/finance"
+            "data/swarm"
+          )
+          for p in "${ALLOWED[@]}"; do
+            if [ -e "$p" ]; then git add -- "$p" 2>/dev/null || true; fi
+          done
+          git --no-pager diff --cached --stat || true
           if ! git diff --cached --quiet; then
-            git commit -m "chore(payout): health report update"
-            git push origin HEAD:${{ github.ref_name }}
+            git commit -m "chore(payout): health report update" || true
+            git push origin "HEAD:${{ github.ref_name }}"
           else
             echo "No health artifacts to commit."
           fi
-

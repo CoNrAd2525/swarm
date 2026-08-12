@@ -5,39 +5,58 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: changelog-watch
+  cancel-in-progress: true
 jobs:
   watch:
     runs-on: ubuntu-latest
-    concurrency:
-      group: changelog-watch
-      cancel-in-progress: true
+    env:
+      AUTOCOMMIT_ENABLE: ${{ vars.AUTOCOMMIT_ENABLE || 'false' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
-      - run: npm ci --omit=dev || npm ci || npm install --omit=dev --no-audit --no-fund --no-package-lock
+          node-version: "24"
+          cache: "npm"
+      - name: Install dependencies (with retries)
+        run: |
+          set -euo pipefail
+          n=0
+          until [ $n -ge 3 ]; do
+            if npm ci --no-audit --no-fund --omit=dev 2>/dev/null; then break; fi
+            n=$((n+1))
+            echo "Install retry ($n)..."
+            sleep 5
+          done
       - name: Poll changelogs
-        run: node ./scripts/changelog-watch.mjs
+        run: node ./scripts/changelog-watch.mjs || echo "changelog-watch failed but continuing"
       - name: Upload artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: changelog-watch
           path: rank/output/site-data/changelog_watch.json
+          if-no-files-found: ignore
       - name: Commit changes
         run: |
-          if [ "${{ vars.AUTOCOMMIT_ENABLE || 'false' }}" != "true" ]; then
+          set -euo pipefail
+          if [ "${AUTOCOMMIT_ENABLE}" != "true" ]; then
             echo "Autocommit disabled."
             exit 0
           fi
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "chore: refresh changelog watch"
-            git push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          ALLOWED=(
+            "rank/output/site-data/changelog_watch.json"
+          )
+          for p in "${ALLOWED[@]}"; do
+            if [ -e "$p" ]; then git add -- "$p" 2>/dev/null || true; fi
+          done
+          git --no-pager diff --cached --stat || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: refresh changelog watch" || true
+            git push origin "HEAD:${{ github.ref_name }}"
           else
             echo "No changes to commit."
           fi
-

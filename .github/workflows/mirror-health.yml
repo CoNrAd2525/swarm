@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: mirror-health
+  cancel-in-progress: false
+
 jobs:
   parity:
     runs-on: ubuntu-latest
@@ -15,12 +19,12 @@ jobs:
       UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO || 'CoNrAd2525/swarm' }}
       UPSTREAM_BRANCHES: ${{ vars.UPSTREAM_BRANCHES || 'master release' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Check upstream parity
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p exports/reports
           {
             echo "{"
@@ -32,8 +36,8 @@ jobs:
 
           first=1
           for b in $UPSTREAM_BRANCHES; do
-            upstream_sha="$(git ls-remote \"https://github.com/${UPSTREAM_REPO}.git\" \"refs/heads/$b\" | awk '{print $1}' | head -n 1)"
-            mirror_sha="$(git ls-remote \"https://github.com/${GITHUB_REPOSITORY}.git\" \"refs/heads/$b\" | awk '{print $1}' | head -n 1)"
+            upstream_sha="$(git ls-remote "https://github.com/${UPSTREAM_REPO}.git" "refs/heads/$b" 2>/dev/null | awk '{print $1}' | head -n 1 || true)"
+            mirror_sha="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" "refs/heads/$b" 2>/dev/null | awk '{print $1}' | head -n 1 || true)"
             if [ -z "$upstream_sha" ]; then
               upstream_sha="null"
             else
@@ -61,8 +65,8 @@ jobs:
             echo "}"
           } >> exports/reports/mirror_health_last.json
       - name: Upload mirror health
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: mirror-health-${{ github.run_id }}
           path: exports/reports/mirror_health_last.json
-
+          if-no-files-found: ignore

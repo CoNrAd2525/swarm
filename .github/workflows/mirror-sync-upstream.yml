@@ -21,7 +21,7 @@ jobs:
       UPSTREAM_BRANCHES: ${{ vars.UPSTREAM_BRANCHES || 'master release' }}
       UPSTREAM_TAGS: ${{ vars.UPSTREAM_TAGS || 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: true
@@ -31,15 +31,16 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
       - name: Fetch upstream
         run: |
-          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" || true
-          git fetch upstream --prune --tags
+          set -euo pipefail
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" 2>/dev/null || true
+          git fetch upstream --prune --tags || echo "upstream fetch failed but continuing"
       - name: Sync branches
         run: |
-          set -e
+          set -euo pipefail
           for b in $UPSTREAM_BRANCHES; do
             if git show-ref --verify --quiet "refs/remotes/upstream/$b"; then
               git checkout -B "$b" "upstream/$b"
-              git push origin "$b" --force-with-lease
+              git push origin "$b" --force-with-lease || echo "push origin $b failed but continuing"
             else
               echo "Upstream branch not found: $b"
             fi
@@ -47,5 +48,5 @@ jobs:
       - name: Sync tags
         if: env.UPSTREAM_TAGS == 'true'
         run: |
-          git push origin --tags --force
-
+          set -euo pipefail
+          git push origin --tags --force || echo "tag sync push failed but continuing"

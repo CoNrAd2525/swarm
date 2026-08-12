@@ -6,23 +6,37 @@ on:
       - master
 permissions:
   contents: write
+concurrency:
+  group: generate-now-release
+  cancel-in-progress: false
 jobs:
   generate:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[generate-now]')
     runs-on: ubuntu-latest
+    env:
+      AUTOCOMMIT_ENABLE: ${{ vars.AUTOCOMMIT_ENABLE || 'false' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: release
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
-      - run: npm ci || npm install --no-audit --no-fund --no-package-lock
+          node-version: "24"
+          cache: "npm"
+      - name: Install deps (with retries)
+        run: |
+          set -euo pipefail
+          n=0
+          until [ $n -ge 3 ]; do
+            if npm ci --no-audit --no-fund 2>/dev/null; then break; fi
+            n=$((n+1)); echo "Install retry ($n)..."; sleep 5
+          done
       - name: Bank reconciliation (Plaid) - auto confirm
         id: bank_reconcile
         run: |
-          out="$(node ./scripts/auto-confirm-bank-settlements.mjs)"
+          set -euo pipefail
+          out="$(node ./scripts/auto-confirm-bank-settlements.mjs 2>&1 || true)"
           echo "$out"
           confirmed="$(echo "$out" | jq -r '.confirmed // 0' 2>/dev/null || echo 0)"
           if [ -z "$confirmed" ] || [ "$confirmed" = "null" ]; then
@@ -33,9 +47,10 @@ jobs:
         env:
           OWNER_SETTLEMENT_AUTORUN: ${{ vars.OWNER_SETTLEMENT_AUTORUN }}
         run: |
+          set -euo pipefail
           if [ "${OWNER_SETTLEMENT_AUTORUN:-false}" = "true" ]; then
             if [ "${{ steps.bank_reconcile.outputs.confirmed }}" -gt 0 ]; then
-              node ./scripts/auto-settle-owner-daemon.mjs --once
+              node ./scripts/auto-settle-owner-daemon.mjs --once || echo "owner settlement daemon failed but continuing"
             else
               echo "No confirmed incomings detected; skipping owner settlement cycle"
             fi
@@ -44,18 +59,37 @@ jobs:
           fi
       - name: Generate multilingual course pages (optional)
         run: |
+          set -euo pipefail
           if [ -f "./scripts/generate-multilang-courses.mjs" ]; then
-            node ./scripts/generate-multilang-courses.mjs
+            node ./scripts/generate-multilang-courses.mjs || echo "multilingual course gen failed but continuing"
           else
             echo "scripts/generate-multilang-courses.mjs not present; skipping generation"
           fi
       - name: Commit and push changes to release
         run: |
+          set -euo pipefail
+          if [ "${AUTOCOMMIT_ENABLE}" != "true" ]; then
+            echo "Autocommit disabled via AUTOCOMMIT_ENABLE (default false)."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          ALLOWED=(
+            "data/base44_export"
+            "data/finance"
+            "data/swarm"
+            "exports/reports"
+            "rank/output"
+            "site/realworldcerts"
+            "data/notifications"
+            "data/ops"
+          )
+          for p in "${ALLOWED[@]}"; do
+            if [ -e "$p" ]; then git add -- "$p" 2>/dev/null || true; fi
+          done
+          git --no-pager diff --cached --stat || true
           if ! git diff --cached --quiet; then
-            git commit -m "generate-now: course pages and settlement state"
+            git commit -m "generate-now: course pages and settlement state" || true
             git push origin HEAD:release
           else
             echo "No changes to commit."

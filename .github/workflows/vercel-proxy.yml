@@ -9,17 +9,33 @@ on:
       - 'api/**'
   workflow_dispatch:
 
+concurrency:
+  group: vercel-proxy-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '18'
-      - name: Install Vercel CLI
-        run: npm i -g vercel
+          node-version: "24"
+          cache: "npm"
+      - name: Install dependencies (with retries)
+        run: |
+          set -euo pipefail
+          n=0
+          until [ $n -ge 3 ]; do
+            if npm ci --no-audit --no-fund 2>/dev/null; then break; fi
+            n=$((n+1)); echo "Install retry ($n)..."; sleep 5
+          done
+      - name: Install Vercel CLI (pinned major)
+        run: |
+          set -euo pipefail
+          npm i -g vercel@41 --no-audit --no-fund 2>/dev/null || npm i -g vercel@41
+          vercel --version
       - name: Ensure Vercel project uses repo root (best effort)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -29,7 +45,7 @@ jobs:
           VERCEL_GIT_REPO: CoNrAd2525/swarm
           VERCEL_ROOT_DIRECTORY: .
           VERCEL_GIT_BRANCH: release
-        run: node scripts/vercel-update-project-repo.mjs || true
+        run: node scripts/vercel-update-project-repo.mjs || echo "vercel-update-project-repo failed but continuing"
       - name: Deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -37,11 +53,16 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROXY_PROJECT_NAME: ${{ secrets.VERCEL_PROXY_PROJECT_NAME }}
         run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "Skipping deploy: VERCEL_TOKEN not set."
+            exit 0
+          fi
           NAME="${VERCEL_PROXY_PROJECT_NAME:-rwc-proxy}"
-          if [ -n "$VERCEL_TEAM_ID" ]; then
-            npx vercel pull --environment=production --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" || true
-            npx vercel deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID"
+          if [ -n "${VERCEL_TEAM_ID:-}" ]; then
+            npx --yes vercel@41 pull --environment=production --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" || true
+            npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID"
           else
-            npx vercel pull --environment=production --yes --token "$VERCEL_TOKEN" || true
-            npx vercel deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN"
+            npx --yes vercel@41 pull --environment=production --yes --token "$VERCEL_TOKEN" || true
+            npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN"
           fi

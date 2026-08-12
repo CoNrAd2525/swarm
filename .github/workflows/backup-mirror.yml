@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: backup-mirror-cloud
+  cancel-in-progress: false
+
 jobs:
   backup:
     runs-on: ubuntu-latest
@@ -24,29 +28,30 @@ jobs:
       ENVBOX_KEY: ${{ secrets.ENVBOX_KEY }}
       PLAIDBOX_KEY: ${{ secrets.PLAIDBOX_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: "npm"
       - name: Install dependencies (with retries)
         run: |
+          set -euo pipefail
           n=0
           until [ $n -ge 3 ]
           do
-            npm ci && break
+            if npm ci --no-audit --no-fund 2>/dev/null; then break; fi
             n=$((n+1))
             echo "Retrying install ($n)..."
             sleep 5
           done
       - name: Export Base44 entities
         run: |
+          set -euo pipefail
           if [ -z "$BASE44_APP_ID" ] || [ -z "$BASE44_SERVICE_TOKEN" ]; then
             echo "No Base44 credentials set — skipping export-full-base44."
           else
-            set -o pipefail
             node ./scripts/export-full-base44.mjs || echo "export-full-base44 failed but continuing"
           fi
       - name: Local snapshot
@@ -57,6 +62,7 @@ jobs:
         run: npm run swarm:monitor:sync || echo "swarm:monitor:sync failed but continuing"
       - name: Package backup bundle
         run: |
+          set -euo pipefail
           ts=$(date -u +%Y%m%dT%H%M%SZ)
           echo "TS=$ts" >> "$GITHUB_ENV"
           mkdir -p backups
@@ -72,19 +78,20 @@ jobs:
       - name: Upload bundle to Supabase Storage
         if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.MIRROR_SUPABASE_BUCKET != '' }}
         run: |
+          set -euo pipefail
           bucket="${MIRROR_SUPABASE_BUCKET}"
           base="${SUPABASE_URL}/storage/v1"
-          curl -sS -X POST "${base}/bucket" \
+          curl -fSL --connect-timeout 10 --max-time 60 -sS -X POST "${base}/bucket" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
             --data "{\"id\":\"${bucket}\",\"name\":\"${bucket}\",\"public\":false}" >/dev/null 2>&1 || true
           object_path="backup/${GITHUB_REF_NAME}/${TS}/backup_mirror.tgz"
-          curl -sS -X PUT "${base}/object/${bucket}/${object_path}" \
+          curl -fSL --connect-timeout 15 --max-time 300 -sS -X PUT "${base}/object/${bucket}/${object_path}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @"backups/backup_mirror_${TS}.tgz" || echo "supabase upload failed but continuing"
       - name: Upload backups (artifact)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: backup-mirror-${{ github.run_id }}
           if-no-files-found: ignore

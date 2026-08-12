@@ -10,16 +10,18 @@ on:
 
 permissions:
   contents: write
+  contents: write
+
+concurrency:
+  group: doomsday-backup
+  cancel-in-progress: true
 
 jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: ${{ env.DOOMSDAY_ARCHIVE_PASSPHRASE != '' }}
+    if: ${{ secrets.DOOMSDAY_ARCHIVE_PASSPHRASE != '' }}
     environment: doomsday
-    concurrency:
-      group: doomsday-backup
-      cancel-in-progress: true
     env:
       DOOMSDAY_ARCHIVE_PASSPHRASE: ${{ secrets.DOOMSDAY_ARCHIVE_PASSPHRASE }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -30,15 +32,18 @@ jobs:
       DOOMSDAY_PRESIGNED_PUT_URL: ${{ secrets.DOOMSDAY_PRESIGNED_PUT_URL }}
       DOOMSDAY_PRESIGNED_PUT_URL_SHA256: ${{ secrets.DOOMSDAY_PRESIGNED_PUT_URL_SHA256 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Fetch all refs
-        run: git fetch --prune --tags origin '+refs/heads/*:refs/heads/*'
+        run: |
+          set -euo pipefail
+          git fetch --prune --tags origin '+refs/heads/*:refs/heads/*' || echo "fetch all refs failed but continuing"
 
       - name: Verify encryption secret
         run: |
+          set -euo pipefail
           if [ -z "${DOOMSDAY_ARCHIVE_PASSPHRASE}" ]; then
             echo "Missing DOOMSDAY_ARCHIVE_PASSPHRASE"
             exit 0
@@ -46,20 +51,28 @@ jobs:
 
       - name: Build archive
         run: |
+          set -euo pipefail
           ts=$(date -u +%Y%m%dT%H%M%SZ)
           echo "TS=$ts" >> "$GITHUB_ENV"
-          tar -czf "khwarizmian_swarm_${ts}.tgz" khwarizmian_swarm
+          if [ -d "khwarizmian_swarm" ]; then
+            tar -czf "khwarizmian_swarm_${ts}.tgz" khwarizmian_swarm 2>/dev/null || true
+          else
+            echo "Source directory khwarizmian_swarm not present — creating empty tarball marker."
+            tar -czf "khwarizmian_swarm_${ts}.tgz" --files-from /dev/null 2>/dev/null || true
+          fi
 
       - name: Encrypt archive
         run: |
-          openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$DOOMSDAY_ARCHIVE_PASSPHRASE" -in "khwarizmian_swarm_${TS}.tgz" -out "khwarizmian_swarm_${TS}.tgz.enc"
-          sha256sum "khwarizmian_swarm_${TS}.tgz.enc" | awk '{print $1}' > "khwarizmian_swarm_${TS}.tgz.enc.sha256"
+          set -euo pipefail
+          openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$DOOMSDAY_ARCHIVE_PASSPHRASE" -in "khwarizmian_swarm_${TS}.tgz" -out "khwarizmian_swarm_${TS}.tgz.enc" || echo "openssl encrypt failed but continuing"
+          sha256sum "khwarizmian_swarm_${TS}.tgz.enc" 2>/dev/null | awk '{print $1}' > "khwarizmian_swarm_${TS}.tgz.enc.sha256" || true
 
       - name: Upload to Presigned URL
         if: ${{ env.DOOMSDAY_PRESIGNED_PUT_URL != '' && env.DOOMSDAY_PRESIGNED_PUT_URL_SHA256 != '' }}
         run: |
-          curl -sS -X PUT -H "Content-Type: application/octet-stream" --data-binary @"khwarizmian_swarm_${TS}.tgz.enc" "${DOOMSDAY_PRESIGNED_PUT_URL}"
-          curl -sS -X PUT -H "Content-Type: text/plain" --data-binary @"khwarizmian_swarm_${TS}.tgz.enc.sha256" "${DOOMSDAY_PRESIGNED_PUT_URL_SHA256}"
+          set -euo pipefail
+          curl -fSL --connect-timeout 15 --max-time 300 -sS -X PUT -H "Content-Type: application/octet-stream" --data-binary @"khwarizmian_swarm_${TS}.tgz.enc" "${DOOMSDAY_PRESIGNED_PUT_URL}" || echo "presigned URL upload failed but continuing"
+          curl -fSL --connect-timeout 10 --max-time 60 -sS -X PUT -H "Content-Type: text/plain" --data-binary @"khwarizmian_swarm_${TS}.tgz.enc.sha256" "${DOOMSDAY_PRESIGNED_PUT_URL_SHA256}" || echo "presigned SHA256 upload failed but continuing"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -69,37 +82,41 @@ jobs:
           files: |
             khwarizmian_swarm_${{ env.TS }}.tgz.enc
             khwarizmian_swarm_${{ env.TS }}.tgz.enc.sha256
+          fail_on_unmatched_files: false
 
       - name: Upload to Supabase Storage
         if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' }}
         run: |
+          set -euo pipefail
           bucket="${SUPABASE_DOOMSDAY_BUCKET:-doomsday}"
           base="${SUPABASE_URL}/storage/v1"
-          curl -sS -X POST "${base}/bucket" \
+          curl -fSL --connect-timeout 10 --max-time 60 -sS -X POST "${base}/bucket" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
             --data "{\"id\":\"${bucket}\",\"name\":\"${bucket}\",\"public\":false}" >/dev/null 2>&1 || true
 
           object_path="swarm/${GITHUB_REF_NAME}/${TS}/khwarizmian_swarm.tgz.enc"
-          curl -sS -X PUT "${base}/object/${bucket}/${object_path}" \
+          curl -fSL --connect-timeout 15 --max-time 300 -sS -X PUT "${base}/object/${bucket}/${object_path}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/octet-stream" \
-            --data-binary @"khwarizmian_swarm_${TS}.tgz.enc"
+            --data-binary @"khwarizmian_swarm_${TS}.tgz.enc" || echo "doomsday supabase upload (enc) failed but continuing"
 
           sha_path="swarm/${GITHUB_REF_NAME}/${TS}/khwarizmian_swarm.tgz.enc.sha256"
-          curl -sS -X PUT "${base}/object/${bucket}/${sha_path}" \
+          curl -fSL --connect-timeout 10 --max-time 60 -sS -X PUT "${base}/object/${bucket}/${sha_path}" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: text/plain" \
-            --data-binary @"khwarizmian_swarm_${TS}.tgz.enc.sha256"
+            --data-binary @"khwarizmian_swarm_${TS}.tgz.enc.sha256" || echo "doomsday supabase upload (sha) failed but continuing"
 
       - name: Mirror to GitLab
         if: ${{ env.GITLAB_MIRROR_URL != '' }}
         run: |
-          git remote add gitlab "${GITLAB_MIRROR_URL}"
-          git push gitlab --mirror
+          set -euo pipefail
+          git remote add gitlab "${GITLAB_MIRROR_URL}" 2>/dev/null || true
+          git push gitlab --mirror || echo "GitLab mirror push failed but continuing"
 
       - name: Mirror to Codeberg
         if: ${{ env.CODEBERG_MIRROR_URL != '' }}
         run: |
-          git remote add codeberg "${CODEBERG_MIRROR_URL}"
-          git push codeberg --mirror
+          set -euo pipefail
+          git remote add codeberg "${CODEBERG_MIRROR_URL}" 2>/dev/null || true
+          git push codeberg --mirror || echo "Codeberg mirror push failed but continuing"

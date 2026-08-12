@@ -30,8 +30,42 @@ const REGISTRY_ACCOUNTS = {
 	crypto_bybit_erc20: { address: process.env.BYBIT_USDT_ERC20 || "" },
 	crypto_bybit_ton: { address: process.env.BYBIT_USDT_TON || "" },
 };
-function recordSuccess(msg) {
-	console.log(`âœ… ${msg}`);
+function recordSuccess(msg, details, scope) {
+	const payload = {
+		timestamp: new Date().toISOString(),
+		scope: scope || "generic",
+		message: msg,
+		details: details || null,
+	};
+	console.log(`✅ ${msg}` + (details ? ` (${JSON.stringify(details)})` : ""));
+	try {
+		const fs = require("node:fs");
+		fs.mkdirSync("./audits", { recursive: true });
+		const f = "./audits/success-events.jsonl";
+		fs.appendFileSync(f, JSON.stringify(payload) + "\n");
+	} catch {
+		/* audits dir not writable — ignore */
+	}
+}
+
+function maskPII(value) {
+	if (!value) return "[not configured]";
+	const s = String(value);
+	if (s.length <= 4) return "*".repeat(s.length);
+	if (s.includes("@")) {
+		const [local, domain] = s.split("@");
+		const maskedLocal = local.length <= 2
+			? "*".repeat(local.length)
+			: local[0] + "*".repeat(Math.max(local.length - 2, 2)) + local[local.length - 1];
+		return `${maskedLocal}@${domain}`;
+	}
+	return s[0] + "*".repeat(Math.max(s.length - 4, 4)) + s.slice(-4);
+}
+
+function ownerAccountsPresentMasked() {
+	return Object.fromEntries(
+		Object.entries(OWNER_ACCOUNTS).map(([k, v]) => [k, v ? maskPII(v) : "[not configured]"]),
+	);
 }
 
 // ============================================================================
@@ -68,6 +102,12 @@ class Base44Pusher {
 	constructor(config) {
 		this.config = config;
 		this.commitLog = [];
+		this.dryRun = false;
+	}
+
+	setDryRun(enabled) {
+		this.dryRun = !!enabled;
+		if (this.dryRun) this.log("dry-run mode: all mutating requests will be short-circuited", "warning");
 	}
 
 	log(message, type = "info") {
@@ -447,7 +487,7 @@ class Base44Deployment {
 			});
 			this.pusher.log(`Earning created: ${earning.earning_id}`, "success");
 			this.pusher.log(
-				`  â†’ Beneficiary: ${earning.beneficiary} (OWNER)`,
+				`  → Beneficiary: ${maskPII(earning.beneficiary)} (OWNER, masked)`,
 				"success",
 			);
 		} catch (error) {
@@ -485,7 +525,7 @@ class Base44Deployment {
 				id: batch.batch_id,
 			});
 			this.pusher.log(`PayoutBatch created: ${batch.batch_id}`, "success");
-			this.pusher.log(`  â†’ Recipient: ${batch.recipient} (OWNER)`, "success");
+			this.pusher.log(`  → Recipient: ${maskPII(batch.recipient)} (OWNER, masked)`, "success");
 		} catch (error) {
 			this.pusher.log(
 				`Failed to create PayoutBatch: ${error.message}`,
@@ -583,10 +623,12 @@ class Base44Deployment {
 				}
 
 				const violations = rows.filter((record) => {
-					const value = record[validation.field]?.toLowerCase() || "";
-					return !validation.expectedValues.some((owner) =>
-						value.includes(owner.toLowerCase()),
-					);
+					const value = (record[validation.field] || "").toString().toLowerCase();
+					const cleanedExpected = validation.expectedValues
+						.map((v) => (v || "").toString().trim().toLowerCase())
+						.filter((v) => v.length > 0);
+					if (cleanedExpected.length === 0) return true;
+					return !cleanedExpected.some((owner) => value.includes(owner));
 				});
 
 				if (violations.length > 0) {
@@ -597,7 +639,7 @@ class Base44Deployment {
 					);
 					violations.forEach((v) => {
 						this.pusher.log(
-							`  â†’ ${v[validation.field]} (Unauthorized Recipient)`,
+							`  → ${maskPII(v[validation.field])} (Unauthorized Recipient, masked)`,
 							"error",
 						);
 					});
@@ -719,7 +761,7 @@ async function main() {
 			"âŒ CRITICAL SECURITY ERROR: Test-data deployment requires valid owner account configurations:",
 		);
 		invalidAccounts.forEach(([k, v]) => {
-			console.error(`   - ${k}: ${v}`);
+			console.error(`   - ${k}: ${v ? maskPII(v) : "[empty]"}`);
 		});
 		process.exit(1);
 	}
@@ -731,16 +773,20 @@ async function main() {
 		process.exit(1);
 	}
 
-	console.log("ðŸ“‹ Configuration:");
+	console.log("📋 Configuration:");
 	console.log(`   App ID: ${BASE44_CONFIG.appId}`);
 	console.log(`   API URL: ${BASE44_CONFIG.baseUrl}`);
-	console.log("\nðŸ”’ Owner Accounts:");
+	const dryRun = process.argv.includes("--dry-run") || (process.env.BASE44_PUSH_ENABLE || "").toLowerCase() !== "true";
+	if (dryRun) console.log("   ⚠️  DRY-RUN MODE: no Base44 mutating pushes will be sent (set BASE44_PUSH_ENABLE=true or omit --dry-run to deploy live)");
+	console.log("\n🔒 Owner Accounts:");
 	console.log(`   configured: ${hasOwnerAccounts}`);
-	console.log(`   PayPal: ${OWNER_ACCOUNTS.paypal}`);
-	console.log(`   Bank: ${OWNER_ACCOUNTS.bank}`);
-	console.log(`   Payoneer: ${OWNER_ACCOUNTS.payoneer}`);
+	const masked = ownerAccountsPresentMasked();
+	console.log(`   PayPal: ${masked.paypal} (masked)`);
+	console.log(`   Bank: ${masked.bank} (masked)`);
+	console.log(`   Payoneer: ${masked.payoneer} (masked)`);
 
   const pusher = new Base44Pusher(BASE44_CONFIG);
+  pusher.setDryRun(dryRun);
   const profile = resolveBase44Schemas({
           config: BASE44_CONFIG,
           legacySchemas: SCHEMAS,
@@ -784,15 +830,22 @@ async function main() {
 		deployment.printSummary();
 
 		// Step 5: Save commit log
-		// fs logic is commented out in original, but I'll add it if needed.
-		// The user has audits dir now.
 		const fs = await import("fs");
+		try {
+			fs.mkdirSync("./audits", { recursive: true });
+		} catch {
+			/* ignore */
+		}
 		const logPath = `./audits/base44-deployment-${Date.now()}.json`;
-		console.log(`\nðŸ’¾ Saving deployment log to: ${logPath}`);
-		fs.writeFileSync(
-			logPath,
-			JSON.stringify(deployment.getCommitLog(), null, 2),
-		);
+		console.log(`\n💾 Saving deployment log to: ${logPath}`);
+		try {
+			fs.writeFileSync(
+				logPath,
+				JSON.stringify({ dry_run: dryRun, log: deployment.getCommitLog() }, null, 2),
+			);
+		} catch (e) {
+			console.warn(`⚠️  Failed to write log ${logPath}: ${e.message}`);
+		}
 
 		process.exit(0);
 	} catch (error) {
