@@ -16,6 +16,11 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy_rank.outputs.preview_url }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
       - name: Setup Node
@@ -23,6 +28,16 @@ jobs:
         with:
           node-version: "24"
           cache: "npm"
+      - name: Echo secret presence (diagnostic only, value never printed)
+        env:
+          VERCEL_TOKEN_PRESENT: ${{ secrets.VERCEL_TOKEN && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          echo "VERCEL_TOKEN_PRESENT=${VERCEL_TOKEN_PRESENT}"
+          if [ "${VERCEL_TOKEN_PRESENT}" != "true" ]; then
+            echo "  -> All Vercel CLI / deploy steps below will be skipped."
+            echo "  -> Hint: If token IS set in repo secrets, check: (a) environment scoping (this job uses 'production' environment), (b) branch protections on 'release' branch, (c) org-level secret filters."
+          fi
       - name: Install deps (with retries)
         run: |
           set -euo pipefail
@@ -48,13 +63,13 @@ jobs:
             echo "rank/output/index.html not built yet (may be generated elsewhere)"
           fi
       - name: Install Vercel CLI (pinned major)
-        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        if: secrets.VERCEL_TOKEN
         run: |
           set -euo pipefail
           npm i -g vercel@41 --no-audit --no-fund 2>/dev/null || npm i -g vercel@41
           vercel --version
       - name: Check Vercel project link (best effort)
-        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        if: secrets.VERCEL_TOKEN
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
@@ -64,7 +79,7 @@ jobs:
           export VERCEL_EXPECT_GITHUB_REPO="CoNrAd2525/swarm"
           node scripts/vercel-check-project-link.mjs || true
       - name: Ensure Vercel project uses canonical root (best effort)
-        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        if: secrets.VERCEL_TOKEN
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
@@ -76,7 +91,8 @@ jobs:
           export VERCEL_GIT_BRANCH="release"
           node scripts/vercel-update-project-repo.mjs || true
       - name: Deploy rank/output to Vercel
-        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        id: deploy_rank
+        if: secrets.VERCEL_TOKEN
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
@@ -84,21 +100,28 @@ jobs:
           VERCEL_STATIC_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
         run: |
           set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "::error::VERCEL_TOKEN is empty in bash env (secrets resolution failed for this step). Check repo vs environment scoping."
+            exit 1
+          fi
           NAME="realworldcerts"
+          PREVIEW=""
           if [ -d "rank/output" ]; then
             cd rank/output
             if [ -n "${VERCEL_TEAM_ID:-}" ]; then
               npx --yes vercel@41 pull --environment=production --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" || true
-              npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID"
+              PREVIEW=$(npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID")
             else
               npx --yes vercel@41 pull --environment=production --yes --token "$VERCEL_TOKEN" || true
-              npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN"
+              PREVIEW=$(npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN")
             fi
           else
             echo "Skipping rank/output deploy: directory not present in repository."
           fi
+          echo "preview_url=${PREVIEW}" >> "$GITHUB_OUTPUT"
       - name: Deploy site/realworldcerts to Vercel
-        if: ${{ secrets.VERCEL_TOKEN != '' && hashFiles('site/realworldcerts/**') != '' }}
+        id: deploy_site
+        if: secrets.VERCEL_TOKEN && hashFiles('site/realworldcerts/**') != ''
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
@@ -106,12 +129,18 @@ jobs:
           VERCEL_STATIC_PROJECT_NAME: ${{ secrets.VERCEL_STATIC_PROJECT_NAME }}
         run: |
           set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "::error::VERCEL_TOKEN empty in site/realworldcerts deploy step (secrets resolution failed)."
+            exit 1
+          fi
           NAME="realworldcerts-site"
+          PREVIEW=""
           cd site/realworldcerts
           if [ -n "${VERCEL_TEAM_ID:-}" ]; then
             npx --yes vercel@41 pull --environment=production --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" || true
-            npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID"
+            PREVIEW=$(npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID")
           else
             npx --yes vercel@41 pull --environment=production --yes --token "$VERCEL_TOKEN" || true
-            npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN"
+            PREVIEW=$(npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN")
           fi
+          echo "preview_url=${PREVIEW}" >> "$GITHUB_OUTPUT"
