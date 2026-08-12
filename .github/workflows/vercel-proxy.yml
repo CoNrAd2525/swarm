@@ -16,6 +16,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: production
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
       - name: Setup Node
@@ -23,6 +27,12 @@ jobs:
         with:
           node-version: "24"
           cache: "npm"
+      - name: Echo secret presence (diagnostic only, value never printed)
+        env:
+          VERCEL_TOKEN_PRESENT: ${{ secrets.VERCEL_TOKEN && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          echo "VERCEL_TOKEN_PRESENT=${VERCEL_TOKEN_PRESENT}"
       - name: Install dependencies (with retries)
         run: |
           set -euo pipefail
@@ -32,11 +42,13 @@ jobs:
             n=$((n+1)); echo "Install retry ($n)..."; sleep 5
           done
       - name: Install Vercel CLI (pinned major)
+        if: secrets.VERCEL_TOKEN
         run: |
           set -euo pipefail
           npm i -g vercel@41 --no-audit --no-fund 2>/dev/null || npm i -g vercel@41
           vercel --version
       - name: Ensure Vercel project uses repo root (best effort)
+        if: secrets.VERCEL_TOKEN
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
@@ -47,6 +59,8 @@ jobs:
           VERCEL_GIT_BRANCH: release
         run: node scripts/vercel-update-project-repo.mjs || echo "vercel-update-project-repo failed but continuing"
       - name: Deploy
+        id: deploy_proxy
+        if: secrets.VERCEL_TOKEN
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
@@ -55,14 +69,16 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${VERCEL_TOKEN:-}" ]; then
-            echo "Skipping deploy: VERCEL_TOKEN not set."
-            exit 0
+            echo "::error::VERCEL_TOKEN empty in deploy step (secrets resolution failed). Check repo vs environment scoping."
+            exit 1
           fi
           NAME="${VERCEL_PROXY_PROJECT_NAME:-rwc-proxy}"
+          PREVIEW=""
           if [ -n "${VERCEL_TEAM_ID:-}" ]; then
             npx --yes vercel@41 pull --environment=production --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID" || true
-            npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID"
+            PREVIEW=$(npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN" --scope "$VERCEL_TEAM_ID")
           else
             npx --yes vercel@41 pull --environment=production --yes --token "$VERCEL_TOKEN" || true
-            npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN"
+            PREVIEW=$(npx --yes vercel@41 deploy --prod --yes --name "$NAME" --token "$VERCEL_TOKEN")
           fi
+          echo "preview_url=${PREVIEW}" >> "$GITHUB_OUTPUT"
