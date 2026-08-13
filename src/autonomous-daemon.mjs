@@ -39,10 +39,12 @@ import { SwarmMemory as _SwarmMemory } from "./swarm/shared-memory.mjs";
 import { startSupervisor as startSwarmSupervisor } from "./swarm/supervisor.mjs";
 import { TaskManager as _TaskManager } from "./swarm/task-manager.mjs";
 import { runSystemIntegritySync as _runSystemIntegritySync } from "./system-integrity.mjs";
+import { buildSwarmGuardrails } from "./swarm-guardrails.mjs";
 
 const healer = new SelfHealer();
 const enforcer = new ExternalPayerEnforcer();
 const replenisher = new ReplenishmentProtocol();
+const guardrails = buildSwarmGuardrails();
 
 // #region debug-point C:report-helper
 function reportDebugEvent(hypothesisId, location, msg, data) {
@@ -2009,6 +2011,74 @@ async function runTick(cfg, state) {
 	if (isMoneyMovingTasks(cfg)) {
 		if (!envIsTrue(process.env.SWARM_LIVE, "false")) {
 			throw new Error("LIVE MODE NOT GUARANTEED (SWARM_LIVE downgraded)");
+		}
+		const scanCtx = {};
+		const scan = guardrails.runFullScan(scanCtx);
+		out.meta.guardrails = {
+			score: scan.score.score,
+			state: scan.score.state,
+			breakersActive: Object.keys(scan.breakers).length,
+			triggeredPatterns: Object.entries(scan.score.breakdown ?? {})
+				.filter(([, v]) => v.triggered)
+				.map(([k]) => k),
+		};
+		if (guardrails.isCircuitBreakerActive("velocity_without_revenue")) {
+			out.meta.freeze = {
+				active: true,
+				reason: "velocity_without_revenue circuit breaker tripped",
+				until: guardrails
+					.getCircuitBreakers()
+					.breakers?.velocity_without_revenue?.expiresAt,
+			};
+		}
+		guardrails.recordDecision(
+			`tick:${String(cfg.tasks.createPayoutBatches)}:${String(
+				cfg.tasks.autoSubmitPayPalPayoutBatches,
+			)}`,
+			"autonomous-daemon tick signature",
+			{ actor: "autonomous-daemon" },
+		);
+		const amnesia = guardrails.checkContextAmnesia(
+			`tick:${String(cfg.tasks.createPayoutBatches)}:${String(
+				cfg.tasks.autoSubmitPayPalPayoutBatches,
+			)}`,
+		);
+		if (amnesia.triggered) {
+			guardrails.immediateRemediations({
+				hydrateSubAgents: Number(
+					process.env.SWARM_HYDRATE_SUB_AGENTS ?? 8,
+				),
+			});
+		}
+		recordAudit("GUARDRAIL_SCAN", {
+			score: scan.score.score,
+			state: scan.score.state,
+			status:
+				scan.score.score <= guardrails.cfg.safeScoreThreshold
+					? "APPROVED"
+					: "REVIEW",
+			triggered: out.meta.guardrails.triggeredPatterns,
+		}).catch(() => {});
+		if (scan.score.score > guardrails.cfg.warningScoreThreshold) {
+			out.results.guardrails_hardened = {
+				ok: false,
+				score: scan.score.score,
+				action:
+					"ABORTED_MONEY_MOVING_TASKS_UNTIL_SCORE_BELOW_" +
+					guardrails.cfg.warningScoreThreshold,
+			};
+			cfg = {
+				...cfg,
+				tasks: {
+					...cfg.tasks,
+					createPayoutBatches: false,
+					autoApprovePayoutBatches: false,
+					autoSubmitPayPalPayoutBatches: false,
+					autoExportPayoneerPayoutBatches: false,
+					syncPayPalLedgerBatches: false,
+					autoSettleOwnerPayoneer: false,
+				},
+			};
 		}
 	}
 

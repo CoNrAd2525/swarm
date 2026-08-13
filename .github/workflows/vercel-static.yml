@@ -14,7 +14,71 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  pattern-guardrails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: vercel-static-pattern-scan
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    outputs:
+      score: ${{ steps.scan.outputs.score }}
+      state: ${{ steps.scan.outputs.state }}
+      safe: ${{ steps.safe.outputs.safe }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+      - name: Install (guardrails only)
+        run: |
+          set -euo pipefail
+          n=0
+          until [ $n -ge 3 ]; do
+            npm ci --no-audit --no-fund --omit=dev 2>/dev/null && break
+            n=$((n+1))
+            echo "Install retry ($n)..."
+            sleep 5
+          done
+      - name: Run 12-pattern score scan
+        id: scan
+        run: |
+          set -euo pipefail
+          export SWARM_FAIL_SCORE=15
+          set +e
+          OUT=$(node ./src/swarm-guardrails.mjs --scan 2>&1)
+          RC=$?
+          set -e
+          echo "--- scan output ---"
+          echo "$OUT"
+          SCORE=$(echo "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{try{const o=JSON.parse(s);console.log(o.score?.score ?? o.summary?.patternScore ?? "")}catch(e){console.log("")}})')
+          STATE=$(echo "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{try{const o=JSON.parse(s);console.log(o.score?.state ?? o.summary?.patternState ?? "")}catch(e){console.log("")}})')
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+          echo "state=$STATE" >> "$GITHUB_OUTPUT"
+          echo "score: $SCORE / state: $STATE / rc: $RC"
+          if [ "$RC" -ne 0 ]; then
+            echo "::error::Pattern guardrail scan failed (exit $RC). Deploy halted. score=$SCORE state=$STATE"
+            exit $RC
+          fi
+      - name: Safe score gate
+        id: safe
+        run: |
+          set -euo pipefail
+          SCORE="${{ steps.scan.outputs.score }}"
+          SAFE=1
+          if [ -z "$SCORE" ]; then SAFE=0; fi
+          if [ "${SAFE}" = "1" ] && [ "$SCORE" -gt 15 ]; then SAFE=0; fi
+          echo "safe=$SAFE" >> "$GITHUB_OUTPUT"
+          if [ "$SAFE" = "0" ]; then
+            echo "::error::Deploying vercel-static requires pattern score <= 15 (got: $SCORE). Remediate before release push."
+            exit 1
+          fi
+          echo "pattern score $SCORE is <= 15 (SAFE): proceed."
+
   deploy:
+    needs: pattern-guardrails
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -34,9 +98,15 @@ jobs:
         run: |
           set -euo pipefail
           echo "VERCEL_TOKEN_PRESENT=${VERCEL_TOKEN_PRESENT}"
+          echo "SWARM_PATTERN_SCORE=${{ needs.pattern-guardrails.outputs.score }}"
+          echo "SWARM_PATTERN_STATE=${{ needs.pattern-guardrails.outputs.state }}"
           if [ "${VERCEL_TOKEN_PRESENT}" != "true" ]; then
             echo "  -> All Vercel CLI / deploy steps below will be skipped."
             echo "  -> Hint: If token IS set in repo secrets, check: (a) environment scoping (this job uses 'production' environment), (b) branch protections on 'release' branch, (c) org-level secret filters."
+          fi
+          if [ "${{ needs.pattern-guardrails.outputs.safe }}" != "1" ]; then
+            echo "::error::pattern-guardrails gate did not declare safe=1. Refusing deployment."
+            exit 1
           fi
       - name: Install deps (with retries)
         run: |
