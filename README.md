@@ -1,6 +1,16 @@
 # 🤖 Swarm — Supervised Autonomous Agent Network
 
-> Last updated: **2026-06-05** | Status: **Active Development**
+> Last updated: **2026-09-06** | Status: **Active Development** | Charter: [SWARM CUSTODIANSHIP v2](SWARM_CUSTODIANSHIP.md)
+
+---
+
+## Governance
+
+All agents and workflows operate under **SWARM CUSTODIANSHIP & COLLECTIVE OWNERSHIP
+(Constitution v2)** — [SWARM_CUSTODIANSHIP.md](SWARM_CUSTODIANSHIP.md).
+Every workflow agent step runs the mandatory **Scan → Triage → Execute → Log** loop
+and broadcasts `[SWARM_ELEVATION]` telemetry to `SwarmAuditLog`.
+Workflow operating documentation: [docs/SWARM_WORKFLOWS.md](docs/SWARM_WORKFLOWS.md).
 
 ---
 
