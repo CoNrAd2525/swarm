@@ -15,9 +15,10 @@
 - New `docs/SWARM_WORKFLOWS.md`: canonical workflow operating doc (fleet inventory, governing rules, change-management requirements for new workflow prompts)
 - README.md: Governance section + architecture diagram refreshed to custodian model
 - DEPLOY.md: cross-link to workflow operating doc
+- `docs/SWARM_WORKFLOWS.md` extended with per-workflow runbooks: step tables, switch branch logic, failure modes, debugging quick-reference (§5)
 
 ### 🔗 Commits
-- `9ad6196` codify constitution · `0d3cb1b` move to root · `663953c` eliza-bridge injection · `f094070` workflow docs
+- `9ad6196` codify constitution · `0d3cb1b` move to root · `663953c` eliza-bridge injection · `f094070` workflow docs · `0697bde` README custodian architecture + deploy cross-link · `aae3a51` per-workflow runbooks (§5)
 
 ## Version 2026.02.25 - Base44 Coordination & Owner Directive Validation
 
