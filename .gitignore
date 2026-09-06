@@ -44,3 +44,5 @@ swarm-new/
 repo-backup-2026-01-12.zip
 doomsday-vault/
 src/real/ledger/execution_failures.log
+apps/realworldcerts-next/tsconfig.tsbuildinfo
+*.tsbuildinfo
