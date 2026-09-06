@@ -22,6 +22,10 @@ Go to **Settings > Secrets and variables > Actions** and ensure these secrets ar
 
 ## 2. Deployment Workflows
 
+> These are GitHub Actions CI/CD workflows. The agent-driven Base44 workflow fleet
+> (Bug Sentinel, Clickless Tick, Critic, Disbursement pipelines) is documented
+> separately in [docs/SWARM_WORKFLOWS.md](docs/SWARM_WORKFLOWS.md).
+
 ### A. Build Container
 **Workflow:** `Site Container Build`
 - **Trigger:** Push to `main` or tag `v*`.

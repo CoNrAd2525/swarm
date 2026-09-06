@@ -1,5 +1,24 @@
 # Base44 App Update Changelogs
 
+## Version 2026.09.06 - SWARM CUSTODIANSHIP Constitution v2 Injection
+
+### 🏛 Constitution
+- Codified **SWARM CUSTODIANSHIP & COLLECTIVE OWNERSHIP (Constitution v2)** as the root-level canonical charter (`SWARM_CUSTODIANSHIP.md`)
+- 4 layers: core culture directive, mandatory Scan → Triage → Execute → Log loop, few-shot refusal-override examples, `[SWARM_ELEVATION]` post-correction telemetry format
+
+### 💉 Prompt Injection (100% coverage)
+- Injected the custodianship preamble into all 8 agent steps across 5 Base44 workflows: Bug Sentinel (scan/fix/alert), Critic Loop, Clickless Tick, Auto Disbursement Pipeline (notify/alert), Hourly Disbursement & Report Append (broadcast)
+- `src/swarm/eliza-bridge.mjs` `getSystemPrompt()` now prepends the preamble to every Eliza-backed agent persona automatically
+- SwarmAgent registry: all 5 agents tagged `constitution_version: 2.0-custodianship`
+
+### 📚 Documentation
+- New `docs/SWARM_WORKFLOWS.md`: canonical workflow operating doc (fleet inventory, governing rules, change-management requirements for new workflow prompts)
+- README.md: Governance section + architecture diagram refreshed to custodian model
+- DEPLOY.md: cross-link to workflow operating doc
+
+### 🔗 Commits
+- `9ad6196` codify constitution · `0d3cb1b` move to root · `663953c` eliza-bridge injection · `f094070` workflow docs
+
 ## Version 2026.02.25 - Base44 Coordination & Owner Directive Validation
 
 ### 🚀 Deployment

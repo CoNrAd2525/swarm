@@ -17,20 +17,29 @@ Workflow operating documentation: [docs/SWARM_WORKFLOWS.md](docs/SWARM_WORKFLOWS
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    SWARM NETWORK                     │
-│                                                      │
-│  Agents (Node.js)    →    SwarmSupervisor (Base44)   │
-│  orchestrate-settlement        ↓                     │
-│  market-research           Constitution              │
-│                             Enforcement              │
-│                                ↓                     │
-│                          Risk Tiering                │
-│                                ↓                     │
-│                     Owner Approval (5 min TTL)       │
-│                                ↓                     │
-│                        Immutable Ledger              │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                       SWARM NETWORK                           │
+│           (Constitution v2 — every agent is a custodian)      │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │ CUSTODIAN AGENTS  (Scan → Triage → Execute → Log)        │ │
+│  │  Bug Sentinel · Clickless Tick · Critic · Disbursement  │ │
+│  │  Eliza agents (Orchestrator, Scout) · Node.js agents    │ │
+│  │  → any inherited error corrected on sight, logged as     │ │
+│  │    [SWARM_ELEVATION] telemetry to SwarmAuditLog          │ │
+│  └───────────────────────────┬─────────────────────────────┘ │
+│                              ↓                                 │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │ SWARM SUPERVISOR (Base44)                                │ │
+│  │  Constitution Enforcement → Risk Tiering                 │ │
+│  │  → Owner Approval (5 min TTL) → Immutable Ledger         │ │
+│  └─────────────────────────────────────────────────────────┘ │
+│                              ↓                                 │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │ SELF-IMPROVEMENT LOOP: nightly Critic analyzes           │ │
+│  │ [SWARM_ELEVATION] logs → custodianship scores → report   │ │
+│  └─────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
