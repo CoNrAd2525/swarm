@@ -68,3 +68,84 @@ swarm errors, with `[SWARM_ELEVATION]` telemetry.
   the preamble automatically via `src/swarm/eliza-bridge.mjs` `getSystemPrompt()`.
 - After any workflow prompt change, log the change to `SwarmAuditLog` as
   `[SWARM_ELEVATION]` so the nightly Critic sees the edit.
+
+
+---
+
+## 5. Per-Workflow Runbooks
+
+Every workflow below runs in the Base44 workflow engine (CNCF SWF v1.0), timezone
+`Africa/Casablanca`. Agent steps (`invoke_superagent_step`) cost credits and always
+begin with the Constitution v2 preamble. Debug any run via the workflow run log,
+`get_backend_function_logs` for the named function, and `SwarmAuditLog` entries.
+
+### 5.1 Swarm Bug Sentinel — `0 */6 * * *` (every 6h)
+
+| # | Task | Type | Detail |
+|---|------|------|--------|
+| 1 | `scan_bugs` | agent | Runs `npx tsc --noEmit 2>&1` on the AgentSwarm project (fallback: `tsc-errors.txt`), parses errors into `[{file,line,column,message}]`, POSTs to backend fn `swarmBugScanner`, returns triaged fix plan or `status: idle`. |
+| 2 | `check_results` | switch | `.scan_bugs.status == "triaged"` → `notify_bugs`; `== "idle"` → end; otherwise → `alert_error`. |
+| 3 | `notify_bugs` | agent | Applies `fix_instruction` per auto-fixable bug, reports totals to owner, broadcasts each fix as `[SWARM_ELEVATION]`. |
+| 4 | `alert_error` | agent | Brief owner alert on scanner failure. |
+
+**Failure modes:** tsc unavailable → falls back to stale `tsc-errors.txt` (verify file
+freshness before trusting an "idle"); `swarmBugScanner` API error → `alert_error`;
+recurring same error → check tsconfig target (ES2022 baseline, commit `251fea8`).
+
+### 5.2 Swarm Clickless Tick — `0 * * * *` (hourly)
+
+| # | Task | Type | Detail |
+|---|------|------|--------|
+| 1 | `run_tick` | backend fn `swarmClicklessTick` | READ-ONLY phases: `rail-health`, `tx-reconcile`, `audit-integrity`, agent heartbeats. Returns `{status, phases[], uid}`. NEVER moves money. |
+| 2 | `check_status` | switch | `status == "ok"` → end (silent); `"errors"`/`"warning"` → `report`; catch-all → `report`. |
+| 3 | `report` | agent | Concise phase-by-phase health report to owner. |
+
+**Failure modes:** a tick exception lands on the catch-all → `report` (never silent
+failure); degraded rail → `warning` status; heartbeat gaps → check SwarmAgent records.
+
+### 5.3 Swarm Critic Loop — `0 0 * * *` (daily, midnight)
+
+| # | Task | Type | Detail |
+|---|------|------|--------|
+| 1 | `scan_audit` | backend fn `swarmCritic` | Scans `SwarmAuditLog` for `[SWARM_ELEVATION]` entries; computes per-agent `custodianship_score`, `inherited_error_drops`, recurring failure modules. |
+| 2 | `notify_critic` | agent | Delivers the self-improvement report: best/worst custodians, module patterns. No blame — pattern analysis. |
+
+**Failure modes:** zero elevation entries → report should state custodianship loop is
+quiet (agents fixing nothing = no inherited errors — healthy); stale scores → check
+`last_heartbeat` on SwarmAgent records.
+
+### 5.4 Auto Disbursement Pipeline — `0 * * * *` (hourly)
+
+| # | Task | Type | Detail |
+|---|------|------|--------|
+| 1 | `run_disbursement` | backend fn `autoDisbursePipeline` | Picks up settled transactions, disburses to pre-set owner accounts. Rail priority: **Attijariwafa → Wise → Stripe → PayPal → Payoneer**. |
+| 2 | `check_results` | switch | `"completed"` → `notify_owner`; `"idle"` → end (nothing settled); catch-all → `alert_error`. |
+| 3 | `notify_owner` | agent | Tx count, total amount, rail breakdown, fees. |
+| 4 | `alert_error` | agent | Concise error alert + audit log pointer. |
+
+**Failure modes:** `idle` is normal (no settled funds); rail config missing → error
+alert (never blocks other rails); ledger mismatch → check SwarmLedger chain hashes.
+
+### 5.5 Hourly Disbursement & Report Append — `0 * * * *` (inactive; supersedes 5.4 when active)
+
+| # | Task | Type | Detail |
+|---|------|------|--------|
+| 1 | `disburse` | backend fn `autoDisbursePipeline` | Same as 5.4 step 1. |
+| 2 | `tick` | backend fn `swarmClicklessTick` | Read-only reconcile of what step 1 did. |
+| 3 | `append_report` | backend fn `appendDisbursementReport` | Appends cycle report to the Swarm Project Google Doc (googledrive `drive.file` scope). Args: `cycle_uid` = tick uid, cycle summary, disburse/tick results. |
+| 4 | `broadcast` | agent | 2–3 line hands-free digest via `broadcast_message` — rail health, reconcile, audit-24h, doc-append status. Never asks for action. |
+
+**Failure modes:** Google Doc append failure → broadcast still fires (report loss is
+non-fatal, flagged in digest); both 5.4 and 5.5 active would double-run the pipeline —
+keep only one active at a time.
+
+### 5.6 Debugging quick reference
+
+1. **Run log** — inspect step-by-step output of any failed run (workflow run history).
+2. **Function logs** — `get_backend_function_logs(<function_name>)` for the exact fn.
+3. **Telemetry** — `SwarmAuditLog` filtered on `event_type: SWARM_ELEVATION`.
+4. **Heartbeats** — `SwarmAgent` records for agent-level health.
+5. **Money trail** — `SwarmTransaction` → `SwarmLedger` (immutable hash chain).
+
+Any error found during debugging is an inherited swarm error: fix it on sight and
+log `[SWARM_ELEVATION]` per the charter.
