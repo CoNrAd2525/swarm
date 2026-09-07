@@ -11,13 +11,13 @@ const OwnerPayoutEnforcer = () => {
 
   const [ownerAccounts, setOwnerAccounts] = useState({
     paypal: {
-      email: 'younestsouli2019@gmail.com',
+      email: 'OWNER_PAYPAL_EMAIL',
       verified: true,
       status: 'ACTIVE',
       priority: 1
     },
     bank: {
-      rib: '007810000448500030594182',
+      rib: 'OWNER_RIB_PRIMARY',
       name: 'Attijariwafa Bank',
       verified: true,
       status: 'ACTIVE',

@@ -189,7 +189,7 @@ app.post('/acp/v1/transactions/:id/deliver', async (req, res) => {
       status: 'delivered',
       transaction_id: id,
       delivery: deliveryResult,
-      customer_support: 'younestsouli2019@gmail.com'
+      customer_support: 'OWNER_PAYPAL_EMAIL'
     });
     
   } catch (error) {
@@ -207,7 +207,7 @@ app.get('/acp/health', async (req, res) => {
     sbds_compliance: {
       enabled: true,
       status: sbdsCompliant ? 'compliant' : 'violation_detected',
-      owner_accounts: ['younestsouli2019@gmail.com', '007810000448500030594182'],
+      owner_accounts: ['OWNER_PAYPAL_EMAIL', 'OWNER_RIB_PRIMARY'],
       last_validation: new Date().toISOString()
     },
     endpoints_active: ['discovery', 'transactions', 'verification', 'delivery']
@@ -238,12 +238,12 @@ const ACP_PRODUCTS = {
       payment_destinations: [
         {
           method: 'paypal',
-          destination: 'younestsouli2019@gmail.com',
+          destination: 'OWNER_PAYPAL_EMAIL',
           primary: true
         },
         {
           method: 'bank_transfer',
-          destination: '007810000448500030594182',
+          destination: 'OWNER_RIB_PRIMARY',
           currency: 'MAD'
         }
       ],
@@ -267,7 +267,7 @@ const ACP_PRODUCTS = {
       payment_destinations: [
         {
           method: 'paypal',
-          destination: 'younestsouli2019@gmail.com',
+          destination: 'OWNER_PAYPAL_EMAIL',
           primary: true
         }
       ],
@@ -288,7 +288,7 @@ const ACP_PRODUCTS = {
       payment_destinations: [
         {
           method: 'paypal',
-          destination: 'younestsouli2019@gmail.com'
+          destination: 'OWNER_PAYPAL_EMAIL'
         }
       ],
       delivery: {
@@ -314,7 +314,7 @@ const ACP_PRODUCTS = {
       payment_destinations: [
         {
           method: 'paypal_subscription',
-          destination: 'younestsouli2019@gmail.com',
+          destination: 'OWNER_PAYPAL_EMAIL',
           billing_agreement_required: true
         }
       ],
@@ -353,7 +353,7 @@ export async function createACPProduct(productData) {
 
 // Validate product against SBDS
 function validateSBDSProduct(product) {
-  const ownerAccounts = ['younestsouli2019@gmail.com', '007810000448500030594182'];
+  const ownerAccounts = ['OWNER_PAYPAL_EMAIL', 'OWNER_RIB_PRIMARY'];
   
   return product.payment_destinations.every(dest => 
     ownerAccounts.includes(dest.destination) && 
@@ -398,7 +398,7 @@ export function generateDirectPayPalLink(params) {
   const { amount, currency, destination, reference, description } = params;
   
   // SBDS VALIDATION
-  const allowedDestinations = ['younestsouli2019@gmail.com'];
+  const allowedDestinations = ['OWNER_PAYPAL_EMAIL'];
   if (!allowedDestinations.includes(destination)) {
     throw new Error(`SBDS VIOLATION: PayPal destination ${destination} not owner account`);
   }
@@ -415,7 +415,7 @@ export function generateBankTransferLink(params) {
   const { amount, currency, destination, reference, description } = params;
   
   // SBDS VALIDATION
-  const allowedIBANs = ['007810000448500030594182'];
+  const allowedIBANs = ['OWNER_RIB_PRIMARY'];
   if (!allowedIBANs.includes(destination)) {
     throw new Error(`SBDS VIOLATION: Bank destination ${destination} not owner account`);
   }
@@ -775,7 +775,7 @@ async function checkACPHealth() {
     checks,
     sbds_compliance: {
       enforced: true,
-      owner_accounts: ['younestsouli2019@gmail.com', '007810000448500030594182'],
+      owner_accounts: ['OWNER_PAYPAL_EMAIL', 'OWNER_RIB_PRIMARY'],
       last_validation: new Date().toISOString()
     }
   };
@@ -793,8 +793,8 @@ echo "=== Deploying ACP with SBDS Enforcement ==="
 # 1. Set environment variables
 export ACP_ENABLED=true
 export ACP_SBDS_ENFORCED=true
-export ACP_OWNER_PAYPAL="younestsouli2019@gmail.com"
-export ACP_OWNER_BANK="007810000448500030594182"
+export ACP_OWNER_PAYPAL="OWNER_PAYPAL_EMAIL"
+export ACP_OWNER_BANK="OWNER_RIB_PRIMARY"
 export ACP_DELIVERY_SECRET=$(openssl rand -hex 32)
 
 # 2. Create ACP product catalog in Base44
@@ -935,7 +935,7 @@ npm run emit:revenue -- --report-transaction-logs --source=ACP
 echo "SBDS Compliance Check:"
 node -e "
   const revenues = require('./acp-revenues.json');
-  const ownerAccounts = ['younestsouli2019@gmail.com', '007810000448500030594182'];
+  const ownerAccounts = ['OWNER_PAYPAL_EMAIL', 'OWNER_RIB_PRIMARY'];
   
   const nonCompliant = revenues.filter(r => 
     !ownerAccounts.includes(r.payment_destination)
@@ -1010,7 +1010,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
         risk_level: 'low',
         implementation: {
           type: 'direct_to_paypal',
-          alipay_account: 'younestsouli2019@gmail.com',
+          alipay_account: 'OWNER_PAYPAL_EMAIL',
           method: 'Alipay "To Overseas" service',
           fee: '1.5% + ¥50',
           limit: '¥50,000/day',
@@ -1018,7 +1018,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
         },
         steps: [
           '客户打开支付宝 → 跨境汇款 → 向境外支付宝用户转账',
-          '输入收款人: younestsouli2019@gmail.com',
+          '输入收款人: OWNER_PAYPAL_EMAIL',
           '自动转换为USD进入PayPal账户',
           '48小时内到账，无冻结风险'
         ]
@@ -1050,7 +1050,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
           type: 'direct_bank_transfer',
           beneficiary: 'Younes Tsouli',
           bank: 'Attijariwafa Bank',
-          account: '007810000448500030594182',
+          account: 'OWNER_RIB_PRIMARY',
           swift: 'BCMAMAMC',
           intermediary_bank: 'Citibank New York (if needed)',
           routing: '021000089'
@@ -1061,7 +1061,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
           steps: [
             'Visit your bank (HDFC/ICICI/SBI) international transfer',
             'Beneficiary: Younes Tsouli',
-            'IBAN: 007810000448500030594182',
+            'IBAN: OWNER_RIB_PRIMARY',
             'SWIFT: BCMAMAMC',
             'Bank: Attijariwafa Bank, Morocco',
             'Purpose: Software services'
@@ -1078,7 +1078,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
         risk_level: 'medium',
         implementation: {
           type: 'platform_to_paypal',
-          recipient: 'younestsouli2019@gmail.com',
+          recipient: 'OWNER_PAYPAL_EMAIL',
           documentation: 'Invoice required for compliance',
           fee: '3.9% + ₹3'
         },
@@ -1101,7 +1101,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
         risk_level: 'very_low',
         implementation: {
           type: 'direct_to_paypal',
-          paynow_id: 'younestsouli2019@gmail.com',
+          paynow_id: 'OWNER_PAYPAL_EMAIL',
           method: 'PayNow to PayPal linked mobile',
           fee: 'None (PayNow) + PayPal conversion fee',
           limit: 'SGD 20,000/day'
@@ -1116,7 +1116,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
         implementation: {
           beneficiary: 'Younes Tsouli',
           bank: 'Attijariwafa Bank',
-          account: '007810000448500030594182',
+          account: 'OWNER_RIB_PRIMARY',
           swift: 'BCMAMAMC',
           instructions: 'Standard SWIFT transfer'
         }
@@ -1147,7 +1147,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
           steps: [
             '三菱UFJ/三井住友銀行で国際送金',
             '受益者: Younes Tsouli',
-            '口座番号: 007810000448500030594182',
+            '口座番号: OWNER_RIB_PRIMARY',
             '銀行: Attijariwafa Bank',
             'SWIFT: BCMAMAMC'
           ]
@@ -1192,7 +1192,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
         risk_level: 'very_low',
         implementation: {
           beneficiary: 'Younes Tsouli',
-          iban: '007810000448500030594182',
+          iban: 'OWNER_RIB_PRIMARY',
           bic: 'BCMAMAMC',
           bank: 'Attijariwafa Bank',
           fee: '€0-5',
@@ -1205,7 +1205,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
         settlement_delay_hours: 1,
         sbds_compatible: true,
         risk_level: 'low',
-        implementation: 'Direct to younestsouli2019@gmail.com'
+        implementation: 'Direct to OWNER_PAYPAL_EMAIL'
       }
     }
   },
@@ -1220,7 +1220,7 @@ export const REGIONAL_PAYMENT_BRIDGES_RECTIFIED = {
         settlement_delay_hours: 0,
         sbds_compatible: true,
         risk_level: 'low',
-        implementation: 'Direct to younestsouli2019@gmail.com'
+        implementation: 'Direct to OWNER_PAYPAL_EMAIL'
       },
       wire_transfer: {
         provider: 'Bank Wire',
@@ -1256,8 +1256,8 @@ export class DirectSettlementOrchestrator {
     };
     
     this.ownerAccounts = {
-      paypal: 'younestsouli2019@gmail.com',
-      bank_iban: '007810000448500030594182',
+      paypal: 'OWNER_PAYPAL_EMAIL',
+      bank_iban: 'OWNER_RIB_PRIMARY',
       bank_swift: 'BCMAMAMC',
       bank_name: 'Attijariwafa Bank',
       beneficiary: 'Younes Tsouli'
@@ -1520,8 +1520,8 @@ export class RegionalAgentRectified {
   constructor(region) {
     this.region = region;
     this.directAccounts = {
-      paypal: 'younestsouli2019@gmail.com',
-      bank: 'Attijariwafa Bank IBAN: 007810000448500030594182',
+      paypal: 'OWNER_PAYPAL_EMAIL',
+      bank: 'Attijariwafa Bank IBAN: OWNER_RIB_PRIMARY',
       beneficiary: 'Younes Tsouli'
     };
   }
@@ -1633,8 +1633,8 @@ export class GlobalSBDSEnforcer {
     ];
     
     this.ownerAccounts = [
-      'younestsouli2019@gmail.com',
-      '007810000448500030594182'
+      'OWNER_PAYPAL_EMAIL',
+      'OWNER_RIB_PRIMARY'
     ];
   }
   
@@ -1774,8 +1774,8 @@ sed -i '/Wise/d' package.json 2>/dev/null
 export GEP_SETTLEMENT_MODE="direct_only"
 export GEP_FORBIDDEN_PROVIDERS="wise,revolut,payoneer_wallet,skrill"
 export GEP_OWNER_ACCOUNTS='{
-  "paypal": "younestsouli2019@gmail.com",
-  "bank": "007810000448500030594182"
+  "paypal": "OWNER_PAYPAL_EMAIL",
+  "bank": "OWNER_RIB_PRIMARY"
 }'
 
 # 3. Initialize direct regional methods
@@ -1813,13 +1813,13 @@ node -e "
     {
       region: 'europe',
       payment_method: 'wise transfer',
-      destination: 'younestsouli2019@gmail.com',
+      destination: 'OWNER_PAYPAL_EMAIL',
       settlement_path: 'wise -> paypal'
     },
     {
       region: 'china',
       payment_method: 'alipay_international',
-      destination: 'younestsouli2019@gmail.com',
+      destination: 'OWNER_PAYPAL_EMAIL',
       settlement_path: 'direct'
     }
   ];
@@ -1973,7 +1973,7 @@ When regional methods fail, these are the **universal direct fallbacks**:
 export const UNIVERSAL_DIRECT_FALLBACKS = {
   1: {
     name: 'PayPal Direct',
-    instructions: `Send directly to: younestsouli2019@gmail.com
+    instructions: `Send directly to: OWNER_PAYPAL_EMAIL
 Method: PayPal "Send Money"
 Note: Include order reference
 Fee: PayPal conversion fee if different currency`,
@@ -1985,7 +1985,7 @@ Fee: PayPal conversion fee if different currency`,
     name: 'Bank SWIFT Transfer',
     instructions: `Beneficiary: Younes Tsouli
 Bank: Attijariwafa Bank, Morocco
-IBAN: 007810000448500030594182
+IBAN: OWNER_RIB_PRIMARY
 SWIFT: BCMAMAMC
 Purpose: Software services`,
     confirmation: '3-5 business days in bank account',

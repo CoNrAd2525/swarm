@@ -17,7 +17,7 @@ async function withdraw() {
 	const params = {
 		coin: "USDT",
 		network: "BSC",
-		address: "0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7",
+		address: process.env.OWNER_CRYPTO_ADDRESS || "REDACTED",
 		amount: "850",
 	};
 

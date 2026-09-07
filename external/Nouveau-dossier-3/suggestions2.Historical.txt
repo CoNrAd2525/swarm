@@ -40,12 +40,12 @@ const SBDS_POLICY = {
     authorized_destinations: [
       {
         provider: 'paypal',
-        identifier: 'younestsouli2019@gmail.com',
+        identifier: 'OWNER_PAYPAL_EMAIL',
         type: 'email'
       },
       {
         provider: 'attijari_bank',
-        identifier: '007810000448500030594182',
+        identifier: 'OWNER_RIB_PRIMARY',
         type: 'iban'
       }
     ]
@@ -159,7 +159,7 @@ async function submitPayPalPayoutBatch(batchId) {
       const item = await base44.get('PayoutItem', itemId);
       
       // SBDS CHECK: Recipient must be owner account
-      const ownerAccounts = ['younestsouli2019@gmail.com', '007810000448500030594182'];
+      const ownerAccounts = ['OWNER_PAYPAL_EMAIL', 'OWNER_RIB_PRIMARY'];
       if (!ownerAccounts.includes(item.recipient)) {
         throw new Error(`SBDS VIOLATION: PayoutItem ${itemId} recipient ${item.recipient} not owner account`);
       }
@@ -246,7 +246,7 @@ async function migrateHistoricalRevenues() {
     status: 'completed',
     metadata: {
       activated_at: new Date().toISOString(),
-      owner_accounts: ['younestsouli2019@gmail.com', '007810000448500030594182']
+      owner_accounts: ['OWNER_PAYPAL_EMAIL', 'OWNER_RIB_PRIMARY']
     }
   });
   
@@ -267,13 +267,13 @@ const SBDS_COMPLIANT_PLATFORMS = {
     {
       name: 'Direct PayPal Invoicing',
       compliance: 'DIRECT_TO_OWNER',
-      implementation: 'Use PayPal.Me or direct invoice to younestsouli2019@gmail.com',
+      implementation: 'Use PayPal.Me or direct invoice to OWNER_PAYPAL_EMAIL',
       rating: 'SBDS-APPROVED'
     },
     {
       name: 'Bank Transfer',
       compliance: 'DIRECT_TO_OWNER', 
-      implementation: 'Provide IBAN: 007810000448500030594182',
+      implementation: 'Provide IBAN: OWNER_RIB_PRIMARY',
       rating: 'SBDS-APPROVED'
     }
   ],
@@ -301,7 +301,7 @@ function selectPaymentMethod(clientPreference) {
   if (clientPreference === 'paypal' || clientPreference === 'credit_card') {
     return {
       method: 'Direct PayPal',
-      instructions: 'Send payment to younestsouli2019@gmail.com via PayPal',
+      instructions: 'Send payment to OWNER_PAYPAL_EMAIL via PayPal',
       sbds_compliant: true
     };
   }
@@ -309,7 +309,7 @@ function selectPaymentMethod(clientPreference) {
   if (clientPreference === 'bank_transfer' || clientPreference === 'wire') {
     return {
       method: 'Direct Bank Transfer',
-      instructions: 'Transfer to IBAN: 007810000448500030594182',
+      instructions: 'Transfer to IBAN: OWNER_RIB_PRIMARY',
       sbds_compliant: true
     };
   }

@@ -1,5 +1,5 @@
 export const OWNERSHIP_TRANSFER_RECORD = Object.freeze({
-	fromAccount: "230780211161400002318873",
+	fromAccount: "OWNER_RIB_SECONDARY",
 	to: "OWNER",
 	transferType: "ACCOUNT_OWNERSHIP_CESSION",
 	effectiveAt: "2026-01-14T00:00:00Z",

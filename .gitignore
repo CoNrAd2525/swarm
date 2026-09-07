@@ -46,3 +46,25 @@ doomsday-vault/
 src/real/ledger/execution_failures.log
 apps/realworldcerts-next/tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# SECURITY (2026-09-07): payment/PII artifacts must never be tracked in a public repo
+*_export*.csv
+*_export*.materialized.csv
+archive/
+PAYONEER_REMITTANCE*
+data/base44_export/
+data/finance/
+settlements/
+exports/recon/
+audits/autonomous_hmac/
+paypal_diagnostics*
+data/local_swarm/
+data/notifications/
+data/external_payers_registry.json
+payoneer,manually,submitted,batches/
+submitted.manually/
+payoneer_payout_*.csv
+test_crypto_settlement.json
+favoris_*.html
+migrate/.env.migration
+repair-hallucinations.json

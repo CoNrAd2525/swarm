@@ -68,7 +68,7 @@ async function getTransactionHash() {
     console.log("• Transfer Status: Successfully Initiated");
     console.log("• Network: BEP20 (BNB Chain)");
     console.log("• Amount: 850 USDT");
-    console.log("• Destination: 0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7");
+    console.log("• Destination: OWNER_CRYPTO_ADDRESS");
 
     console.log("");
     console.log("⏳ Transaction Hash Status:");

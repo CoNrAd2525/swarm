@@ -5,7 +5,7 @@ async function getTransactionHash() {
 	console.log("🔍 SEARCHING FOR TRANSACTION HASH...");
 	console.log("Batch ID: BATCH_LIVE_1767528254631");
 	console.log("Amount: 850 USDT");
-	console.log("Destination: 0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7");
+	console.log("Destination: OWNER_CRYPTO_ADDRESS");
 	console.log("");
 
 	const receiptsDir = path.resolve("exports/receipts");
@@ -99,13 +99,13 @@ async function getTransactionHash() {
 	console.log("🚀 CURRENT STATUS:");
 	console.log("✅ Transfer initiated successfully");
 	console.log(
-		"✅ 850 USDT sent to Trust Wallet (0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7)",
+		"✅ 850 USDT sent to Trust Wallet (OWNER_CRYPTO_ADDRESS)",
 	);
 	console.log("✅ BEP20 network confirmed");
 	console.log("⏳ Awaiting blockchain confirmation...");
 	console.log("");
 	console.log(
-		"🔗 Once available, you can track at: https://bscscan.com/address/0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7",
+		"🔗 Once available, you can track at: https://bscscan.com/address/OWNER_CRYPTO_ADDRESS",
 	);
 
 	return null;

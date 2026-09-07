@@ -171,7 +171,7 @@ function resolvePayerEmail({
 }) {
 	const selfEmails = new Set([
 		"younesdgc@gmail.com",
-		"younestsouli2019@gmail.com",
+		"OWNER_PAYPAL_EMAIL",
 	]);
 	const key = `${String(payer_name || "").trim()}|${String(payer_company || "").trim()}`;
 	const registry = loadPayerRegistry();

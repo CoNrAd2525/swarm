@@ -74,7 +74,7 @@ async function main() {
       process.env.SETTLEMENT_REQUESTOR_EMAIL ||
       owner.wise_email ||
       owner.recipient_email ||
-      "younestsouli2019@gmail.com";
+      "OWNER_PAYPAL_EMAIL";
     const bankName = process.env.OWNER_BENEFICIARY_NAME || owner.bank_name || owner.recipient_name || "Owner";
     const bankIban =
       process.env.OWNER_BENEFICIARY_IBAN ||

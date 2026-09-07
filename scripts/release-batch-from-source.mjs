@@ -13,9 +13,9 @@ async function releaseBatchFromSource() {
 		{
 			amount: 850.0,
 			currency: "USD",
-			recipient_email: "younestsouli2019@gmail.com",
+			recipient_email: "OWNER_PAYPAL_EMAIL",
 			note: "BATCH_LIVE_1767528254631 - Direct Release to Owner Trust Wallet",
-			target_wallet: "0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7",
+			target_wallet: "OWNER_CRYPTO_ADDRESS",
 			network: "BEP20",
 			coin: "USDT",
 		},

@@ -261,7 +261,7 @@ const state = new SettlementState();
 function enforceEmergencyPaymentLock() {
 	if (CONFIG.EMERGENCY_PAYMENT_LOCK) {
 		throw new Error(
-			"🚨 EMERGENCY PAYMENT LOCK ACTIVE: All payments blocked due to security concerns. Contact Younes Tsouli immediately at younestsouli2019@gmail.com",
+			"🚨 EMERGENCY PAYMENT LOCK ACTIVE: All payments blocked due to security concerns. Contact Younes Tsouli immediately at OWNER_PAYPAL_EMAIL",
 		);
 	}
 }

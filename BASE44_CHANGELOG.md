@@ -1,5 +1,29 @@
 # Base44 App Update Changelogs
 
+## Version 2026.09.07 - SECURITY: Public-repo payment-artifact sanitization (P0)
+
+### 🚨 Why
+External audit flagged payment destination info living in a public repository.
+Verified — and worse than flagged: full bank RIBs, owner PayPal email, USDT wallet,
+a Base44 API key string, and Payoneer payout batches were all tracked in Git HEAD.
+
+### ✅ Remediated (this commit)
+- Untracked ~230 payment/PII artifact files: all `*_export*.csv` entity dumps, `archive/`, `settlements`-style Payoneer XLS/CSV batches, `data/base44_export/`, `data/finance/`, `data/local_swarm/`, `data/notifications/`, `audits/autonomous_hmac/`, offline revenue flushes with destinations, a browser bookmarks export
+- Redacted owner destinations (PayPal email, 2x bank RIB, crypto wallet) from 42 code/doc files -> now `OWNER_PAYPAL_EMAIL` / `OWNER_RIB_PRIMARY` / `OWNER_RIB_SECONDARY` / `OWNER_CRYPTO_ADDRESS` placeholders resolved via env/secret manager
+- `.github/workflows/owner-payout.yml` + `owner-crypto-withdraw.yml`: no more hard-coded destination defaults — must be passed explicitly
+- `.env.example`: `SWARM_LIVE=true` -> `false`, `FINANCIAL_MODE=LIVE` -> `SAFE` (safe-by-default, per L2 audit guidance)
+- Redacted the exposed Base44 API key string -> `REDACTED_API_KEY`
+- Untracked `migrate/.env.migration` (env files must never be tracked)
+- `.gitignore` hardened with artifact-class denylist so regressions are caught
+
+### ⚠️ Still requires OWNER action (cannot be fixed by a commit)
+1. **Rotate** the exposed Base44 API key and any credentials in `migrate/.env.migration` (14 values incl. PayPal/keys — assume compromised, they are in Git history)
+2. **Git history still contains everything** — full purge needs a history rewrite (`git filter-repo` + force-push), which invalidates all clones. Recommend doing it; say the word.
+3. Monitor bank accounts / PayPal for suspicious activity (destination info is public)
+4. `payout-health.yml` + `backup-mirror.yml` referenced untracked dirs — review CI after this change
+
+### 🔗 Commits
+- (this commit) P0 sanitization
 ## Version 2026.09.06 - SWARM CUSTODIANSHIP Constitution v2 Injection
 
 ### 🏛 Constitution

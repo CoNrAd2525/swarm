@@ -95,7 +95,7 @@ console.log("\n" + "=" .repeat(60));
 if (issuesFound > 0) {
   console.log(`🚨 ${issuesFound} ISSUES FOUND - IMMEDIATE ACTION REQUIRED`);
   console.log("1. Set EMERGENCY_PAYMENT_LOCK=true in .env");
-  console.log("2. Contact Younes Tsouli: younestsouli2019@gmail.com");
+  console.log("2. Contact Younes Tsouli: OWNER_PAYPAL_EMAIL");
   console.log("3. Do not process any payments until resolved");
 } else {
   console.log("✅ NO IMMEDIATE ISSUES DETECTED IN QUICK SCAN");

@@ -1,1 +1,1 @@
-node scripts/payout-paypal-once.mjs --amount 50 --email younestsouli2019@gmail.com --note "Force Payout"
+node scripts/payout-paypal-once.mjs --amount 50 --email OWNER_PAYPAL_EMAIL --note "Force Payout"

@@ -30,7 +30,7 @@ async function test() {
 
 		// Test with a tiny amount to see response structure
 		const result = await binanceClient.withdrawUSDTBEP20({
-			address: "0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7", // test address
+			address: "OWNER_CRYPTO_ADDRESS", // test address
 			amount: 0.01, // tiny amount
 		});
 

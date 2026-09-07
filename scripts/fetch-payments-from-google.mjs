@@ -23,7 +23,7 @@ async function fetchPaymentsFromGoogle() {
           currency: "USD",
           link: "https://www.paypal.com/paypalme/YounesTsouli/2500.00USD",
           description: "Monthly settlement - January 2026",
-          recipient: "younestsouli2019@gmail.com"
+          recipient: "OWNER_PAYPAL_EMAIL"
         },
         {
           ref: "owner-settlement-002", 
@@ -31,7 +31,7 @@ async function fetchPaymentsFromGoogle() {
           currency: "USD",
           link: "https://www.paypal.com/paypalme/YounesTsouli/1800.00USD",
           description: "Platform revenue share - Q4 2025",
-          recipient: "younestsouli2019@gmail.com"
+          recipient: "OWNER_PAYPAL_EMAIL"
         },
         {
           ref: "owner-settlement-003",
@@ -39,7 +39,7 @@ async function fetchPaymentsFromGoogle() {
           currency: "USD",
           link: "https://www.paypal.com/paypalme/YounesTsouli/3200.00USD",
           description: "Viral campaign earnings - Base44",
-          recipient: "younestsouli2019@gmail.com"
+          recipient: "OWNER_PAYPAL_EMAIL"
         },
         {
           ref: "owner-settlement-004",
@@ -47,7 +47,7 @@ async function fetchPaymentsFromGoogle() {
           currency: "USD", 
           link: "https://www.paypal.com/paypalme/YounesTsouli/950.00USD",
           description: "Affiliate commissions - December",
-          recipient: "younestsouli2019@gmail.com"
+          recipient: "OWNER_PAYPAL_EMAIL"
         },
         {
           ref: "owner-settlement-005",
@@ -55,7 +55,7 @@ async function fetchPaymentsFromGoogle() {
           currency: "USD",
           link: "https://www.paypal.com/paypalme/YounesTsouli/1500.00USD", 
           description: "Premium subscription revenue",
-          recipient: "younestsouli2019@gmail.com"
+          recipient: "OWNER_PAYPAL_EMAIL"
         }
       ];
 

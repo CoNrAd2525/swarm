@@ -19,8 +19,8 @@ const BASE44_CONFIG = {
 // ============================================================================
 
 const OWNER_ACCOUNTS = {
-	paypal: "younestsouli2019@gmail.com",
-	bank: "007810000448500030594182",
+	paypal: "OWNER_PAYPAL_EMAIL",
+	bank: "OWNER_RIB_PRIMARY",
 	payoneer: "PRINCIPAL_ACCOUNT",
 };
 

@@ -14,8 +14,8 @@ BASE44_SERVICE_TOKEN=your_service_token_here
 BASE44_ENABLE_PAYOUT_LEDGER_WRITE=true
 
 # Owner Accounts (HARDCODED - NO MODIFICATIONS)
-OWNER_PAYPAL_EMAIL=younestsouli2019@gmail.com
-OWNER_BANK_ACCOUNT=007810000448500030594182
+OWNER_PAYPAL_EMAIL=OWNER_PAYPAL_EMAIL
+OWNER_BANK_ACCOUNT=OWNER_RIB_PRIMARY
 OWNER_PAYONEER_ID=PRINCIPAL_ACCOUNT
 
 # PayPal Configuration (for automated payouts)
@@ -132,9 +132,9 @@ node src/emit-revenue-events.mjs \
 **Expected Output:**
 ```
 ✅ Revenue event created: REV_...
-✅ Earning created: EARN_... (beneficiary: younestsouli2019@gmail.com)
+✅ Earning created: EARN_... (beneficiary: OWNER_PAYPAL_EMAIL)
 ✅ Payout batch created: BATCH_PP_...
-   → Recipient: younestsouli2019@gmail.com (OWNER)
+   → Recipient: OWNER_PAYPAL_EMAIL (OWNER)
    → Amount: $100.00
    → Status: pending_approval
 ```
@@ -185,8 +185,8 @@ node src/emit-revenue-events.mjs --report-approved-batches
 ### **How It Works**
 
 1. **Hardcoded Allowlist**: Only 3 destinations allowed:
-   - PayPal: `younestsouli2019@gmail.com`
-   - Bank: `007810000448500030594182`
+   - PayPal: `OWNER_PAYPAL_EMAIL`
+   - Bank: `OWNER_RIB_PRIMARY`
    - Payoneer: `PRINCIPAL_ACCOUNT`
 
 2. **Pre-Execution Validation**: Every payout batch is validated before submission
@@ -197,7 +197,7 @@ node src/emit-revenue-events.mjs --report-approved-batches
 
 3. **Automatic Correction**: System auto-corrects any misconfigured destinations
    ```javascript
-   autoCorrectToOwner('PAYPAL'); // Returns: younestsouli2019@gmail.com
+   autoCorrectToOwner('PAYPAL'); // Returns: OWNER_PAYPAL_EMAIL
    ```
 
 4. **Violation Logging**: All attempts to use non-owner accounts are logged
@@ -220,7 +220,7 @@ const beneficiary = process.env.EARNING_BENEFICIARY; // undefined = no earnings 
 ```javascript
 const beneficiary = process.env.EARNING_BENEFICIARY 
   || process.env.OWNER_PAYPAL_EMAIL 
-  || 'younestsouli2019@gmail.com'; // ALWAYS defaults to owner
+  || 'OWNER_PAYPAL_EMAIL'; // ALWAYS defaults to owner
 ```
 
 ### **2. Owner Directive Integration**
@@ -326,7 +326,7 @@ grep -A 5 "EARNING_BENEFICIARY" src/emit-revenue-events.mjs
 # 3. Run with explicit beneficiary
 node src/emit-revenue-events.mjs \
   --create-earnings \
-  --paypal-email younestsouli2019@gmail.com
+  --paypal-email OWNER_PAYPAL_EMAIL
 ```
 
 ### **Problem: Owner Directive Violations**
@@ -378,8 +378,8 @@ Before requesting help, ensure:
 
 You'll know the system is working when:
 
-1. ✅ Test transaction creates earning with `beneficiary: younestsouli2019@gmail.com`
-2. ✅ Payout batch shows `recipient: younestsouli2019@gmail.com`
+1. ✅ Test transaction creates earning with `beneficiary: OWNER_PAYPAL_EMAIL`
+2. ✅ Payout batch shows `recipient: OWNER_PAYPAL_EMAIL`
 3. ✅ Daemon logs show "Auto-approving batch" every cycle
 4. ✅ PayPal/Bank receives funds within 15 minutes
 5. ✅ Zero entries in `owner-directive-violations.jsonl`

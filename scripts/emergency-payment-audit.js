@@ -106,7 +106,7 @@ async function analyzePaymentFile(filePath) {
       /231486.*15924956/i,  // Barclays sort code and account
       /Beneficiary Name.*Owner(?!\s+Tsouli)/i,  // "Owner" but not "Owner Tsouli"
       /Recipient Name.*Owner(?!\s+Tsouli)/i,
-      /younestsouli2019@gmail.com(?!\s*$)/i  // Email with extra characters
+      /OWNER_PAYPAL_EMAIL(?!\s*$)/i  // Email with extra characters
     ];
     
     let fileHasIssues = false;
@@ -221,7 +221,7 @@ function generateAuditReport() {
     console.log("🚨 SECURITY BREACH DETECTED!");
     console.log("IMMEDIATE ACTION REQUIRED:");
     console.log("1. Set EMERGENCY_PAYMENT_LOCK=true in .env");
-    console.log("2. Contact Younes Tsouli immediately at younestsouli2019@gmail.com");
+    console.log("2. Contact Younes Tsouli immediately at OWNER_PAYPAL_EMAIL");
     console.log("3. Do not process any payments until issue is resolved");
     process.exit(1);
   } else {

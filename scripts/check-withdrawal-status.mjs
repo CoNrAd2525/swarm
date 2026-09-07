@@ -10,7 +10,7 @@ async function checkWithdrawalStatus() {
 		// Check the status of the withdrawal
 		const status = await api.fm.gateway.getWithdrawalStatus({
 			provider: "binance",
-			address: "0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7",
+			address: "OWNER_CRYPTO_ADDRESS",
 			amount: 850,
 		});
 

@@ -10,7 +10,7 @@ import { parseArgs } from "../src/utils/cli.mjs";
 
 const SETTLEMENT_AMOUNT_USD = 850;
 const TARGET_WALLET = {
-	address: "0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7",
+	address: "OWNER_CRYPTO_ADDRESS",
 	network: "BEP20", // BSC in ccxt terms
 	coin: "USDT",
 };

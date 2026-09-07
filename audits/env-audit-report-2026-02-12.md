@@ -13,12 +13,12 @@
 These are essential for owner payments and security:
 
 - **OWNER_BENEFICIARY_NAME:** Younes Tsouli ✅
-- **OWNER_PAYPAL_EMAIL:** younestsouli2019@gmail.com ✅
+- **OWNER_PAYPAL_EMAIL:** [REDACTED-2026-09-07] ✅
 - **OWNER_WISE_RECIPIENT_NAME:** Younes Tsouli ✅
-- **OWNER_WISE_EMAIL:** younestsouli2019@gmail.com ✅
+- **OWNER_WISE_EMAIL:** [REDACTED-2026-09-07] ✅
 - **OWNER_GOOGLEPAY_RECIPIENT_NAME:** Younes Tsouli ✅
 - **OWNER_GOOGLEPAY_PHONE:** +212600000000 ✅
-- **OWNER_BENEFICIARY_ALLOWLIST_JSON:** ["007810000448500030594182"] ✅
+- **OWNER_BENEFICIARY_ALLOWLIST_JSON:** ["[REDACTED-2026-09-07]"] ✅
 - **EMERGENCY_PAYMENT_LOCK:** false ✅
 
 ---
@@ -111,4 +111,4 @@ Could consolidate to single `TRUST_WALLET_USDT_ADDRESS` to reduce secret count
 
 ---
 
-**Contact:** Younes Tsouli (younestsouli2019@gmail.com) for any missing configuration data.
+**Contact:** Younes Tsouli ([REDACTED-2026-09-07]) for any missing configuration data.

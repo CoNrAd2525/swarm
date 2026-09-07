@@ -3,7 +3,7 @@ import { binanceClient } from "../src/crypto/binance-client.mjs";
 console.log("🔍 BINANCE SIGNATURE DEBUG – OFFICIAL LIB + TIMESTAMP FIX");
 
 const withdrawalParams = {
-	address: "0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7",
+	address: "OWNER_CRYPTO_ADDRESS",
 	amount: "850",
 };
 

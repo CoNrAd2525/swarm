@@ -14,7 +14,7 @@ async function main() {
   const receiver =
     env("OWNER_PAYPAL_EMAIL") ||
     env("PAYPAL_OWNER_EMAIL") ||
-    "younestsouli2019@gmail.com";
+    "OWNER_PAYPAL_EMAIL";
   const amount = env("PAYOUT_AMOUNT", "0.01");
   const currency = env("PAYOUT_CURRENCY", "USD");
   const senderBatchId = nowId("owner_live");

@@ -83,7 +83,7 @@ class HistoricalRevenueProcessor {
 			recipient_email:
 				process.env.OWNER_PAYONEER_EMAIL ||
 				process.env.SETTLEMENT_REQUESTOR_EMAIL ||
-				"younestsouli2019@gmail.com", // Fallback to known owner
+				"OWNER_PAYPAL_EMAIL", // Fallback to known owner
 			recipient_name:
 				process.env.OWNER_NAME ||
 				process.env.SETTLEMENT_REQUESTOR_NAME ||

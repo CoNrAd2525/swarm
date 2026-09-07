@@ -64,7 +64,7 @@ Crucial security safeguards have been implemented to enforce the **Owner Revenue
 
 ### 1. Security: Owner Revenue Directive
 - **New Module:** Created `src/owner-directive.mjs` to serve as the single source of truth for authorized beneficiaries.
-- **Enforcement:** Hardcoded allowlists for PayPal (`younestsouli2019@gmail.com`) and Bank Wire (`007810000448500030594182`).
+- **Enforcement:** Hardcoded allowlists for PayPal (`OWNER_PAYPAL_EMAIL`) and Bank Wire (`OWNER_RIB_PRIMARY`).
 - **Elimination of Middlemen:** Any configuration attempting to route funds to unauthorized accounts or obscure Payoneer directories is now automatically rejected with a `VIOLATION` error.
 
 ### 2. Autonomous Daemon Hardening

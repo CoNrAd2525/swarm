@@ -45,7 +45,7 @@ async function verifyCryptoTransfer() {
 		console.log("✅ Batch ID: BATCH_LIVE_1767528254631");
 		console.log("✅ Amount: 850 USDT");
 		console.log(
-			"✅ Destination: 0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7 (Trust Wallet)",
+			"✅ Destination: OWNER_CRYPTO_ADDRESS (Trust Wallet)",
 		);
 		console.log("✅ Network: BEP20 (BNB Chain)");
 		console.log("✅ Status: Processing/Initiated");

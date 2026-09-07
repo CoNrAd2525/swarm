@@ -13,7 +13,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const OWNER_EMAIL = process.env.OWNER_PAYPAL_EMAIL || 'younestsouli2019@gmail.com';
+const OWNER_EMAIL = process.env.OWNER_PAYPAL_EMAIL || 'OWNER_PAYPAL_EMAIL';
 
 function readCSV(filePath) {
   if (!fs.existsSync(filePath)) {

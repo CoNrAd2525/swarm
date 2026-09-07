@@ -4,7 +4,7 @@ import path from "node:path";
 
 // Extracted from src/policy/ownership-policy.ts
 const OWNERSHIP_POLICY = {
-	cededAccounts: ["230780211161400002318873"],
+	cededAccounts: ["OWNER_RIB_SECONDARY"],
 	owner: {
 		id: "OWNER",
 		effectiveAt: "2026-01-14T00:00:00Z",

@@ -6,7 +6,7 @@ console.log("🎯 BATCH DETAILS:");
 console.log("• Batch ID: BATCH_LIVE_1767528254631");
 console.log("• Amount: 850 USDT");
 console.log(
-	"• Destination: 0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7 (Trust Wallet)",
+	"• Destination: OWNER_CRYPTO_ADDRESS (Trust Wallet)",
 );
 console.log("• Network: BEP20 (BNB Chain)");
 console.log("• Provider: Binance API");
@@ -53,7 +53,7 @@ console.log("");
 
 console.log("🔗 TRACKING LINKS:");
 console.log(
-	"• Trust Wallet Address: https://bscscan.com/address/0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7",
+	"• Trust Wallet Address: https://bscscan.com/address/OWNER_CRYPTO_ADDRESS",
 );
 console.log("• BNB Chain Explorer: https://bscscan.com");
 console.log("");

@@ -1176,7 +1176,7 @@
 					"validation_method": "PayPal_transaction_verification"
 				},
 				"payment_platform": "PayPal",
-				"default_paypal_account": "younestsouli2019@gmail.com"
+				"default_paypal_account": "OWNER_PAYPAL_EMAIL"
 			},
 			"platforms": ["TikTok", "Twitter", "Reddit"],
 			"kpi_goals": {
@@ -1197,7 +1197,7 @@
 			"Currency": "USD",
 			"Gateway": "PaymentGateway-Agent-PayPal",
 			"Amount": 1500,
-			"Recipient": "younestsouli2019@gmail.com",
+			"Recipient": "OWNER_PAYPAL_EMAIL",
 			"Execution": "Payments-Agent-Sigma",
 			"Authorization": "Finance-Agent-Delta"
 		},
@@ -1775,7 +1775,7 @@
 		"priority": "medium",
 		"parameters": {
 			"payment_configuration": {
-				"default_paypal_account": "younestsouli2019@gmail.com",
+				"default_paypal_account": "OWNER_PAYPAL_EMAIL",
 				"payment_platform": "PayPal"
 			},
 			"base44_acceleration": {
@@ -1862,7 +1862,7 @@
 			"Amount": 1500,
 			"Currency": "USD",
 			"Gateway": "PaymentGateway-Agent-PayPal",
-			"Recipient": "younestsouli2019@gmail.com",
+			"Recipient": "OWNER_PAYPAL_EMAIL",
 			"Authorization": "Finance-Agent-Delta"
 		},
 		"legacy_file": "Mission_export (35).csv",
@@ -1899,7 +1899,7 @@
 		"parameters": {
 			"target_revenue": 2000,
 			"payment_configuration": {
-				"default_paypal_account": "younestsouli2019@gmail.com",
+				"default_paypal_account": "OWNER_PAYPAL_EMAIL",
 				"payment_platform": "PayPal"
 			},
 			"template_count": 50,
@@ -2144,7 +2144,7 @@
 		"priority": "critical",
 		"parameters": {
 			"currency": "USD",
-			"recipient": "younestsouli2019@gmail.com",
+			"recipient": "OWNER_PAYPAL_EMAIL",
 			"amount": 5000
 		},
 		"legacy_file": "Mission_export (35).csv",
@@ -3317,7 +3317,7 @@
 			"strategy_focus": "maximize sales from existing/new content",
 			"revenue_streams": ["video_sales", "product_sales"],
 			"target_website": "realworldcerts.com",
-			"target_paypal_email": "younestsouli2019@gmail.com"
+			"target_paypal_email": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (35).csv",
 		"is_sample": false
@@ -3337,7 +3337,7 @@
 				"continuous_monitoring"
 			],
 			"scope_of_platforms": "all_current_and_future_sales_platforms",
-			"target_paypal_email": "younestsouli2019@gmail.com"
+			"target_paypal_email": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (35).csv",
 		"is_sample": false
@@ -3356,7 +3356,7 @@
 				"transfer_orchestration",
 				"continuous_monitoring"
 			],
-			"target_paypal_email": "younestsouli2019@gmail.com",
+			"target_paypal_email": "OWNER_PAYPAL_EMAIL",
 			"automation_goal": "full_crypto_revenue_collection_and_fiat_transfer_to_paypal",
 			"existing_api_context": "Binance API already provided",
 			"scope_of_platforms": "all_current_and_future_crypto_platforms_including_binance"
@@ -3493,7 +3493,7 @@
 		"parameters": {
 			"payment_configuration": {
 				"payment_platform": "PayPal",
-				"default_paypal_account": "younestsouli2019@gmail.com"
+				"default_paypal_account": "OWNER_PAYPAL_EMAIL"
 			},
 			"base44_expansion": {
 				"subscription_model": true,
@@ -6060,7 +6060,7 @@
 				"Confirm token has transfer permissions",
 				"Verify token can access live PayPal environment"
 			],
-			"target_paypal_account": "younestsouli2019@gmail.com",
+			"target_paypal_account": "OWNER_PAYPAL_EMAIL",
 			"AUTH_VERIFICATION": [
 				"GENERATE fresh OAuth token",
 				"VALIDATE token expiration (must be > 1 hour)",
@@ -6158,13 +6158,13 @@
 		"priority": "critical",
 		"parameters": {
 			"CONFIRMATION_PROTOCOL": [
-				"SEND email confirmation to younestsouli2019@gmail.com",
+				"SEND email confirmation to OWNER_PAYPAL_EMAIL",
 				"PROVIDE detailed transaction list with IDs",
 				"INCLUDE PayPal transaction references",
 				"DOCUMENT any issues or resolutions",
 				"ESTABLISH follow-up procedures if needed"
 			],
-			"recipient_email": "younestsouli2019@gmail.com",
+			"recipient_email": "OWNER_PAYPAL_EMAIL",
 			"original_amount": "$29,366.00",
 			"FINAL_VERIFICATION": [
 				"SUM all successfully transferred amounts",
@@ -6766,7 +6766,7 @@
 				},
 				"phase_2": {
 					"option_a": {
-						"instructions": "1. Log in to your PayPal account: https://www.paypal.com/\n2. Click \"Send & Request\" → \"Send Money\"\n3. Enter recipient: younestsouli2019@gmail.com\n4. Enter amount: $29,366.00\n5. Select \"Sending to a friend\"\n6. Add note: \"Swarm Revenue Transfer\"\n7. Review and confirm transfer\n8. Save transaction ID for records",
+						"instructions": "1. Log in to your PayPal account: https://www.paypal.com/\n2. Click \"Send & Request\" → \"Send Money\"\n3. Enter recipient: OWNER_PAYPAL_EMAIL\n4. Enter amount: $29,366.00\n5. Select \"Sending to a friend\"\n6. Add note: \"Swarm Revenue Transfer\"\n7. Review and confirm transfer\n8. Save transaction ID for records",
 						"title": "Direct PayPal Transfer (Recommended)"
 					},
 					"option_b": {
@@ -7769,7 +7769,7 @@
 		"parameters": {
 			"transfer_type": "accelerated_weekly_distribution",
 			"currency": "USD",
-			"recipient_email": "younestsouli2019@gmail.com",
+			"recipient_email": "OWNER_PAYPAL_EMAIL",
 			"payment_method": "PayPal",
 			"amount": 80223
 		},
@@ -8550,7 +8550,7 @@
 				"Success Verification Protocol (24 hours)"
 			],
 			"mission_objective_summary": "To fix issues with PayPal payouts, including reprocessing failed payouts, activating system components, correcting PayPal integration, updating dashboards, and verifying success. The detailed execution guide and verification checklist provided in the operational documentation (original script) outline the steps.",
-			"paypal_email": "younestsouli2019@gmail.com"
+			"paypal_email": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (62).csv",
 		"is_sample": false
@@ -8709,21 +8709,21 @@
 			"payouts_to_reprocess": [
 				{
 					"id": "PP-2024-001",
-					"email": "younestsouli2019@gmail.com",
+					"email": "OWNER_PAYPAL_EMAIL",
 					"amount": 28500
 				},
 				{
 					"id": "PP-2024-002",
-					"email": "younestsouli2019@gmail.com",
+					"email": "OWNER_PAYPAL_EMAIL",
 					"amount": 35200
 				},
 				{
 					"id": "PP-2024-003",
-					"email": "younestsouli2019@gmail.com",
+					"email": "OWNER_PAYPAL_EMAIL",
 					"amount": 42100
 				},
 				{
-					"email": "younestsouli2019@gmail.com",
+					"email": "OWNER_PAYPAL_EMAIL",
 					"amount": 31800,
 					"id": "PP-2024-004"
 				}
@@ -9195,7 +9195,7 @@
 				"Status": "LIVE",
 				"Transaction Rules": "MAD 50-100,000 • Daily limit: MAD 500,000",
 				"Routing": "Domestic transactions ≥ MAD 5,000",
-				"Account": "YOUNES TSOULI • RIB: 230780211161400002318873"
+				"Account": "YOUNES TSOULI • RIB: OWNER_RIB_SECONDARY"
 			},
 			"Advanced Features": {
 				"Intelligent Routing System": {
@@ -9227,7 +9227,7 @@
 				}
 			},
 			"PayPal": {
-				"Account": "younestsouli2019@gmail.com • Business Verified",
+				"Account": "OWNER_PAYPAL_EMAIL • Business Verified",
 				"Transaction Rules": "$1-50,000 • Daily limit: $200,000",
 				"Status": "LIVE",
 				"Routing": "International transactions < $5,000"
@@ -9236,7 +9236,7 @@
 				"Transaction Rules": "MAD/USD/EUR 10-50,000 • Daily limit: 100,000",
 				"Status": "CONFIGURING",
 				"Routing": "Fallback on failure",
-				"API Key": "2020d875179f45eaa44cf1aa4529b962"
+				"API Key": "REDACTED_API_KEY"
 			}
 		},
 		"legacy_file": "Mission_export (64).csv",
@@ -9313,7 +9313,7 @@
 		"parameters": {
 			"processing_time": "Real-time withdrawals",
 			"primary_gateway": "Attijariwafa Bank (LIVE)",
-			"bank_account": "YOUNES TSOULI - RIB: 230780211161400002318873",
+			"bank_account": "YOUNES TSOULI - RIB: OWNER_RIB_SECONDARY",
 			"withdrawal_threshold": "MAD 1 (withdraw everything immediately)",
 			"secondary_gateways": ["PayPal", "Base44"]
 		},
@@ -10047,8 +10047,8 @@
 		"parameters": {
 			"objective": "Enforce SBDS-1.0 recipient allowlist at payout batch creation",
 			"allowed_recipients": [
-				"younestsouli2019@gmail.com",
-				"007810000448500030594182"
+				"OWNER_PAYPAL_EMAIL",
+				"OWNER_RIB_PRIMARY"
 			],
 			"enforcement": "reject_non_compliant",
 			"axiom": "NO_THIRD_PARTY_CUSTODY"
@@ -10993,7 +10993,7 @@
 		"parameters": {
 			"amount": "5000",
 			"currency": "USD",
-			"recipient": "younestsouli2019@gmail.com"
+			"recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (10).csv",
 		"is_sample": false
@@ -11033,7 +11033,7 @@
 		"parameters": {
 			"Amount": 5000,
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com"
+			"Recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (10).csv",
 		"is_sample": false
@@ -11047,7 +11047,7 @@
 			"Amount": 5000,
 			"Frequency": "Monthly",
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com"
+			"Recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (10).csv",
 		"is_sample": false
@@ -11216,7 +11216,7 @@
 	},
 	{
 		"id": "68bbf9d4ada28de529acdfa7",
-		"title": "\"Monthly PayPal Transfer to younestsouli2019@gmail.com\"",
+		"title": "\"Monthly PayPal Transfer to OWNER_PAYPAL_EMAIL\"",
 		"status": "todo",
 		"priority": "medium",
 		"parameters": {},
@@ -11258,7 +11258,7 @@
 		"parameters": {
 			"Amount": "5000",
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com",
+			"Recipient": "OWNER_PAYPAL_EMAIL",
 			"Authorization": "Finance-Agent-Delta",
 			"Execution": "Payments-Agent-Sigma",
 			"Gateway": "PaymentGateway-Agent-PayPal"
@@ -11341,7 +11341,7 @@
 		"parameters": {
 			"amount": "5000",
 			"currency": "USD",
-			"recipient": "younestsouli2019@gmail.com"
+			"recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (15).csv",
 		"is_sample": false
@@ -11443,7 +11443,7 @@
 			"Execution": "Payments-Agent-Sigma",
 			"Gateway": "PaymentGateway-Agent-PayPal",
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com"
+			"Recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (15).csv",
 		"is_sample": false
@@ -12938,7 +12938,7 @@
 		"parameters": {
 			"Amount": 5000,
 			"Gateway": "PaymentGateway-Agent-PayPal",
-			"Recipient": "younestsouli2019@gmail.com",
+			"Recipient": "OWNER_PAYPAL_EMAIL",
 			"Execution": "Payments-Agent-Sigma",
 			"Authorization": "Finance-Agent-Delta",
 			"Currency": "USD"
@@ -12977,7 +12977,7 @@
 		"parameters": {
 			"amount": "5000",
 			"currency": "USD",
-			"recipient": "younestsouli2019@gmail.com"
+			"recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (15).csv",
 		"is_sample": false
@@ -13049,7 +13049,7 @@
 		"parameters": {
 			"Amount": 5000,
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com"
+			"Recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (15).csv",
 		"is_sample": false
@@ -13063,7 +13063,7 @@
 			"Amount": 5000,
 			"Frequency": "Monthly",
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com"
+			"Recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (15).csv",
 		"is_sample": false
@@ -13816,7 +13816,7 @@
 	},
 	{
 		"id": "68c65b2297252d42856c9909",
-		"title": "Monthly PayPal Transfer to younestsouli2019@gmail.com",
+		"title": "Monthly PayPal Transfer to OWNER_PAYPAL_EMAIL",
 		"status": "todo",
 		"priority": "critical",
 		"parameters": {},
@@ -13858,7 +13858,7 @@
 		"parameters": {
 			"Amount": "5000",
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com",
+			"Recipient": "OWNER_PAYPAL_EMAIL",
 			"Authorization": "Finance-Agent-Delta",
 			"Execution": "Payments-Agent-Sigma",
 			"Gateway": "PaymentGateway-Agent-PayPal"
@@ -13941,7 +13941,7 @@
 		"parameters": {
 			"amount": "5000",
 			"currency": "USD",
-			"recipient": "younestsouli2019@gmail.com"
+			"recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (20).csv",
 		"is_sample": false
@@ -14043,7 +14043,7 @@
 			"Execution": "Payments-Agent-Sigma",
 			"Gateway": "PaymentGateway-Agent-PayPal",
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com"
+			"Recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (20).csv",
 		"is_sample": false
@@ -15538,7 +15538,7 @@
 		"parameters": {
 			"Amount": 5000,
 			"Gateway": "PaymentGateway-Agent-PayPal",
-			"Recipient": "younestsouli2019@gmail.com",
+			"Recipient": "OWNER_PAYPAL_EMAIL",
 			"Execution": "Payments-Agent-Sigma",
 			"Authorization": "Finance-Agent-Delta",
 			"Currency": "USD"
@@ -15577,7 +15577,7 @@
 		"parameters": {
 			"amount": "5000",
 			"currency": "USD",
-			"recipient": "younestsouli2019@gmail.com"
+			"recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (20).csv",
 		"is_sample": false
@@ -15649,7 +15649,7 @@
 		"parameters": {
 			"Amount": 5000,
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com"
+			"Recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (20).csv",
 		"is_sample": false
@@ -15663,7 +15663,7 @@
 			"Amount": 5000,
 			"Frequency": "Monthly",
 			"Currency": "USD",
-			"Recipient": "younestsouli2019@gmail.com"
+			"Recipient": "OWNER_PAYPAL_EMAIL"
 		},
 		"legacy_file": "Mission_export (20).csv",
 		"is_sample": false
@@ -16389,7 +16389,7 @@
 	},
 	{
 		"id": "68c65e655bb16d3f127146f7",
-		"title": "Monthly PayPal Transfer to younestsouli2019@gmail.com",
+		"title": "Monthly PayPal Transfer to OWNER_PAYPAL_EMAIL",
 		"status": "todo",
 		"priority": "critical",
 		"parameters": {},
@@ -16675,7 +16675,7 @@
 				"revenue_tracking_active"
 			],
 			"payment_configuration": {
-				"default_paypal_account": "younestsouli2019@gmail.com",
+				"default_paypal_account": "OWNER_PAYPAL_EMAIL",
 				"payment_platform": "PayPal"
 			}
 		},

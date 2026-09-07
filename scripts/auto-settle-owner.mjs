@@ -194,7 +194,7 @@ async function main() {
 					reference: r.reference,
 					source: "csv_archive",
 				},
-				beneficiary: process.env.OWNER_PAYONEER_EMAIL || "younestsouli2019@gmail.com",
+				beneficiary: process.env.OWNER_PAYONEER_EMAIL || "OWNER_PAYPAL_EMAIL",
 			}));
 			fromBase44 = false;
 		}
@@ -211,7 +211,7 @@ async function main() {
 				reference: r.reference,
 				source: "csv_archive",
 			},
-			beneficiary: process.env.OWNER_PAYONEER_EMAIL || "younestsouli2019@gmail.com",
+			beneficiary: process.env.OWNER_PAYONEER_EMAIL || "OWNER_PAYPAL_EMAIL",
 		}));
 		fromBase44 = false;
 	}

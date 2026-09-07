@@ -110,7 +110,7 @@ async function main() {
 	const occurredAtMs = Date.parse(String(rows[0].occurred_at || ""));
 	const expectedTotal = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
 	const destRib = String(
-		process.env.OWNER_BANK_RIB || "007810000448500030594182",
+		process.env.OWNER_BANK_RIB || "OWNER_RIB_PRIMARY",
 	).trim();
 	console.log(
 		JSON.stringify({ watching: true, file: inputCsv, expectedTotal, destRib }),

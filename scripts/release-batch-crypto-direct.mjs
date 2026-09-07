@@ -12,7 +12,7 @@ async function releaseBatchFromSource() {
 		{
 			amount: 850.0,
 			currency: "USDT",
-			recipient_address: "0xA46225a984E2B2B5E5082E52AE8d8915A09fEfe7",
+			recipient_address: "OWNER_CRYPTO_ADDRESS",
 			network: "BEP20",
 			coin: "USDT",
 			note: "BATCH_LIVE_1767528254631 - Direct Crypto Release to Owner Trust Wallet",
