@@ -149,3 +149,37 @@ keep only one active at a time.
 
 Any error found during debugging is an inherited swarm error: fix it on sight and
 log `[SWARM_ELEVATION]` per the charter.
+
+---
+
+## 6. Payout Safety Principles (post-L2-audit, 2026-09-07)
+
+Binding on every money-adjacent agent step. These come from the L2 audit's PayPal
+evidence gap and the public-repo sanitization incident.
+
+1. **INSTRUCTION ≠ SUBMISSION ≠ ACCEPTANCE ≠ SETTLEMENT ≠ RECONCILIATION.** A payout
+   instruction on disk (e.g. `WAITING_MANUAL_EXECUTION`) is not money sent. Never
+   treat artifacts as payment records.
+2. **UNKNOWN is a safe state.** If a provider call's outcome is ambiguous (network
+   died, crash, no provider reference), NEVER auto-retry. Quarantine, then resolve
+   via provider reconciliation (`getPayment` / statement evidence) first. Blind
+   retry = duplicate money.
+3. **Evidence gap → `RECONCILIATION_REQUIRED`, not payout.** Missing provider
+   reference bodies (cf. PayPal 2026-08-26→28 history gap) mean hold + human
+   review. Never re-pay because evidence is missing.
+4. **Safe-by-default flags stay off.** `SWARM_LIVE=false`, `FINANCIAL_MODE=SAFE`,
+   `RECOVERY_FORCE_EXECUTE=false` until reconciliation gaps are closed. No agent
+   step may set these.
+5. **Destinations are IDs, not literals.** Agents reference
+   `owner_account_id` / env placeholders; full RIBs/IBANs/wallets live in the
+   secret manager, never in Git (see BASE44_CHANGELOG 2026.09.07).
+6. **No new autonomous payout dispatch** until the ledger-first payout state
+   machine (payouts + payout_events, immutable, idempotent) exists. The current
+   hourly pipeline runs only against dry-run-guarded backend functions.
+
+### 6.1 Sanitization incident quick reference (2026-09-07)
+
+Public repo exposed destinations in ~270 tracked files (RIBs, PayPal email, USDT
+wallet, a Base44 API key, `.env.migration` with US bank + routing + TOTP secret).
+HEAD is sanitized (commit `0b52856`); **Git history still contains everything**
+until a `git filter-repo` rewrite is run — owner decision required.
