@@ -1,130 +1,58 @@
-# 🤖 Swarm — Supervised Autonomous Agent Network
+# BetterBinance Claimer (BBC) Ultimate
 
-> Last updated: **2026-09-06** | Status: **Active Development** | Charter: [SWARM CUSTODIANSHIP v2](SWARM_CUSTODIANSHIP.md)
+**The most advanced, multi-chain, multi-platform crypto automation tool.**
 
----
+## 🚀 Features
 
-## Governance
+### 1. Multi-Platform Code Claiming
+- **Binance**: Auto-claims Red Packets & Box Codes.
+- **Bitget**: Auto-claims generic codes.
+- **Bybit**: Auto-claims giveaway codes.
 
-All agents and workflows operate under **SWARM CUSTODIANSHIP & COLLECTIVE OWNERSHIP
-(Constitution v2)** — [SWARM_CUSTODIANSHIP.md](SWARM_CUSTODIANSHIP.md).
-Every workflow agent step runs the mandatory **Scan → Triage → Execute → Log** loop
-and broadcasts `[SWARM_ELEVATION]` telemetry to `SwarmAuditLog`.
-Workflow operating documentation: [docs/SWARM_WORKFLOWS.md](docs/SWARM_WORKFLOWS.md).
+### 2. Alpha Intel Scout (New!)
+- Automatically scans Telegram channels for high-value keywords ("Testnet", "Funding", "Airdrop Confirmed").
+- Displays a real-time feed in the Dashboard.
+- **DYOR**: One-click Twitter search for every lead.
 
----
+### 3. Giveaway Sniper (New!)
+- **"First 10 people to drop ETH address"** -> **Auto-Sniped!**
+- Detects wallet drop requests in milliseconds.
+- Auto-replies with your configured ETH/SOL/BSC address.
 
-## Architecture
+### 4. Referral Booster ("Get Frens")
+- Takes your referral link (Blum, Hamster, etc.).
+- Uses your other linked Telegram accounts to auto-start the bot.
+- Supports Proxies for safe boosting.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                       SWARM NETWORK                           │
-│           (Constitution v2 — every agent is a custodian)      │
-│                                                               │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │ CUSTODIAN AGENTS  (Scan → Triage → Execute → Log)        │ │
-│  │  Bug Sentinel · Clickless Tick · Critic · Disbursement  │ │
-│  │  Eliza agents (Orchestrator, Scout) · Node.js agents    │ │
-│  │  → any inherited error corrected on sight, logged as     │ │
-│  │    [SWARM_ELEVATION] telemetry to SwarmAuditLog          │ │
-│  └───────────────────────────┬─────────────────────────────┘ │
-│                              ↓                                 │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │ SWARM SUPERVISOR (Base44)                                │ │
-│  │  Constitution Enforcement → Risk Tiering                 │ │
-│  │  → Owner Approval (5 min TTL) → Immutable Ledger         │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                              ↓                                 │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │ SELF-IMPROVEMENT LOOP: nightly Critic analyzes           │ │
-│  │ [SWARM_ELEVATION] logs → custodianship scores → report   │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────┘
-```
+### 5. Blum Automation
+- Auto-claims daily rewards.
+- Auto-completes tasks (Twitter, Telegram joins).
+- Simulates Drop Game for maximum points.
 
----
+## 🛠 Setup
 
-## Modules
+1. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### 🏛 `base44/` — Supervised Backend (Base44)
+2. **Configure `.env`**:
+   - Get `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` from https://my.telegram.org.
 
-| File | Description |
-|------|-------------|
-| `ARCHITECTURE.md` | Full architecture doc + integration guide |
-| `functions/swarmSupervisor.ts` | Backend Deno function — all gating logic |
-| `entities/SwarmAgent.json` | Agent registry schema |
-| `entities/SwarmTransaction.json` | Transaction schema |
-| `entities/SwarmLedger.json` | Immutable ledger schema |
-| `entities/SwarmApprovalRequest.json` | Approval queue schema |
-| `entities/SwarmAuditLog.json` | Audit log schema |
+3. **Run**:
+   ```bash
+   python src/main.py
+   ```
 
-**Endpoint:** `https://superagent-d5a9f123.base44.app/functions/swarmSupervisor`
+4. **Open Dashboard**:
+   - Go to `http://localhost:5000` on your PC or Mobile.
 
-**Constitution hash:** `008a1afa6cc55c63385d1b0b98b057ec06f9c9c9df174870da03bbcb9dab4839`
+## 📱 Mobile Dashboard
+The dashboard is designed for mobile. You can:
+- Add new Telegram accounts.
+- Configure your Wallet Addresses for Sniping.
+- View Alpha Intel on the go.
+- Boost referrals from your phone.
 
----
-
-### 📊 `market_research/` — TikTok Network Intelligence
-
-| File | Description |
-|------|-------------|
-| `README.md` | Full breakdown, tiers, niches, hidden gems |
-| `tiktok_accounts_summary.json` | 149 accounts — stats + top performers |
-| `outreach_pipeline.py` | Segmented outreach + supervisor routing |
-
-**149 accounts** tiered and niche-tagged:
-- 🟣 Mega (1M+): 1 — @qurantv1997
-- 🔴 Macro (100k–1M): 13 — @techdropp, @flourishingphilosophy, @moksha_3m
-- 🟠 Mid (10k–100k): 28
-- 🟡 Micro (1k–10k): 64
-- ⚪ Nano (<1k): 43 — several with >30% engagement
-
----
-
-## SwarmSupervisor API
-
-| Action | Description |
-|--------|-------------|
-| `submit_transaction` | Submit for gating — auto or approval-required |
-| `approve_transaction` | Owner approves/rejects (5 min TTL) |
-| `kill_switch` | Emergency stop — agent or global |
-| `heartbeat` | Agent liveness signal |
-| `get_status` | Live dashboard |
-
-**Risk tiers:**
-- Tier 1 (≤$500, reconciliation) → **auto-approved**
-- Tier 2 ($500–$2500) → **owner approval required**
-- Tier 3 (>$2500) → **HIGH RISK — owner approval required**
-
----
-
-## Quick Start
-
-```bash
-# Check swarm status
-curl -X POST https://superagent-d5a9f123.base44.app/functions/swarmSupervisor \
-  -H "Content-Type: application/json" \
-  -d '{"action":"get_status"}'
-
-# Submit a transaction
-curl -X POST https://superagent-d5a9f123.base44.app/functions/swarmSupervisor \
-  -H "Content-Type: application/json" \
-  -d '{"action":"submit_transaction","agent_id":"AGENT_01","intent":"SETTLE_REVENUE_TO_OWNER","amount_usd":500,"currency":"USD","destination":"owner@paypal.com","destination_type":"paypal"}'
-
-# Run outreach pipeline (dry run)
-python3 market_research/outreach_pipeline.py --tier=macro
-```
-
----
-
-## Entity: TikTokAccount
-
-Stored in Base44. 149 records with:
-- `influencer_tier` — mega/macro/mid/micro/nano
-- `engagement_rate` — likes/video ÷ followers × 100
-- `niche_tags` — auto-detected from bio
-- `swarm_status` — prospect → contacted → active_partner
-
----
-
-*Built with [Base44](https://base44.com) · Supervised by human-on-the-loop architecture*
+## ⚠️ Disclaimer
+Use at your own risk. This tool is for educational purposes.

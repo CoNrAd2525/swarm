@@ -1,20 +1,15 @@
-version: "3.9"
 services:
-  site:
-    image: ghcr.io/${OWNER}/realworldcerts-site:latest
-    container_name: realworldcerts-site
-    restart: unless-stopped
-    environment:
-      - SITE_PORT=8080
-      - SITE_RATE_MAX=30
-      - SITE_RATE_WINDOW_MS=60000
-      - SITE_ALLOWLIST=
-      - PAYPAL_OWNER_EMAIL=${PAYPAL_OWNER_EMAIL}
+  bbc-bot:
+    build: .
+    container_name: better_binance_claimer
+    restart: always  # This ensures the bot restarts automatically if it crashes or the server reboots
     ports:
-      - "80:8080"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      - "5000:5000"  # Expose Dashboard
+    volumes:
+      - ./data:/app/data       # Mount persistent data directory
+      - ./chrome_profile:/app/chrome_profile # Mount Chrome profile for cookies
+      - .:/app                 # Mount source code (optional in prod, good for dev)
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1

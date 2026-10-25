@@ -1,0 +1,10 @@
+telethon
+python-dotenv
+colorama
+requests
+selenium
+webdriver-manager
+flask
+fake-useragent
+python-socks[asyncio]
+cryptography
