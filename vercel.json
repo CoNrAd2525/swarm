@@ -2,6 +2,8 @@
   "version": 2,
   "routes": [
     { "handle": "filesystem" },
+    { "src": "^/checkout/([a-z0-9-]+)/?$", "dest": "/checkout/$1.html" },
+    { "src": "^/courses/([a-z0-9-]+)/?$", "dest": "/courses/$1.html" },
     { "src": "^/$", "dest": "/rank/output/index.html" },
     { "src": "^/(.*)$", "dest": "/rank/output/$1" }
   ]
